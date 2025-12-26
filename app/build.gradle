@@ -21,6 +21,10 @@ dependencies {
     // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    
+    // PostgreSQL
+    runtimeOnly 'org.postgresql:postgresql'
     
     // Spring AI - OpenAI兼容模式 (阿里云DashScope)
     implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M4'
@@ -28,6 +32,12 @@ dependencies {
     // Apache Tika for document parsing (PDF, DOCX, TXT)
     implementation libs.tika.core
     implementation libs.tika.parsers
+    
+    // AWS S3 SDK for RustFS storage
+    implementation 'software.amazon.awssdk:s3:2.25.27'
+    
+    // PDF导出 - iText 7
+    implementation 'com.itextpdf:itext7-core:7.2.5'
     
     // Lombok
     compileOnly libs.lombok

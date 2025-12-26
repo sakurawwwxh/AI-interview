@@ -20,14 +20,17 @@ public class InterviewSessionService {
     
     private final InterviewQuestionService questionService;
     private final AnswerEvaluationService evaluationService;
+    private final InterviewPersistenceService persistenceService;
     
     // 内存存储会话（生产环境应使用Redis）
     private final Map<String, InterviewSession> sessions = new ConcurrentHashMap<>();
     
     public InterviewSessionService(InterviewQuestionService questionService, 
-                                   AnswerEvaluationService evaluationService) {
+                                   AnswerEvaluationService evaluationService,
+                                   InterviewPersistenceService persistenceService) {
         this.questionService = questionService;
         this.evaluationService = evaluationService;
+        this.persistenceService = persistenceService;
     }
     
     /**
@@ -36,7 +39,8 @@ public class InterviewSessionService {
     public InterviewSessionDTO createSession(CreateInterviewRequest request) {
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         
-        log.info("创建面试会话: {}, 题目数量: {}", sessionId, request.questionCount());
+        log.info("创建面试会话: {}, 题目数量: {}, resumeId: {}", 
+                sessionId, request.questionCount(), request.resumeId());
         
         // 生成面试问题
         List<InterviewQuestionDTO> questions = questionService.generateQuestions(
@@ -47,12 +51,23 @@ public class InterviewSessionService {
         InterviewSession session = new InterviewSession(
             sessionId,
             request.resumeText(),
+            request.resumeId(),
             questions,
             0,
             SessionStatus.CREATED
         );
         
         sessions.put(sessionId, session);
+        
+        // 保存到数据库
+        if (request.resumeId() != null) {
+            try {
+                persistenceService.saveSession(sessionId, request.resumeId(), 
+                        request.questionCount(), questions);
+            } catch (Exception e) {
+                log.warn("保存面试会话到数据库失败: {}", e.getMessage());
+            }
+        }
         
         return toDTO(session);
     }
@@ -121,6 +136,20 @@ public class InterviewSessionService {
             session.status = SessionStatus.COMPLETED;
         }
         
+        // 保存答案到数据库
+        if (session.resumeId != null) {
+            try {
+                persistenceService.saveAnswer(
+                    request.sessionId(), index, 
+                    question.question(), question.category(),
+                    request.answer(), 0, null  // 分数在报告生成时更新
+                );
+                persistenceService.updateCurrentQuestionIndex(request.sessionId(), session.currentIndex);
+            } catch (Exception e) {
+                log.warn("保存答案到数据库失败: {}", e.getMessage());
+            }
+        }
+        
         log.info("会话 {} 提交答案: 问题{}, 剩余{}题", 
             request.sessionId(), index, session.questions.size() - session.currentIndex);
         
@@ -155,6 +184,15 @@ public class InterviewSessionService {
         
         session.status = SessionStatus.EVALUATED;
         
+        // 保存报告到数据库
+        if (session.resumeId != null) {
+            try {
+                persistenceService.saveReport(sessionId, report);
+            } catch (Exception e) {
+                log.warn("保存报告到数据库失败: {}", e.getMessage());
+            }
+        }
+        
         return report;
     }
     
@@ -175,15 +213,17 @@ public class InterviewSessionService {
     private static class InterviewSession {
         final String sessionId;
         final String resumeText;
+        final Long resumeId;
         final List<InterviewQuestionDTO> questions;
         int currentIndex;
         SessionStatus status;
         
-        InterviewSession(String sessionId, String resumeText, 
+        InterviewSession(String sessionId, String resumeText, Long resumeId,
                         List<InterviewQuestionDTO> questions,
                         int currentIndex, SessionStatus status) {
             this.sessionId = sessionId;
             this.resumeText = resumeText;
+            this.resumeId = resumeId;
             this.questions = new ArrayList<>(questions);
             this.currentIndex = currentIndex;
             this.status = status;

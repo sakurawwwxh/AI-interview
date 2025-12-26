@@ -2,8 +2,11 @@ package interview.guide.controller;
 
 import interview.guide.config.AppConfigProperties;
 import interview.guide.dto.ResumeAnalysisResponse;
+import interview.guide.entity.ResumeEntity;
+import interview.guide.service.FileStorageService;
 import interview.guide.service.ResumeGradingService;
 import interview.guide.service.ResumeParseService;
+import interview.guide.service.ResumePersistenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -12,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 简历控制器
@@ -26,13 +30,19 @@ public class ResumeController {
     
     private final ResumeParseService parseService;
     private final ResumeGradingService gradingService;
+    private final FileStorageService storageService;
+    private final ResumePersistenceService persistenceService;
     private final AppConfigProperties appConfig;
     
     public ResumeController(ResumeParseService parseService, 
                            ResumeGradingService gradingService,
+                           FileStorageService storageService,
+                           ResumePersistenceService persistenceService,
                            AppConfigProperties appConfig) {
         this.parseService = parseService;
         this.gradingService = gradingService;
+        this.storageService = storageService;
+        this.persistenceService = persistenceService;
         this.appConfig = appConfig;
     }
     
@@ -67,7 +77,29 @@ public class ResumeController {
         }
         
         try {
-            // 3. 解析简历文本
+            // 3. 检查简历是否已存在（去重）
+            Optional<ResumeEntity> existingResume = persistenceService.findExistingResume(file);
+            if (existingResume.isPresent()) {
+                ResumeEntity resume = existingResume.get();
+                log.info("检测到重复简历，返回历史分析结果: resumeId={}", resume.getId());
+                
+                // 获取历史分析结果，不重新分析
+                ResumeAnalysisResponse analysis = persistenceService.getLatestAnalysisAsDTO(resume.getId())
+                    .orElseGet(() -> gradingService.analyzeResume(resume.getResumeText()));
+                
+                return ResponseEntity.ok(Map.of(
+                    "analysis", analysis,
+                    "storage", Map.of(
+                        "fileKey", resume.getStorageKey() != null ? resume.getStorageKey() : "",
+                        "fileUrl", resume.getStorageUrl() != null ? resume.getStorageUrl() : "",
+                        "resumeId", resume.getId()
+                    ),
+                    "duplicate", true,
+                    "message", "检测到相同简历，已返回历史分析结果"
+                ));
+            }
+            
+            // 4. 解析简历文本
             String resumeText = parseService.parseResume(file);
             
             if (resumeText == null || resumeText.trim().isEmpty()) {
@@ -75,12 +107,32 @@ public class ResumeController {
                     .body(Map.of("error", "无法从文件中提取文本内容，请确保文件不是扫描版PDF"));
             }
             
-            // 4. AI分析简历
+            // 5. 保存简历到RustFS
+            String fileKey = storageService.uploadResume(file);
+            String fileUrl = storageService.getFileUrl(fileKey);
+            log.info("简历已存储到RustFS: {}", fileKey);
+            
+            // 6. 保存简历到数据库
+            ResumeEntity savedResume = persistenceService.saveResume(file, resumeText, fileKey, fileUrl);
+            
+            // 7. AI分析简历
             ResumeAnalysisResponse analysis = gradingService.analyzeResume(resumeText);
             
-            log.info("简历分析完成: {}, 得分: {}", fileName, analysis.overallScore());
+            // 8. 保存评测结果
+            persistenceService.saveAnalysis(savedResume, analysis);
             
-            return ResponseEntity.ok(analysis);
+            log.info("简历分析完成: {}, 得分: {}, resumeId={}", fileName, analysis.overallScore(), savedResume.getId());
+            
+            // 9. 返回结果，包含存储信息
+            return ResponseEntity.ok(Map.of(
+                "analysis", analysis,
+                "storage", Map.of(
+                    "fileKey", fileKey,
+                    "fileUrl", fileUrl,
+                    "resumeId", savedResume.getId()
+                ),
+                "duplicate", false
+            ));
             
         } catch (Exception e) {
             log.error("简历处理失败: {}", e.getMessage(), e);

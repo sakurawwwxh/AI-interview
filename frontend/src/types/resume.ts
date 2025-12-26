@@ -8,6 +8,21 @@ export interface ResumeAnalysisResponse {
   originalText: string;
 }
 
+// 存储信息
+export interface StorageInfo {
+  fileKey: string;
+  fileUrl: string;
+  resumeId?: number;
+}
+
+// 上传API完整响应
+export interface UploadResponse {
+  analysis: ResumeAnalysisResponse;
+  storage: StorageInfo;
+  duplicate?: boolean;
+  message?: string;
+}
+
 export interface ScoreDetail {
   contentScore: number;      // 内容完整性 (0-25)
   structureScore: number;    // 结构清晰度 (0-20)
