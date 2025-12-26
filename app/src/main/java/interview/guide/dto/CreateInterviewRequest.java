@@ -5,7 +5,8 @@ package interview.guide.dto;
  */
 public record CreateInterviewRequest(
     String resumeText,      // 简历文本内容
-    int questionCount       // 面试题目数量 (建议5-15)
+    int questionCount,      // 面试题目数量 (5-20)
+    Long resumeId           // 简历ID（用于持久化关联）
 ) {
     public CreateInterviewRequest {
         if (questionCount < 3 || questionCount > 20) {

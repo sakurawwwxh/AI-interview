@@ -32,6 +32,7 @@ export type QuestionType =
 export interface CreateInterviewRequest {
   resumeText: string;
   questionCount: number;
+  resumeId?: number;
 }
 
 export interface SubmitAnswerRequest {
