@@ -7,6 +7,7 @@ import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.font.PdfFontFactory.EmbeddingStrategy;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -46,6 +48,54 @@ public class PdfExportService {
     }
     
     /**
+     * 创建支持中文的字体
+     */
+    private PdfFont createChineseFont() {
+        try {
+            // 尝试使用 macOS 系统字体
+            String[] fontPaths = {
+                "/System/Library/Fonts/PingFang.ttc,0",
+                "/System/Library/Fonts/STHeiti Light.ttc,0",
+                "/System/Library/Fonts/Hiragino Sans GB.ttc,0",
+                // Windows 字体
+                "C:/Windows/Fonts/simsun.ttc,0",
+                "C:/Windows/Fonts/msyh.ttc,0",
+                // Linux 字体
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc,0"
+            };
+            
+            for (String fontPath : fontPaths) {
+                String path = fontPath.contains(",") ? fontPath.split(",")[0] : fontPath;
+                if (new File(path).exists()) {
+                    log.info("使用系统字体: {}", fontPath);
+                    return PdfFontFactory.createFont(fontPath, PdfEncodings.IDENTITY_H, EmbeddingStrategy.PREFER_EMBEDDED);
+                }
+            }
+            
+            // 如果没有找到系统字体，尝试使用 iText 内置的中文字体
+            log.info("使用 iText 内置中文字体");
+            return PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
+            
+        } catch (Exception e) {
+            log.error("创建中文字体失败，使用默认字体: {}", e.getMessage());
+            try {
+                return PdfFontFactory.createFont();
+            } catch (Exception ex) {
+                throw new RuntimeException("无法创建字体", ex);
+            }
+        }
+    }
+    
+    /**
+     * 清理文本中可能导致字体问题的字符
+     */
+    private String sanitizeText(String text) {
+        if (text == null) return "";
+        // 移除可能导致问题的特殊字符（如 emoji）
+        return text.replaceAll("[\\p{So}\\p{Cs}]", "").trim();
+    }
+    
+    /**
      * 导出简历分析报告为PDF
      */
     public byte[] exportResumeAnalysis(ResumeEntity resume, ResumeAnalysisResponse analysis) throws Exception {
@@ -54,8 +104,8 @@ public class PdfExportService {
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
         
-        // 使用内置字体支持中文
-        PdfFont font = PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
+        // 使用支持中文的字体
+        PdfFont font = createChineseFont();
         document.setFont(font);
         
         // 标题
@@ -101,7 +151,7 @@ public class PdfExportService {
         if (analysis.summary() != null) {
             document.add(new Paragraph("\n"));
             document.add(createSectionTitle("简历摘要"));
-            document.add(new Paragraph(analysis.summary()));
+            document.add(new Paragraph(sanitizeText(analysis.summary())));
         }
         
         // 优势亮点
@@ -109,7 +159,7 @@ public class PdfExportService {
             document.add(new Paragraph("\n"));
             document.add(createSectionTitle("优势亮点"));
             for (String strength : analysis.strengths()) {
-                document.add(new Paragraph("• " + strength));
+                document.add(new Paragraph("• " + sanitizeText(strength)));
             }
         }
         
@@ -118,10 +168,10 @@ public class PdfExportService {
             document.add(new Paragraph("\n"));
             document.add(createSectionTitle("改进建议"));
             for (ResumeAnalysisResponse.Suggestion suggestion : analysis.suggestions()) {
-                document.add(new Paragraph("【" + suggestion.priority() + "】" + suggestion.category())
+                document.add(new Paragraph("【" + suggestion.priority() + "】" + sanitizeText(suggestion.category()))
                     .setBold());
-                document.add(new Paragraph("问题: " + suggestion.issue()));
-                document.add(new Paragraph("建议: " + suggestion.recommendation()));
+                document.add(new Paragraph("问题: " + sanitizeText(suggestion.issue())));
+                document.add(new Paragraph("建议: " + sanitizeText(suggestion.recommendation())));
                 document.add(new Paragraph("\n"));
             }
         }
@@ -139,8 +189,8 @@ public class PdfExportService {
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
         
-        // 使用内置字体支持中文
-        PdfFont font = PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
+        // 使用支持中文的字体
+        PdfFont font = createChineseFont();
         document.setFont(font);
         
         // 标题
@@ -178,7 +228,7 @@ public class PdfExportService {
         if (session.getOverallFeedback() != null) {
             document.add(new Paragraph("\n"));
             document.add(createSectionTitle("总体评价"));
-            document.add(new Paragraph(session.getOverallFeedback()));
+            document.add(new Paragraph(sanitizeText(session.getOverallFeedback())));
         }
         
         // 优势
@@ -190,7 +240,7 @@ public class PdfExportService {
                     document.add(new Paragraph("\n"));
                     document.add(createSectionTitle("表现优势"));
                     for (String s : strengths) {
-                        document.add(new Paragraph("• " + s));
+                        document.add(new Paragraph("• " + sanitizeText(s)));
                     }
                 }
             } catch (Exception e) {
@@ -207,7 +257,7 @@ public class PdfExportService {
                     document.add(new Paragraph("\n"));
                     document.add(createSectionTitle("改进建议"));
                     for (String s : improvements) {
-                        document.add(new Paragraph("• " + s));
+                        document.add(new Paragraph("• " + sanitizeText(s)));
                     }
                 }
             } catch (Exception e) {
@@ -227,16 +277,16 @@ public class PdfExportService {
                     " [" + (answer.getCategory() != null ? answer.getCategory() : "综合") + "]")
                     .setBold()
                     .setFontSize(12));
-                document.add(new Paragraph("Q: " + answer.getQuestion()));
-                document.add(new Paragraph("A: " + (answer.getUserAnswer() != null ? answer.getUserAnswer() : "未回答")));
+                document.add(new Paragraph("Q: " + sanitizeText(answer.getQuestion())));
+                document.add(new Paragraph("A: " + sanitizeText(answer.getUserAnswer() != null ? answer.getUserAnswer() : "未回答")));
                 document.add(new Paragraph("得分: " + answer.getScore() + "/100")
                     .setFontColor(getScoreColor(answer.getScore())));
                 if (answer.getFeedback() != null) {
-                    document.add(new Paragraph("评价: " + answer.getFeedback())
+                    document.add(new Paragraph("评价: " + sanitizeText(answer.getFeedback()))
                         .setItalic());
                 }
                 if (answer.getReferenceAnswer() != null) {
-                    document.add(new Paragraph("参考答案: " + answer.getReferenceAnswer())
+                    document.add(new Paragraph("参考答案: " + sanitizeText(answer.getReferenceAnswer()))
                         .setFontColor(new DeviceRgb(39, 174, 96)));
                 }
             }
