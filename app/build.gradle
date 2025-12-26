@@ -1,0 +1,50 @@
+/*
+ * AI Interview Platform - Backend Application
+ * Spring Boot 3.3 + Spring AI + Apache Tika
+ */
+
+plugins {
+    id 'java'
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
+}
+
+group = 'com.interview'
+version = '0.0.1-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    
+    // Spring AI - OpenAI兼容模式 (阿里云DashScope)
+    implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M4'
+    
+    // Apache Tika for document parsing (PDF, DOCX, TXT)
+    implementation libs.tika.core
+    implementation libs.tika.parsers
+    
+    // Lombok
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
