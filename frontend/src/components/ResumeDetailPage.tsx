@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { historyApi, ResumeDetail, InterviewItem } from '../api/history';
+import { historyApi, ResumeDetail, InterviewItem, InterviewDetail } from '../api/history';
 
 interface ResumeDetailPageProps {
   resumeId: number;
@@ -10,13 +10,17 @@ interface ResumeDetailPageProps {
 }
 
 type TabType = 'analysis' | 'interview';
+type DetailViewType = 'list' | 'interviewDetail';
 
 export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }: ResumeDetailPageProps) {
   const [resume, setResume] = useState<ResumeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('analysis');
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
   const [[page, direction], setPage] = useState([0, 0]);
+  const [detailView, setDetailView] = useState<DetailViewType>('list');
+  const [selectedInterview, setSelectedInterview] = useState<InterviewDetail | null>(null);
+  const [loadingInterview, setLoadingInterview] = useState(false);
 
   useEffect(() => {
     loadResumeDetail();
@@ -39,8 +43,8 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
     return new Date(dateStr).toLocaleDateString('zh-CN');
   };
 
-  const handleExportPdf = async () => {
-    setExporting(true);
+  const handleExportAnalysisPdf = async () => {
+    setExporting('analysis');
     try {
       const blob = await historyApi.exportAnalysisPdf(resumeId);
       const url = window.URL.createObjectURL(blob);
@@ -54,14 +58,53 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
     } catch (err) {
       alert('导出失败，请重试');
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
+  };
+
+  const handleExportInterviewPdf = async (sessionId: string) => {
+    setExporting(sessionId);
+    try {
+      const blob = await historyApi.exportInterviewPdf(sessionId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `面试报告_${sessionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('导出失败，请重试');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleViewInterview = async (sessionId: string) => {
+    setLoadingInterview(true);
+    try {
+      const detail = await historyApi.getInterviewDetail(sessionId);
+      setSelectedInterview(detail);
+      setDetailView('interviewDetail');
+    } catch (err) {
+      alert('加载面试详情失败');
+    } finally {
+      setLoadingInterview(false);
+    }
+  };
+
+  const handleBackToInterviewList = () => {
+    setDetailView('list');
+    setSelectedInterview(null);
   };
 
   const handleTabChange = (tab: TabType) => {
     const newPage = tab === 'analysis' ? 0 : 1;
     setPage([newPage, newPage > page ? 1 : -1]);
     setActiveTab(tab);
+    setDetailView('list');
+    setSelectedInterview(null);
   };
 
   const slideVariants = {
@@ -116,7 +159,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <motion.button 
-            onClick={onBack}
+            onClick={detailView === 'interviewDetail' ? handleBackToInterviewList : onBack}
             className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all shadow-sm"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -126,100 +169,141 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
             </svg>
           </motion.button>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">{resume.filename}</h2>
+            <h2 className="text-xl font-bold text-slate-900">
+              {detailView === 'interviewDetail' ? `面试详情 #${selectedInterview?.sessionId?.slice(-6) || ''}` : resume.filename}
+            </h2>
             <p className="text-sm text-slate-500 flex items-center gap-1.5">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
                 <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              上传于 {formatDate(resume.uploadedAt)}
+              {detailView === 'interviewDetail' 
+                ? `完成于 ${formatDate(selectedInterview?.completedAt || selectedInterview?.createdAt || '')}`
+                : `上传于 ${formatDate(resume.uploadedAt)}`
+              }
             </p>
           </div>
         </div>
         
         <div className="flex gap-3">
-          <motion.button
-            onClick={handleExportPdf}
-            disabled={exporting}
-            className="px-5 py-2.5 border border-slate-200 bg-white rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all disabled:opacity-50"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {exporting ? '导出中...' : '导出 PDF'}
-          </motion.button>
-          <motion.button
-            onClick={() => onStartInterview(resume.resumeText, resumeId)}
-            className="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all"
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            开始模拟面试
-          </motion.button>
+          {detailView === 'interviewDetail' && selectedInterview && (
+            <motion.button
+              onClick={() => handleExportInterviewPdf(selectedInterview.sessionId)}
+              disabled={exporting === selectedInterview.sessionId}
+              className="px-5 py-2.5 border border-slate-200 bg-white rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {exporting === selectedInterview.sessionId ? '导出中...' : '导出 PDF'}
+            </motion.button>
+          )}
+          {detailView !== 'interviewDetail' && (
+            <motion.button
+              onClick={() => onStartInterview(resume.resumeText, resumeId)}
+              className="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all flex items-center gap-2"
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              开始模拟面试
+            </motion.button>
+          )}
         </div>
       </div>
 
-      {/* 标签页切换 */}
-      <div className="bg-white rounded-2xl p-2 mb-6 inline-flex gap-1">
-        {tabs.map((tab) => (
-          <motion.button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id)}
-            className={`relative px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-colors
-              ${activeTab === tab.id ? 'text-primary-600' : 'text-slate-500 hover:text-slate-700'}`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {activeTab === tab.id && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute inset-0 bg-primary-50 rounded-xl"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
-            <span className="relative z-10 flex items-center gap-2">
-              <tab.icon className="w-5 h-5" />
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">{tab.count}</span>
+      {/* 标签页切换 - 仅在非面试详情时显示 */}
+      {detailView !== 'interviewDetail' && (
+        <div className="bg-white rounded-2xl p-2 mb-6 inline-flex gap-1">
+          {tabs.map((tab) => (
+            <motion.button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`relative px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-colors
+                ${activeTab === tab.id ? 'text-primary-600' : 'text-slate-500 hover:text-slate-700'}`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {activeTab === tab.id && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-primary-50 rounded-xl"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
               )}
-            </span>
-          </motion.button>
-        ))}
-      </div>
+              <span className="relative z-10 flex items-center gap-2">
+                <tab.icon className="w-5 h-5" />
+                {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">{tab.count}</span>
+                )}
+              </span>
+            </motion.button>
+          ))}
+        </div>
+      )}
 
-      {/* 内容区域 - 带滑动动画 */}
+      {/* 内容区域 */}
       <div className="relative overflow-hidden">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={activeTab}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-            {activeTab === 'analysis' ? (
-              <AnalysisPanel analysis={latestAnalysis} />
-            ) : (
-              <InterviewPanel 
-                interviews={resume.interviews || []} 
-                onStartInterview={() => onStartInterview(resume.resumeText, resumeId)}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+        {detailView === 'interviewDetail' && selectedInterview ? (
+          <InterviewDetailPanel 
+            interview={selectedInterview}
+          />
+        ) : (
+          <AnimatePresence initial={false} custom={direction} mode="wait">
+            <motion.div
+              key={activeTab}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              {activeTab === 'analysis' ? (
+                <AnalysisPanel 
+                  analysis={latestAnalysis} 
+                  onExport={handleExportAnalysisPdf}
+                  exporting={exporting === 'analysis'}
+                />
+              ) : (
+                <InterviewPanel 
+                  interviews={resume.interviews || []} 
+                  onStartInterview={() => onStartInterview(resume.resumeText, resumeId)}
+                  onViewInterview={handleViewInterview}
+                  onExportInterview={handleExportInterviewPdf}
+                  exporting={exporting}
+                  loadingInterview={loadingInterview}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
     </motion.div>
   );
 }
 
 // 简历分析面板
-function AnalysisPanel({ analysis }: { analysis: any }) {
+function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExport: () => void, exporting: boolean }) {
   if (!analysis) {
     return (
       <div className="bg-white rounded-2xl p-12 text-center">
-        <div className="text-6xl mb-6">📊</div>
+        <div className="w-16 h-16 mx-auto mb-6 bg-slate-100 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-slate-400" viewBox="0 0 24 24" fill="none">
+            <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
         <h3 className="text-xl font-semibold text-slate-700 mb-2">暂无分析数据</h3>
         <p className="text-slate-500">请等待 AI 完成简历分析</p>
       </div>
@@ -235,12 +319,28 @@ function AnalysisPanel({ analysis }: { analysis: any }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <div className="flex items-center gap-2 text-slate-500 mb-6">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-            <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="font-semibold">核心评价</span>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2 text-slate-500">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="font-semibold">核心评价</span>
+          </div>
+          <motion.button
+            onClick={onExport}
+            disabled={exporting}
+            className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {exporting ? '导出中...' : '导出分析报告'}
+          </motion.button>
         </div>
 
         <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-6">
@@ -311,7 +411,21 @@ function AnalysisPanel({ analysis }: { analysis: any }) {
 }
 
 // 面试记录面板
-function InterviewPanel({ interviews, onStartInterview }: { interviews: InterviewItem[], onStartInterview: () => void }) {
+function InterviewPanel({ 
+  interviews, 
+  onStartInterview, 
+  onViewInterview, 
+  onExportInterview,
+  exporting,
+  loadingInterview 
+}: { 
+  interviews: InterviewItem[], 
+  onStartInterview: () => void, 
+  onViewInterview: (sessionId: string) => void,
+  onExportInterview: (sessionId: string) => void,
+  exporting: string | null,
+  loadingInterview: boolean
+}) {
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -331,12 +445,17 @@ function InterviewPanel({ interviews, onStartInterview }: { interviews: Intervie
       score: interview.overallScore || 0,
       index: index + 1
     }))
-    .reverse(); // 按时间正序
+    .reverse();
 
   if (interviews.length === 0) {
     return (
       <div className="bg-white rounded-2xl p-12 text-center">
-        <div className="text-6xl mb-6">🎙️</div>
+        <div className="w-16 h-16 mx-auto mb-6 bg-slate-100 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-slate-400" viewBox="0 0 24 24" fill="none">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
         <h3 className="text-xl font-semibold text-slate-700 mb-2">暂无面试记录</h3>
         <p className="text-slate-500 mb-6">开始模拟面试，获取专业评估</p>
         <motion.button
@@ -419,12 +538,6 @@ function InterviewPanel({ interviews, onStartInterview }: { interviews: Intervie
       >
         <div className="flex items-center justify-between mb-6">
           <span className="font-semibold text-slate-800">历史面试场次</span>
-          <button className="text-sm text-primary-500 flex items-center gap-1 hover:text-primary-600">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            筛选
-          </button>
         </div>
 
         <div className="space-y-4">
@@ -434,6 +547,7 @@ function InterviewPanel({ interviews, onStartInterview }: { interviews: Intervie
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
+              onClick={() => onViewInterview(interview.sessionId)}
               className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors group"
             >
               {/* 得分 */}
@@ -462,13 +576,27 @@ function InterviewPanel({ interviews, onStartInterview }: { interviews: Intervie
                   </span>
                   <span className="flex items-center gap-1">
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                      <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     {interview.totalQuestions} 题
                   </span>
                 </div>
               </div>
+
+              {/* 导出按钮 */}
+              <motion.button
+                onClick={(e) => { e.stopPropagation(); onExportInterview(interview.sessionId); }}
+                disabled={exporting === interview.sessionId}
+                className="px-3 py-2 text-slate-400 hover:text-primary-500 hover:bg-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </motion.button>
 
               {/* 箭头 */}
               <svg className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all flex-shrink-0" viewBox="0 0 24 24" fill="none">
@@ -477,8 +605,288 @@ function InterviewPanel({ interviews, onStartInterview }: { interviews: Intervie
             </motion.div>
           ))}
         </div>
+
+        {loadingInterview && (
+          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 flex items-center gap-4">
+              <motion.div 
+                className="w-8 h-8 border-3 border-slate-200 border-t-primary-500 rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              />
+              <span className="text-slate-600">加载面试详情...</span>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
+  );
+}
+
+// 面试详情面板
+function InterviewDetailPanel({ interview }: { interview: InterviewDetail }) {
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([0]));
+
+  const toggleQuestion = (index: number) => {
+    setExpandedQuestions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-600';
+    if (score >= 60) return 'text-amber-600';
+    return 'text-red-500';
+  };
+
+  // 计算圆环进度
+  const scorePercent = interview.overallScore !== null ? (interview.overallScore / 100) * 100 : 0;
+  const circumference = 2 * Math.PI * 54; // r=54
+  const strokeDashoffset = circumference - (scorePercent / 100) * circumference;
+
+  return (
+    <motion.div 
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      {/* 评分卡片 - 紫色渐变 */}
+      <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 rounded-2xl p-8 text-white">
+        <div className="flex flex-col items-center text-center">
+          {/* 圆环进度条 */}
+          <div className="relative w-32 h-32 mb-6">
+            <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+              {/* 背景圆环 */}
+              <circle
+                cx="60"
+                cy="60"
+                r="54"
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth="8"
+                fill="none"
+              />
+              {/* 进度圆环 */}
+              <motion.circle
+                cx="60"
+                cy="60"
+                r="54"
+                stroke="white"
+                strokeWidth="8"
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <motion.span 
+                className="text-4xl font-bold"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                {interview.overallScore ?? '-'}
+              </motion.span>
+              <span className="text-sm text-white/70">总分</span>
+            </div>
+          </div>
+          
+          <h3 className="text-2xl font-bold mb-3">面试评估</h3>
+          <p className="text-white/90 max-w-2xl leading-relaxed">
+            {interview.overallFeedback || '表现良好，展示了扎实的技术基础。'}
+          </p>
+        </div>
+      </div>
+
+      {/* 表现优势 */}
+      {interview.strengths && interview.strengths.length > 0 && (
+        <motion.div 
+          className="bg-white rounded-2xl p-6 shadow-sm"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h4 className="font-semibold text-emerald-600 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            表现优势
+          </h4>
+          <ul className="space-y-3">
+            {interview.strengths.map((s: string, i: number) => (
+              <li key={i} className="text-slate-700 flex items-start gap-3">
+                <span className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0"></span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
+
+      {/* 改进建议 */}
+      {interview.improvements && interview.improvements.length > 0 && (
+        <motion.div 
+          className="bg-white rounded-2xl p-6 shadow-sm"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h4 className="font-semibold text-amber-600 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+              <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            改进建议
+          </h4>
+          <ul className="space-y-3">
+            {interview.improvements.map((s: string, i: number) => (
+              <li key={i} className="text-slate-700 flex items-start gap-3">
+                <span className="w-2 h-2 bg-amber-500 rounded-full mt-2 flex-shrink-0"></span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
+
+      {/* 问答记录详情 */}
+      <div>
+        <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
+            <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          问答记录详情
+        </h4>
+        
+        <div className="space-y-4">
+          {interview.answers?.map((answer, idx) => (
+            <motion.div 
+              key={idx}
+              className="bg-white rounded-2xl shadow-sm overflow-hidden"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + idx * 0.05 }}
+            >
+              {/* 问题头部 - 可点击展开 */}
+              <div 
+                className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => toggleQuestion(idx)}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center text-sm font-semibold">
+                    {answer.questionIndex + 1}
+                  </span>
+                  <span className="px-3 py-1 bg-primary-50 text-primary-600 text-xs font-medium rounded-full">
+                    {answer.category || '综合'}
+                  </span>
+                  <span className={`font-semibold ${getScoreColor(answer.score)}`}>
+                    得分: {answer.score}
+                  </span>
+                </div>
+                <motion.svg 
+                  className="w-5 h-5 text-slate-400"
+                  animate={{ rotate: expandedQuestions.has(idx) ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  viewBox="0 0 24 24" 
+                  fill="none"
+                >
+                  <polyline points="6,9 12,15 18,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </motion.svg>
+              </div>
+              
+              {/* 问题内容 */}
+              <div className="px-5 pb-2">
+                <p className="text-slate-800 font-medium leading-relaxed">{answer.question}</p>
+              </div>
+
+              {/* 展开内容 */}
+              <AnimatePresence>
+                {expandedQuestions.has(idx) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-5 pb-5 space-y-4">
+                      {/* 你的回答 */}
+                      <div className="bg-slate-50 rounded-xl p-4">
+                        <p className="text-sm text-slate-500 mb-2 flex items-center gap-1">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          你的回答
+                        </p>
+                        <p className={`leading-relaxed ${
+                          !answer.userAnswer || answer.userAnswer === '不知道' 
+                            ? 'text-red-500 font-medium' 
+                            : 'text-slate-700'
+                        }`}>
+                          "{answer.userAnswer || '(未回答)'}"</p>
+                      </div>
+
+                      {/* AI 深度评价 */}
+                      {answer.feedback && (
+                        <div>
+                          <p className="text-sm text-slate-600 mb-2 flex items-center gap-2 font-medium">
+                            <svg className="w-4 h-4 text-primary-500" viewBox="0 0 24 24" fill="none">
+                              <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            AI 深度评价
+                          </p>
+                          <p className="text-slate-700 leading-relaxed pl-6">{answer.feedback}</p>
+                        </div>
+                      )}
+
+                      {/* 参考答案 */}
+                      {answer.referenceAnswer && (
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                          <p className="text-sm text-slate-600 mb-3 flex items-center gap-2 font-medium">
+                            <svg className="w-4 h-4 text-primary-500" viewBox="0 0 24 24" fill="none">
+                              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
+                              <path d="M9 12H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              <path d="M12 9V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                            参考答案
+                          </p>
+                          <div className="text-slate-700 leading-relaxed whitespace-pre-line">{answer.referenceAnswer}</div>
+                        </div>
+                      )}
+
+                      {/* 关键要点 */}
+                      {answer.keyPoints && answer.keyPoints.length > 0 && (
+                        <div className="pt-2">
+                          <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                            提示：点击参考答案中的关键词可查看详细文档
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

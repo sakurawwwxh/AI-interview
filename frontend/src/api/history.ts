@@ -47,6 +47,8 @@ export interface AnswerItem {
   userAnswer: string;
   score: number;
   feedback: string;
+  referenceAnswer?: string;
+  keyPoints?: string[];
   answeredAt: string;
 }
 

@@ -145,7 +145,14 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     >
       <div className="bg-white rounded-2xl p-8 shadow-sm">
         <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-          <span className="text-3xl">🎯</span> 面试配置
+          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+            <svg className="w-5 h-5 text-primary-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+            </svg>
+          </div>
+          面试配置
         </h2>
         
         <div className="mb-8">
@@ -265,8 +272,13 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
                 className={`flex gap-3 ${msg.type === 'user' ? 'justify-end' : ''}`}
               >
                 {msg.type === 'interviewer' && (
-                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                    🤖
+                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-primary-600" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="11" width="18" height="10" rx="2" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="8.5" cy="16" r="1.5" fill="currentColor"/>
+                      <circle cx="15.5" cy="16" r="1.5" fill="currentColor"/>
+                      <path d="M8 11V7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7V11" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
                   </div>
                 )}
                 <div className={`max-w-[80%] ${msg.type === 'user' ? 'order-first' : ''}`}>
@@ -289,8 +301,11 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
                   </div>
                 </div>
                 {msg.type === 'user' && (
-                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">
-                    👤
+                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-emerald-600" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
                   </div>
                 )}
               </motion.div>
@@ -373,7 +388,12 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         {/* 分类得分 */}
         <div className="bg-white rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span>📊</span> 分类得分
+            <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
+              <path d="M18 20V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 20V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 20V14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            分类得分
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {report.categoryScores.map((cat, idx) => (
@@ -394,7 +414,13 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         {/* 总体评价 */}
         <div className="bg-white rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span>📝</span> 总体评价
+            <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
+              <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            总体评价
           </h3>
           <p className="text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl">{report.overallFeedback}</p>
         </div>
@@ -407,7 +433,13 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h3 className="text-lg font-semibold text-emerald-800 mb-4">✨ 你的优势</h3>
+            <h3 className="text-lg font-semibold text-emerald-800 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              你的优势
+            </h3>
             <ul className="space-y-3">
               {report.strengths.map((s, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-emerald-700">
@@ -424,7 +456,12 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <h3 className="text-lg font-semibold text-amber-800 mb-4">💡 改进建议</h3>
+            <h3 className="text-lg font-semibold text-amber-800 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              改进建议
+            </h3>
             <ul className="space-y-3">
               {report.improvements.map((s, idx) => (
                 <li key={idx} className="flex items-start gap-2 text-amber-700">
@@ -439,7 +476,13 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         {/* 问题详情 */}
         <div className="bg-white rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span>📋</span> 问题详情与评分
+            <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="2"/>
+              <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="9" y1="16" x2="15" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            问题详情与评分
           </h3>
           <div className="space-y-4">
             {report.questionDetails.map((q, idx) => (
@@ -471,7 +514,11 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         {/* 参考答案 */}
         <div className="bg-white rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <span>📚</span> 参考答案
+            <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6.5 2H20V22H6.5A2.5 2.5 0 014 19.5V4.5A2.5 2.5 0 016.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            参考答案
           </h3>
           <div className="space-y-4">
             {report.referenceAnswers.map((ref, idx) => (
@@ -521,7 +568,15 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center justify-center gap-3">
-          <span className="text-4xl">🎤</span> 模拟面试
+          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          模拟面试
         </h1>
         <p className="text-slate-500">{stageSubtitles[stage]}</p>
       </motion.div>

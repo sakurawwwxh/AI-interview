@@ -235,6 +235,10 @@ public class PdfExportService {
                     document.add(new Paragraph("评价: " + answer.getFeedback())
                         .setItalic());
                 }
+                if (answer.getReferenceAnswer() != null) {
+                    document.add(new Paragraph("参考答案: " + answer.getReferenceAnswer())
+                        .setFontColor(new DeviceRgb(39, 174, 96)));
+                }
             }
         }
         
