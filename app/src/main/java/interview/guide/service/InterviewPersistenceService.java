@@ -141,6 +141,7 @@ public class InterviewPersistenceService {
         try {
             Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
             if (sessionOpt.isEmpty()) {
+                log.warn("会话不存在: {}", sessionId);
                 return;
             }
             
@@ -154,6 +155,44 @@ public class InterviewPersistenceService {
             session.setCompletedAt(LocalDateTime.now());
             
             sessionRepository.save(session);
+            
+            // 直接从数据库查询答案并更新
+            List<InterviewAnswerEntity> answers = answerRepository.findBySessionSessionIdOrderByQuestionIndex(sessionId);
+            log.info("查询到 {} 个答案需要更新", answers.size());
+            
+            if (!answers.isEmpty()) {
+                // 更新每个答案的得分和评价
+                for (InterviewReportDTO.QuestionEvaluation eval : report.questionDetails()) {
+                    for (InterviewAnswerEntity answer : answers) {
+                        if (answer.getQuestionIndex() != null && 
+                            answer.getQuestionIndex() == eval.questionIndex()) {
+                            answer.setScore(eval.score());
+                            answer.setFeedback(eval.feedback());
+                            log.debug("更新答案 {} 的评价: score={}", eval.questionIndex(), eval.score());
+                            break;
+                        }
+                    }
+                }
+                
+                // 设置参考答案和关键点
+                for (InterviewReportDTO.ReferenceAnswer refAns : report.referenceAnswers()) {
+                    for (InterviewAnswerEntity answer : answers) {
+                        if (answer.getQuestionIndex() != null && 
+                            answer.getQuestionIndex() == refAns.questionIndex()) {
+                            answer.setReferenceAnswer(refAns.referenceAnswer());
+                            if (refAns.keyPoints() != null && !refAns.keyPoints().isEmpty()) {
+                                answer.setKeyPointsJson(objectMapper.writeValueAsString(refAns.keyPoints()));
+                            }
+                            log.debug("更新答案 {} 的参考答案", refAns.questionIndex());
+                            break;
+                        }
+                    }
+                }
+                
+                answerRepository.saveAll(answers);
+                log.info("已更新 {} 个答案的评价和参考答案", answers.size());
+            }
+            
             log.info("面试报告已保存: sessionId={}, score={}", sessionId, report.overallScore());
             
         } catch (JsonProcessingException e) {

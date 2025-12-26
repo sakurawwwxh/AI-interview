@@ -167,6 +167,16 @@ public class HistoryController {
             aMap.put("userAnswer", a.getUserAnswer());
             aMap.put("score", a.getScore());
             aMap.put("feedback", a.getFeedback());
+            aMap.put("referenceAnswer", a.getReferenceAnswer());
+            // 解析关键点JSON
+            if (a.getKeyPointsJson() != null) {
+                try {
+                    aMap.put("keyPoints", objectMapper.readValue(a.getKeyPointsJson(), 
+                        new TypeReference<List<String>>() {}));
+                } catch (JsonProcessingException e) {
+                    log.error("解析关键点JSON失败", e);
+                }
+            }
             aMap.put("answeredAt", a.getAnsweredAt());
             return aMap;
         }).toList();

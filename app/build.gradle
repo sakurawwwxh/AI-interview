@@ -38,6 +38,7 @@ dependencies {
     
     // PDF导出 - iText 7
     implementation 'com.itextpdf:itext7-core:7.2.5'
+    implementation 'com.itextpdf:font-asian:7.2.5'
     
     // Lombok
     compileOnly libs.lombok

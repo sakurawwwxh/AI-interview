@@ -3,6 +3,8 @@ package interview.guide.repository;
 import interview.guide.entity.InterviewAnswerEntity;
 import interview.guide.entity.InterviewSessionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -22,4 +24,10 @@ public interface InterviewAnswerRepository extends JpaRepository<InterviewAnswer
      * 根据会话ID查找所有答案
      */
     List<InterviewAnswerEntity> findBySessionIdOrderByQuestionIndex(Long sessionId);
+    
+    /**
+     * 根据会话 sessionId 字符串查找所有答案
+     */
+    @Query("SELECT a FROM InterviewAnswerEntity a WHERE a.session.sessionId = :sessionId ORDER BY a.questionIndex")
+    List<InterviewAnswerEntity> findBySessionSessionIdOrderByQuestionIndex(@Param("sessionId") String sessionId);
 }
