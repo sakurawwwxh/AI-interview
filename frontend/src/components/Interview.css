@@ -1,0 +1,402 @@
+.interview-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.interview-header {
+  text-align: center;
+  color: white;
+  margin-bottom: 30px;
+}
+
+.interview-header h1 {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+}
+
+/* 配置界面 */
+.config-section {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.config-section h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #555;
+}
+
+.form-group input[type="number"],
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.form-group textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.question-count-selector {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.count-btn {
+  padding: 10px 20px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.count-btn:hover {
+  border-color: #667eea;
+}
+
+.count-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+}
+
+/* 对话界面 */
+.chat-section {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.progress-bar {
+  background: #e5e7eb;
+  border-radius: 10px;
+  height: 8px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  text-align: center;
+  color: #666;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.chat-container {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding: 10px;
+}
+
+.message {
+  margin-bottom: 15px;
+  padding: 15px;
+  border-radius: 12px;
+  max-width: 85%;
+}
+
+.message.interviewer {
+  background: #f0f7ff;
+  margin-right: auto;
+}
+
+.message.user {
+  background: #f0fdf4;
+  margin-left: auto;
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.message-header .icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.category-tag {
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  margin-left: 10px;
+}
+
+.message-content {
+  line-height: 1.6;
+  color: #333;
+}
+
+.answer-input {
+  display: flex;
+  gap: 10px;
+}
+
+.answer-input textarea {
+  flex: 1;
+  padding: 15px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  resize: none;
+  font-size: 15px;
+  min-height: 80px;
+}
+
+.answer-input textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.submit-btn {
+  padding: 15px 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 报告界面 */
+.report-section {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.report-score {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 15px;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+}
+
+.report-score span {
+  font-size: 36px;
+  font-weight: bold;
+  color: white;
+}
+
+.category-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.category-item {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.category-item .name {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.category-item .score {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+}
+
+.report-block {
+  margin-bottom: 25px;
+}
+
+.report-block h3 {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #eee;
+}
+
+.feedback-text {
+  background: #f0f7ff;
+  padding: 15px;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
+.list-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 0;
+}
+
+.list-item .icon {
+  margin-right: 10px;
+}
+
+.question-detail {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.question-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.question-score {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.question-text {
+  font-weight: 500;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.answer-text {
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #555;
+}
+
+.feedback-inline {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+}
+
+.reference-block {
+  background: #f0fdf4;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.reference-block h4 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.key-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.key-point {
+  background: #dcfce7;
+  color: #166534;
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 12px;
+}
+
+.loading-section {
+  text-align: center;
+  padding: 60px;
+}
+
+.loading-section .spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.back-btn {
+  display: inline-block;
+  padding: 12px 30px;
+  background: #f3f4f6;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-right: 10px;
+}
+
+.back-btn:hover {
+  background: #e5e7eb;
+}

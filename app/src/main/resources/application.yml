@@ -1,0 +1,39 @@
+# AI Interview Platform Configuration
+# 智能AI面试官平台配置
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-interview-platform
+  
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+  
+  # Spring AI - 阿里云DashScope (OpenAI兼容模式)
+  ai:
+    openai:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      api-key: ${AI_BAILIAN_API_KEY}
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.7
+
+# Application custom configuration
+app:
+  resume:
+    upload-dir: ${java.io.tmpdir}/ai-interview/resumes
+    allowed-types:
+      - application/pdf
+      - application/msword
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - text/plain
+  
+  # CORS配置 - React前端
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:5174
