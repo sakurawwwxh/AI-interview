@@ -135,8 +135,13 @@ public class AnswerEvaluationService {
             
             JsonNode evaluationsNode = root.get("questionEvaluations");
             if (evaluationsNode != null && evaluationsNode.isArray()) {
+                // 按数组顺序处理，不依赖AI返回的questionIndex（可能从0或1开始）
+                int index = 0;
                 for (JsonNode evalNode : evaluationsNode) {
-                    int qIndex = evalNode.get("questionIndex").asInt();
+                    if (index >= questions.size()) {
+                        break;
+                    }
+                    
                     int score = evalNode.get("score").asInt();
                     String feedback = evalNode.get("feedback").asText();
                     String refAnswer = evalNode.has("referenceAnswer") 
@@ -144,23 +149,25 @@ public class AnswerEvaluationService {
                     List<String> keyPoints = evalNode.has("keyPoints") 
                         ? parseStringList(evalNode.get("keyPoints")) : List.of();
                     
-                    if (qIndex < questions.size()) {
-                        InterviewQuestionDTO q = questions.get(qIndex);
-                        
-                        questionDetails.add(new QuestionEvaluation(
-                            qIndex, q.question(), q.category(),
-                            q.userAnswer(), score, feedback
-                        ));
-                        
-                        referenceAnswers.add(new ReferenceAnswer(
-                            qIndex, q.question(), refAnswer, keyPoints
-                        ));
-                        
-                        // 收集类别分数
-                        categoryScoresMap
-                            .computeIfAbsent(q.category(), k -> new ArrayList<>())
-                            .add(score);
-                    }
+                    // 使用我们自己的索引，而不是AI返回的
+                    InterviewQuestionDTO q = questions.get(index);
+                    int qIndex = q.questionIndex();
+                    
+                    questionDetails.add(new QuestionEvaluation(
+                        qIndex, q.question(), q.category(),
+                        q.userAnswer(), score, feedback
+                    ));
+                    
+                    referenceAnswers.add(new ReferenceAnswer(
+                        qIndex, q.question(), refAnswer, keyPoints
+                    ));
+                    
+                    // 收集类别分数
+                    categoryScoresMap
+                        .computeIfAbsent(q.category(), k -> new ArrayList<>())
+                        .add(score);
+                    
+                    index++;
                 }
             }
             
