@@ -8,6 +8,31 @@ const api = axios.create({
   timeout: 120000, // 2分钟超时，AI分析需要时间
 });
 
+// 统一响应结果类型
+interface Result<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+// 响应拦截器：提取data字段
+api.interceptors.response.use(
+  (response) => {
+    const result = response.data as Result<unknown>;
+    if (result.code === 200) {
+      // 成功时直接返回data
+      response.data = result.data;
+    } else {
+      // 业务错误抛出异常
+      return Promise.reject(new Error(result.message || '请求失败'));
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const resumeApi = {
   /**
    * 上传简历并获取分析结果
