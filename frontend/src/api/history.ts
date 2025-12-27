@@ -1,5 +1,25 @@
 const API_BASE = 'http://localhost:8080/api/history';
 
+// 统一响应结果类型
+interface Result<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+// 封装fetch请求，解析Result结构
+async function fetchWithResult<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('网络请求失败');
+  }
+  const result: Result<T> = await response.json();
+  if (result.code === 200) {
+    return result.data;
+  }
+  throw new Error(result.message || '请求失败');
+}
+
 export interface ResumeListItem {
   id: number;
   filename: string;
@@ -74,33 +94,21 @@ export const historyApi = {
    * 获取所有简历列表
    */
   async getResumes(): Promise<ResumeListItem[]> {
-    const response = await fetch(`${API_BASE}/resumes`);
-    if (!response.ok) {
-      throw new Error('获取简历列表失败');
-    }
-    return response.json();
+    return fetchWithResult<ResumeListItem[]>(`${API_BASE}/resumes`);
   },
 
   /**
    * 获取简历详情
    */
   async getResumeDetail(id: number): Promise<ResumeDetail> {
-    const response = await fetch(`${API_BASE}/resumes/${id}`);
-    if (!response.ok) {
-      throw new Error('获取简历详情失败');
-    }
-    return response.json();
+    return fetchWithResult<ResumeDetail>(`${API_BASE}/resumes/${id}`);
   },
 
   /**
    * 获取面试详情
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
-    const response = await fetch(`${API_BASE}/interviews/${sessionId}`);
-    if (!response.ok) {
-      throw new Error('获取面试详情失败');
-    }
-    return response.json();
+    return fetchWithResult<InterviewDetail>(`${API_BASE}/interviews/${sessionId}`);
   },
 
   /**

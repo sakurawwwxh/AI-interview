@@ -3,18 +3,17 @@ package interview.guide.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import interview.guide.dto.InterviewQuestionDTO;
-import interview.guide.dto.InterviewReportDTO;
-import interview.guide.dto.ResumeAnalysisResponse;
-import interview.guide.entity.InterviewAnswerEntity;
-import interview.guide.entity.InterviewSessionEntity;
-import interview.guide.entity.ResumeAnalysisEntity;
-import interview.guide.entity.ResumeEntity;
-import interview.guide.service.InterviewPersistenceService;
-import interview.guide.service.PdfExportService;
-import interview.guide.service.ResumePersistenceService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import interview.guide.common.result.Result;
+import interview.guide.modules.interview.model.ResumeAnalysisResponse;
+import interview.guide.modules.interview.model.InterviewAnswerEntity;
+import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.resume.model.ResumeAnalysisEntity;
+import interview.guide.modules.resume.model.ResumeEntity;
+import interview.guide.modules.interview.service.InterviewPersistenceService;
+import interview.guide.infrastructure.export.PdfExportService;
+import interview.guide.modules.resume.service.ResumePersistenceService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,41 +21,29 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
  * 历史记录控制器
  * History Controller for viewing past resumes and interviews
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/history")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class HistoryController {
-    
-    private static final Logger log = LoggerFactory.getLogger(HistoryController.class);
     
     private final ResumePersistenceService resumeService;
     private final InterviewPersistenceService interviewService;
     private final PdfExportService pdfExportService;
     private final ObjectMapper objectMapper;
     
-    public HistoryController(ResumePersistenceService resumeService,
-                            InterviewPersistenceService interviewService,
-                            PdfExportService pdfExportService,
-                            ObjectMapper objectMapper) {
-        this.resumeService = resumeService;
-        this.interviewService = interviewService;
-        this.pdfExportService = pdfExportService;
-        this.objectMapper = objectMapper;
-    }
-    
     /**
      * 获取所有简历列表
      * GET /api/history/resumes
      */
     @GetMapping("/resumes")
-    public ResponseEntity<?> getAllResumes() {
+    public Result<List<Map<String, Object>>> getAllResumes() {
         List<ResumeEntity> resumes = resumeService.findAllResumes();
         
         List<Map<String, Object>> result = resumes.stream().map(resume -> {
@@ -80,7 +67,7 @@ public class HistoryController {
             return map;
         }).toList();
         
-        return ResponseEntity.ok(result);
+        return Result.success(result);
     }
     
     /**
@@ -88,10 +75,10 @@ public class HistoryController {
      * GET /api/history/resumes/{id}
      */
     @GetMapping("/resumes/{id}")
-    public ResponseEntity<?> getResumeDetail(@PathVariable Long id) {
+    public Result<Map<String, Object>> getResumeDetail(@PathVariable Long id) {
         Optional<ResumeEntity> resumeOpt = resumeService.findById(id);
         if (resumeOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            return Result.error(404, "简历不存在");
         }
         
         ResumeEntity resume = resumeOpt.get();
@@ -140,7 +127,7 @@ public class HistoryController {
         List<Map<String, Object>> interviewHistory = interviews.stream().map(this::mapInterviewSession).toList();
         result.put("interviews", interviewHistory);
         
-        return ResponseEntity.ok(result);
+        return Result.success(result);
     }
     
     /**
@@ -148,10 +135,10 @@ public class HistoryController {
      * GET /api/history/interviews/{sessionId}
      */
     @GetMapping("/interviews/{sessionId}")
-    public ResponseEntity<?> getInterviewDetail(@PathVariable String sessionId) {
+    public Result<Map<String, Object>> getInterviewDetail(@PathVariable String sessionId) {
         Optional<InterviewSessionEntity> sessionOpt = interviewService.findBySessionId(sessionId);
         if (sessionOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            return Result.error(404, "面试会话不存在");
         }
         
         InterviewSessionEntity session = sessionOpt.get();
@@ -182,7 +169,7 @@ public class HistoryController {
         }).toList();
         result.put("answers", answerList);
         
-        return ResponseEntity.ok(result);
+        return Result.success(result);
     }
     
     /**

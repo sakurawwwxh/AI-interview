@@ -44,6 +44,11 @@ dependencies {
     compileOnly libs.lombok
     annotationProcessor libs.lombok
     
+    // MapStruct - 对象映射 (必须在Lombok之后配置)
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation libs.junit.jupiter

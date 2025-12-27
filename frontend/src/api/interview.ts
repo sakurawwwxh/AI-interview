@@ -15,6 +15,29 @@ const api = axios.create({
   timeout: 180000, // 3分钟超时
 });
 
+// 统一响应结果类型
+interface Result<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+// 响应拦截器：提取data字段
+api.interceptors.response.use(
+  (response) => {
+    const result = response.data as Result<unknown>;
+    if (result.code === 200) {
+      response.data = result.data;
+    } else {
+      return Promise.reject(new Error(result.message || '请求失败'));
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 export const interviewApi = {
   /**
    * 创建面试会话
