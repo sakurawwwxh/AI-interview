@@ -192,6 +192,31 @@ public class ResumePersistenceService {
     }
     
     /**
+     * 删除简历及其所有关联数据
+     * 包括：简历分析记录、面试会话（会自动删除面试答案）
+     */
+    @Transactional
+    public void deleteResume(Long id) {
+        Optional<ResumeEntity> resumeOpt = resumeRepository.findById(id);
+        if (resumeOpt.isEmpty()) {
+            throw new BusinessException(ErrorCode.RESUME_NOT_FOUND);
+        }
+        
+        ResumeEntity resume = resumeOpt.get();
+        
+        // 1. 删除所有简历分析记录
+        List<ResumeAnalysisEntity> analyses = analysisRepository.findByResumeIdOrderByAnalyzedAtDesc(id);
+        if (!analyses.isEmpty()) {
+            analysisRepository.deleteAll(analyses);
+            log.info("已删除 {} 条简历分析记录", analyses.size());
+        }
+        
+        // 2. 删除简历实体（面试会话会在服务层删除）
+        resumeRepository.delete(resume);
+        log.info("简历已删除: id={}, filename={}", id, resume.getOriginalFilename());
+    }
+    
+    /**
      * 计算文件的SHA-256哈希值
      */
     private String calculateFileHash(MultipartFile file) throws IOException, NoSuchAlgorithmException {

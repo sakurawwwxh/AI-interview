@@ -132,4 +132,22 @@ export const historyApi = {
     }
     return response.blob();
   },
+
+  /**
+   * 删除简历
+   */
+  async deleteResume(id: number): Promise<void> {
+    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
+    const response = await fetch(`${API_BASE_URL}/api/resume/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const result: Result<void> = await response.json();
+      throw new Error(result.message || '删除简历失败');
+    }
+    const result: Result<void> = await response.json();
+    if (result.code !== 200) {
+      throw new Error(result.message || '删除简历失败');
+    }
+  },
 };

@@ -10,6 +10,8 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
   const [resumes, setResumes] = useState<ResumeListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
     loadResumes();
@@ -37,6 +39,26 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
     if (score >= 80) return 'bg-emerald-500';
     if (score >= 60) return 'bg-amber-500';
     return 'bg-red-500';
+  };
+
+  const handleDelete = async (id: number, filename: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // 阻止触发行点击事件
+    
+    if (!confirm(`确定要删除简历 "${filename}" 吗？\n\n删除后将同时删除：\n- 简历评价记录\n- 所有模拟面试记录\n\n此操作不可恢复！`)) {
+      return;
+    }
+    
+    setDeletingId(id);
+    try {
+      await historyApi.deleteResume(id);
+      // 重新加载列表
+      await loadResumes();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '删除失败，请稍后重试');
+    } finally {
+      setDeletingId(null);
+      setShowDeleteConfirm(null);
+    }
   };
 
   const filteredResumes = resumes.filter(resume =>
@@ -128,7 +150,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                 <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">上传日期</th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">AI 评分</th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">面试状态</th>
-                <th className="w-10"></th>
+                <th className="w-20"></th>
               </tr>
             </thead>
             <tbody>
@@ -185,9 +207,30 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                       )}
                     </td>
                     <td className="px-4">
-                      <svg className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" viewBox="0 0 24 24" fill="none">
-                        <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => handleDelete(resume.id, resume.filename, e)}
+                          disabled={deletingId === resume.id}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="删除简历"
+                        >
+                          {deletingId === resume.id ? (
+                            <motion.div
+                              className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                          ) : (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                              <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M10 11V17M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </button>
+                        <svg className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" viewBox="0 0 24 24" fill="none">
+                          <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}
