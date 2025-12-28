@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { interviewApi } from '../api/interview';
+import ConfirmDialog from './ConfirmDialog';
 import type { 
   InterviewSession, 
   InterviewQuestion,
@@ -30,12 +31,12 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   const [messages, setMessages] = useState<Message[]>([]);
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [checkingUnfinished, setCheckingUnfinished] = useState(false);
   const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
@@ -50,6 +51,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     if (resumeId) {
       checkUnfinishedSession();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId]);
   
   const checkUnfinishedSession = async () => {
@@ -76,7 +78,6 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   
   const handleStartNew = () => {
     setUnfinishedSession(null);
-    // 继续正常的创建流程
   };
   
   const restoreSession = (sessionToRestore: InterviewSession) => {
@@ -160,43 +161,6 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     }
   };
   
-  const handleSaveAnswer = async () => {
-    if (!answer.trim() || !session || !currentQuestion) return;
-    
-    setIsSaving(true);
-    try {
-      await interviewApi.saveAnswer({
-        sessionId: session.sessionId,
-        questionIndex: currentQuestion.questionIndex,
-        answer: answer.trim()
-      });
-      
-      // 更新本地状态
-      const userMessage: Message = {
-        type: 'user',
-        content: answer
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
-      // 更新session中的问题答案
-      if (session) {
-        const updatedQuestions = [...session.questions];
-        updatedQuestions[currentQuestion.questionIndex] = {
-          ...currentQuestion,
-          userAnswer: answer.trim()
-        };
-        setSession({ ...session, questions: updatedQuestions });
-      }
-      
-      // 不清空答案，让用户可以继续编辑
-    } catch (err) {
-      setError('暂存失败，请重试');
-      console.error(err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
   const handleSubmitAnswer = async () => {
     if (!answer.trim() || !session || !currentQuestion) return;
     
@@ -240,13 +204,10 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   const handleCompleteEarly = async () => {
     if (!session) return;
     
-    if (!confirm('确定要提前交卷吗？未回答的问题将按0分计算。')) {
-      return;
-    }
-    
     setIsSubmitting(true);
     try {
       await interviewApi.completeInterview(session.sessionId);
+      setShowCompleteConfirm(false);
       setStage('loading-report');
       await generateReport();
     } catch (err) {
@@ -526,7 +487,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="请输入你的回答..."
-              disabled={isSubmitting || isSaving}
+              disabled={isSubmitting}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.ctrlKey) {
                   handleSubmitAnswer();
@@ -534,32 +495,21 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
               }}
               className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-xl resize-none h-24 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all disabled:opacity-60"
             />
-            <div className="flex flex-col gap-2 self-end">
-              <motion.button 
-                onClick={handleSaveAnswer}
-                disabled={!answer.trim() || isSaving || isSubmitting}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSaving ? '暂存中...' : '暂存'}
-              </motion.button>
-              <motion.button 
-                onClick={handleSubmitAnswer}
-                disabled={!answer.trim() || isSubmitting || isSaving}
-                className="px-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-12"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSubmitting ? '提交中...' : '提交回答'}
-              </motion.button>
-            </div>
+            <motion.button 
+              onClick={handleSubmitAnswer}
+              disabled={!answer.trim() || isSubmitting}
+              className="px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all self-end"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {isSubmitting ? '提交中...' : '提交回答'}
+            </motion.button>
           </div>
           <div className="flex items-center justify-between mt-3">
             <p className="text-xs text-slate-400">按 Ctrl+Enter 快速提交</p>
             <motion.button
-              onClick={handleCompleteEarly}
-              disabled={isSubmitting || isSaving}
+              onClick={() => setShowCompleteConfirm(true)}
+              disabled={isSubmitting}
               className="px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -815,6 +765,19 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
         {stage === 'loading-report' && <motion.div key="loading">{renderLoadingReport()}</motion.div>}
         {stage === 'report' && <motion.div key="report">{renderReport()}</motion.div>}
       </AnimatePresence>
+      
+      {/* 提前交卷确认对话框 */}
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        title="提前交卷"
+        message="确定要提前交卷吗？未回答的问题将按0分计算。"
+        confirmText="确定交卷"
+        cancelText="取消"
+        confirmVariant="warning"
+        loading={isSubmitting}
+        onConfirm={handleCompleteEarly}
+        onCancel={() => setShowCompleteConfirm(false)}
+      />
     </div>
   );
 }

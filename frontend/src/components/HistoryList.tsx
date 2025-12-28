@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { historyApi, ResumeListItem } from '../api/history';
+import ConfirmDialog from './ConfirmDialog';
 
 interface HistoryListProps {
   onSelectResume: (id: number) => void;
@@ -11,7 +12,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; filename: string } | null>(null);
 
   useEffect(() => {
     loadResumes();
@@ -41,23 +42,25 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
     return 'bg-red-500';
   };
 
-  const handleDelete = async (id: number, filename: string, e: React.MouseEvent) => {
+  const handleDeleteClick = (id: number, filename: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止触发行点击事件
+    setDeleteConfirm({ id, filename });
+  };
+  
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
     
-    if (!confirm(`确定要删除简历 "${filename}" 吗？\n\n删除后将同时删除：\n- 简历评价记录\n- 所有模拟面试记录\n\n此操作不可恢复！`)) {
-      return;
-    }
-    
+    const { id } = deleteConfirm;
     setDeletingId(id);
     try {
       await historyApi.deleteResume(id);
       // 重新加载列表
       await loadResumes();
+      setDeleteConfirm(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : '删除失败，请稍后重试');
     } finally {
       setDeletingId(null);
-      setShowDeleteConfirm(null);
     }
   };
 
@@ -209,7 +212,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                     <td className="px-4">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={(e) => handleDelete(resume.id, resume.filename, e)}
+                          onClick={(e) => handleDeleteClick(resume.id, resume.filename, e)}
                           disabled={deletingId === resume.id}
                           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="删除简历"
@@ -239,6 +242,31 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
           </table>
         </motion.div>
       )}
+      
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        title="删除简历"
+        message={
+          deleteConfirm ? (
+            <>
+              <p className="mb-2">确定要删除简历 <strong>"{deleteConfirm.filename}"</strong> 吗？</p>
+              <p className="text-sm text-slate-500 mb-2">删除后将同时删除：</p>
+              <ul className="text-sm text-slate-500 list-disc list-inside mb-2">
+                <li>简历评价记录</li>
+                <li>所有模拟面试记录</li>
+              </ul>
+              <p className="text-sm font-semibold text-red-600">此操作不可恢复！</p>
+            </>
+          ) : ''
+        }
+        confirmText="确定删除"
+        cancelText="取消"
+        confirmVariant="danger"
+        loading={deletingId !== null}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </motion.div>
   );
 }
