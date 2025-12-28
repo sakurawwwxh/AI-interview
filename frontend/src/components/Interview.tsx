@@ -30,9 +30,12 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   const [messages, setMessages] = useState<Message[]>([]);
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [checkingUnfinished, setCheckingUnfinished] = useState(false);
+  const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
@@ -42,36 +45,155 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     }
   }, [messages]);
   
+  // 检查是否有未完成的面试（组件挂载时和resumeId变化时）
+  useEffect(() => {
+    if (resumeId) {
+      checkUnfinishedSession();
+    }
+  }, [resumeId]);
+  
+  const checkUnfinishedSession = async () => {
+    if (!resumeId) return;
+    
+    setCheckingUnfinished(true);
+    try {
+      const foundSession = await interviewApi.findUnfinishedSession(resumeId);
+      if (foundSession) {
+        setUnfinishedSession(foundSession);
+      }
+    } catch (err) {
+      console.error('检查未完成面试失败', err);
+    } finally {
+      setCheckingUnfinished(false);
+    }
+  };
+  
+  const handleContinueUnfinished = () => {
+    if (!unfinishedSession) return;
+    restoreSession(unfinishedSession);
+    setUnfinishedSession(null);
+  };
+  
+  const handleStartNew = () => {
+    setUnfinishedSession(null);
+    // 继续正常的创建流程
+  };
+  
+  const restoreSession = (sessionToRestore: InterviewSession) => {
+    setSession(sessionToRestore);
+    
+    // 恢复当前问题
+    const currentQ = sessionToRestore.questions[sessionToRestore.currentQuestionIndex];
+    if (currentQ) {
+      setCurrentQuestion(currentQ);
+      
+      // 如果当前问题已有答案，显示在输入框中
+      if (currentQ.userAnswer) {
+        setAnswer(currentQ.userAnswer);
+      }
+      
+      // 恢复消息历史
+      const restoredMessages: Message[] = [];
+      for (let i = 0; i <= sessionToRestore.currentQuestionIndex; i++) {
+        const q = sessionToRestore.questions[i];
+        restoredMessages.push({
+          type: 'interviewer',
+          content: q.question,
+          category: q.category,
+          questionIndex: i
+        });
+        if (q.userAnswer) {
+          restoredMessages.push({
+            type: 'user',
+            content: q.userAnswer
+          });
+        }
+      }
+      setMessages(restoredMessages);
+    }
+    
+    setStage('interview');
+  };
+  
   const startInterview = async () => {
     setIsCreating(true);
     setError('');
     
     try {
+      // 创建新面试（后端会自动检查未完成的会话）
       const newSession = await interviewApi.createSession({
         resumeText,
         questionCount,
         resumeId
       });
       
-      setSession(newSession);
+      // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
+      const hasProgress = newSession.currentQuestionIndex > 0 || 
+                          newSession.questions.some(q => q.userAnswer) ||
+                          newSession.status === 'IN_PROGRESS';
       
-      if (newSession.questions.length > 0) {
-        const firstQuestion = newSession.questions[0];
-        setCurrentQuestion(firstQuestion);
-        setMessages([{
-          type: 'interviewer',
-          content: firstQuestion.question,
-          category: firstQuestion.category,
-          questionIndex: 0
-        }]);
+      if (hasProgress) {
+        // 这是恢复的会话
+        restoreSession(newSession);
+      } else {
+        // 全新的会话
+        setSession(newSession);
+        
+        if (newSession.questions.length > 0) {
+          const firstQuestion = newSession.questions[0];
+          setCurrentQuestion(firstQuestion);
+          setMessages([{
+            type: 'interviewer',
+            content: firstQuestion.question,
+            category: firstQuestion.category,
+            questionIndex: 0
+          }]);
+        }
+        
+        setStage('interview');
       }
-      
-      setStage('interview');
     } catch (err) {
       setError('创建面试失败，请重试');
       console.error(err);
     } finally {
       setIsCreating(false);
+    }
+  };
+  
+  const handleSaveAnswer = async () => {
+    if (!answer.trim() || !session || !currentQuestion) return;
+    
+    setIsSaving(true);
+    try {
+      await interviewApi.saveAnswer({
+        sessionId: session.sessionId,
+        questionIndex: currentQuestion.questionIndex,
+        answer: answer.trim()
+      });
+      
+      // 更新本地状态
+      const userMessage: Message = {
+        type: 'user',
+        content: answer
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // 更新session中的问题答案
+      if (session) {
+        const updatedQuestions = [...session.questions];
+        updatedQuestions[currentQuestion.questionIndex] = {
+          ...currentQuestion,
+          userAnswer: answer.trim()
+        };
+        setSession({ ...session, questions: updatedQuestions });
+      }
+      
+      // 不清空答案，让用户可以继续编辑
+    } catch (err) {
+      setError('暂存失败，请重试');
+      console.error(err);
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -109,6 +231,26 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
       }
     } catch (err) {
       setError('提交答案失败，请重试');
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleCompleteEarly = async () => {
+    if (!session) return;
+    
+    if (!confirm('确定要提前交卷吗？未回答的问题将按0分计算。')) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await interviewApi.completeInterview(session.sessionId);
+      setStage('loading-report');
+      await generateReport();
+    } catch (err) {
+      setError('提前交卷失败，请重试');
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -154,6 +296,70 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
           </div>
           面试配置
         </h2>
+        
+        {/* 未完成面试提示 */}
+        <AnimatePresence>
+          {checkingUnfinished && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm text-center"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <motion.div 
+                  className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+                正在检查是否有未完成的面试...
+              </div>
+            </motion.div>
+          )}
+          
+          {unfinishedSession && !checkingUnfinished && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 mb-1">检测到未完成的模拟面试</h3>
+                  <p className="text-sm text-amber-700">
+                    已完成 {unfinishedSession.currentQuestionIndex} / {unfinishedSession.totalQuestions} 题
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <motion.button
+                  onClick={handleContinueUnfinished}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  继续未完成的面试
+                </motion.button>
+                <motion.button
+                  onClick={handleStartNew}
+                  className="flex-1 px-4 py-2.5 bg-white border-2 border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-50 transition-all"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  创建新面试
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         <div className="mb-8">
           <label className="block text-sm font-semibold text-slate-600 mb-4">选择面试题目数量</label>
@@ -320,7 +526,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="请输入你的回答..."
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSaving}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.ctrlKey) {
                   handleSubmitAnswer();
@@ -328,17 +534,39 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
               }}
               className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-xl resize-none h-24 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all disabled:opacity-60"
             />
-            <motion.button 
-              onClick={handleSubmitAnswer}
-              disabled={!answer.trim() || isSubmitting}
-              className="px-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all self-end h-12"
+            <div className="flex flex-col gap-2 self-end">
+              <motion.button 
+                onClick={handleSaveAnswer}
+                disabled={!answer.trim() || isSaving || isSubmitting}
+                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {isSaving ? '暂存中...' : '暂存'}
+              </motion.button>
+              <motion.button 
+                onClick={handleSubmitAnswer}
+                disabled={!answer.trim() || isSubmitting || isSaving}
+                className="px-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-12"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {isSubmitting ? '提交中...' : '提交回答'}
+              </motion.button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-xs text-slate-400">按 Ctrl+Enter 快速提交</p>
+            <motion.button
+              onClick={handleCompleteEarly}
+              disabled={isSubmitting || isSaving}
+              className="px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isSubmitting ? '提交中...' : '提交回答'}
+              提前交卷
             </motion.button>
           </div>
-          <p className="text-xs text-slate-400 text-center mt-3">按 Ctrl+Enter 快速提交</p>
         </div>
       </div>
     </motion.div>

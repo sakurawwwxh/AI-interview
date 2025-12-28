@@ -78,4 +78,31 @@ export const interviewApi = {
     const response = await api.get<InterviewReport>(`/api/interview/session/${sessionId}/report`);
     return response.data;
   },
+  
+  /**
+   * 查找未完成的面试会话
+   */
+  async findUnfinishedSession(resumeId: number): Promise<InterviewSession | null> {
+    try {
+      const response = await api.get<InterviewSession>(`/api/interview/unfinished/${resumeId}`);
+      return response.data;
+    } catch (err) {
+      // 如果没有未完成的会话，返回null
+      return null;
+    }
+  },
+  
+  /**
+   * 暂存答案（不进入下一题）
+   */
+  async saveAnswer(request: SubmitAnswerRequest): Promise<void> {
+    await api.post<void>('/api/interview/save-answer', request);
+  },
+  
+  /**
+   * 提前交卷
+   */
+  async completeInterview(sessionId: string): Promise<void> {
+    await api.post<void>(`/api/interview/${sessionId}/complete`);
+  },
 };
