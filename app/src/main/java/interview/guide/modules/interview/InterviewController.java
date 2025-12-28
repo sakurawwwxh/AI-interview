@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 面试控制器
@@ -86,5 +87,41 @@ public class InterviewController {
         log.info("生成面试报告: {}", sessionId);
         InterviewReportDTO report = sessionService.generateReport(sessionId);
         return Result.success(report);
+    }
+    
+    /**
+     * 查找未完成的面试会话
+     * GET /api/interview/unfinished/{resumeId}
+     */
+    @GetMapping("/unfinished/{resumeId}")
+    public Result<InterviewSessionDTO> findUnfinishedSession(@PathVariable Long resumeId) {
+        log.info("查找未完成的面试会话: resumeId={}", resumeId);
+        Optional<InterviewSessionDTO> sessionOpt = sessionService.findUnfinishedSession(resumeId);
+        if (sessionOpt.isEmpty()) {
+            return Result.error(404, "未找到未完成的面试会话");
+        }
+        return Result.success(sessionOpt.get());
+    }
+    
+    /**
+     * 暂存答案（不进入下一题）
+     * POST /api/interview/save-answer
+     */
+    @PostMapping("/save-answer")
+    public Result<Void> saveAnswer(@RequestBody SubmitAnswerRequest request) {
+        log.info("暂存答案: 会话{}, 问题{}", request.sessionId(), request.questionIndex());
+        sessionService.saveAnswer(request);
+        return Result.success(null);
+    }
+    
+    /**
+     * 提前交卷
+     * POST /api/interview/{sessionId}/complete
+     */
+    @PostMapping("/{sessionId}/complete")
+    public Result<Void> completeInterview(@PathVariable String sessionId) {
+        log.info("提前交卷: {}", sessionId);
+        sessionService.completeInterview(sessionId);
+        return Result.success(null);
     }
 }

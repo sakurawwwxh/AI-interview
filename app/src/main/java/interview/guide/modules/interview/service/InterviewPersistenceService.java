@@ -219,4 +219,22 @@ public class InterviewPersistenceService {
             log.info("已删除 {} 个面试会话（包含所有答案）", sessions.size());
         }
     }
+    
+    /**
+     * 查找未完成的面试会话（CREATED或IN_PROGRESS状态）
+     */
+    public Optional<InterviewSessionEntity> findUnfinishedSession(Long resumeId) {
+        List<InterviewSessionEntity.SessionStatus> unfinishedStatuses = List.of(
+            InterviewSessionEntity.SessionStatus.CREATED,
+            InterviewSessionEntity.SessionStatus.IN_PROGRESS
+        );
+        return sessionRepository.findFirstByResumeIdAndStatusInOrderByCreatedAtDesc(resumeId, unfinishedStatuses);
+    }
+    
+    /**
+     * 根据会话ID查找所有答案
+     */
+    public List<InterviewAnswerEntity> findAnswersBySessionId(String sessionId) {
+        return answerRepository.findBySessionSessionIdOrderByQuestionIndex(sessionId);
+    }
 }

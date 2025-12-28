@@ -1,6 +1,7 @@
 package interview.guide.modules.interview.repository;
 
 import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.interview.model.InterviewSessionEntity.SessionStatus;
 import interview.guide.modules.resume.model.ResumeEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -28,4 +29,20 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
      * 根据简历ID查找所有面试记录
      */
     List<InterviewSessionEntity> findByResumeIdOrderByCreatedAtDesc(Long resumeId);
+    
+    /**
+     * 查找简历的未完成面试（CREATED或IN_PROGRESS状态）
+     */
+    Optional<InterviewSessionEntity> findFirstByResumeIdAndStatusInOrderByCreatedAtDesc(
+        Long resumeId, 
+        List<SessionStatus> statuses
+    );
+    
+    /**
+     * 根据简历ID和状态查找会话
+     */
+    Optional<InterviewSessionEntity> findByResumeIdAndStatusIn(
+        Long resumeId,
+        List<SessionStatus> statuses
+    );
 }
