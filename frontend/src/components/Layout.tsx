@@ -1,59 +1,70 @@
-import { ReactNode } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-interface LayoutProps {
-  children: ReactNode;
-  currentPage: 'upload' | 'history';
-  onNavigate: (page: 'upload' | 'history') => void;
-}
+// Layout不再需要children prop，使用Outlet渲染子路由
+interface LayoutProps {}
 
-export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
+export default function Layout({}: LayoutProps) {
+  const location = useLocation();
+  const currentPath = location.pathname;
+  
   const navItems = [
-    { id: 'upload', label: '上传分析', icon: UploadIcon },
-    { id: 'history', label: '历史记录', icon: HistoryIcon },
+    { id: 'upload', path: '/upload', label: '上传分析', icon: UploadIcon },
+    { id: 'history', path: '/history', label: '历史记录', icon: HistoryIcon },
   ] as const;
+
+  // 判断当前页面是否匹配导航项
+  const isActive = (path: string) => {
+    if (path === '/upload') {
+      return currentPath === '/upload' || currentPath === '/';
+    }
+    return currentPath.startsWith(path);
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
       {/* 左侧边栏 */}
       <aside className="w-64 bg-white border-r border-slate-200 p-6 fixed h-screen left-0 top-0 z-50">
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-10">
+        <Link to="/upload" className="flex items-center gap-3 mb-10">
           <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center text-white">
             <LogoIcon />
           </div>
           <span className="text-xl font-bold text-primary-600 tracking-tight">AI Interview</span>
-        </div>
+        </Link>
 
         {/* 导航菜单 */}
         <nav className="space-y-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left
-                ${currentPage === item.id 
-                  ? 'bg-gradient-to-r from-primary-50 to-primary-100 text-primary-600 font-medium' 
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-                }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.id}
+                to={item.path}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left
+                  ${active 
+                    ? 'bg-gradient-to-r from-primary-50 to-primary-100 text-primary-600 font-medium' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </aside>
 
       {/* 主内容区 */}
       <main className="flex-1 ml-64 p-10 min-h-screen overflow-y-auto">
         <motion.div
-          key={currentPage}
+          key={currentPath}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
         >
-          {children}
+          <Outlet />
         </motion.div>
       </main>
     </div>
