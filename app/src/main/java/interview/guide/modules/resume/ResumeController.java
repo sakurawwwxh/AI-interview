@@ -7,6 +7,7 @@ import interview.guide.common.config.AppConfigProperties;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.infrastructure.storage.FileStorageService;
 import interview.guide.modules.resume.model.ResumeEntity;
+import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.resume.service.ResumeGradingService;
 import interview.guide.modules.resume.service.ResumeParseService;
 import interview.guide.modules.resume.service.ResumePersistenceService;
@@ -33,6 +34,7 @@ public class ResumeController {
     private final ResumeGradingService gradingService;
     private final FileStorageService storageService;
     private final ResumePersistenceService persistenceService;
+    private final InterviewPersistenceService interviewPersistenceService;
     private final AppConfigProperties appConfig;
     
     /**
@@ -113,6 +115,45 @@ public class ResumeController {
             ),
             "duplicate", false
         ));
+    }
+    
+    /**
+     * 删除简历
+     * DELETE /api/resume/{id}
+     * 
+     * @param id 简历ID
+     * @return 删除结果
+     */
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteResume(@PathVariable Long id) {
+        log.info("收到删除简历请求: id={}", id);
+        
+        // 获取简历信息（用于删除存储文件）
+        var resumeOpt = persistenceService.findById(id);
+        if (resumeOpt.isEmpty()) {
+            throw new BusinessException(ErrorCode.RESUME_NOT_FOUND);
+        }
+        
+        ResumeEntity resume = resumeOpt.get();
+        
+        // 1. 删除存储的文件（如果存在）
+        if (resume.getStorageKey() != null && !resume.getStorageKey().isEmpty()) {
+            try {
+                storageService.deleteResume(resume.getStorageKey());
+                log.info("已删除存储文件: {}", resume.getStorageKey());
+            } catch (Exception e) {
+                log.warn("删除存储文件失败，继续删除数据库记录: {}", e.getMessage());
+            }
+        }
+        
+        // 2. 删除面试会话（会自动删除面试答案）
+        interviewPersistenceService.deleteSessionsByResumeId(id);
+        
+        // 3. 删除数据库记录（包括分析记录）
+        persistenceService.deleteResume(id);
+        
+        log.info("简历删除完成: id={}", id);
+        return Result.success(null);
     }
     
     /**
