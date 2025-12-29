@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { historyApi, ResumeListItem } from '../api/history';
 import ConfirmDialog from './ConfirmDialog';
+import { formatDateOnly } from '../utils/date';
+import { getScoreColor } from '../utils/score';
 
 interface HistoryListProps {
   onSelectResume: (id: number) => void;
@@ -30,17 +32,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'bg-emerald-500';
-    if (score >= 60) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
 
   const handleDeleteClick = (id: number, filename: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止触发行点击事件
@@ -184,7 +176,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                         <div className="flex items-center gap-3">
                           <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
                             <motion.div 
-                              className={`h-full ${getScoreColor(resume.latestScore)} rounded-full`}
+                              className={`h-full ${getScoreColor(resume.latestScore).split(' ')[0]} rounded-full`}
                               initial={{ width: 0 }}
                               animate={{ width: `${resume.latestScore}%` }}
                               transition={{ duration: 0.8, delay: index * 0.05 }}
