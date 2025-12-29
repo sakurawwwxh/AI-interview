@@ -1,5 +1,5 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import type { InterviewSession } from '../types/interview';
+import {AnimatePresence, motion} from 'framer-motion';
+import type {InterviewSession} from '../types/interview';
 
 interface InterviewConfigPanelProps {
   questionCount: number;

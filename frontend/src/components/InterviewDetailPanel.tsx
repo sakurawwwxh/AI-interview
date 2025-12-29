@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { getScoreColor } from '../utils/score';
-import type { InterviewDetail } from '../api/history';
+import {useMemo, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {getScoreColor} from '../utils/score';
+import type {InterviewDetail} from '../api/history';
 
 interface InterviewDetailPanelProps {
   interview: InterviewDetail;

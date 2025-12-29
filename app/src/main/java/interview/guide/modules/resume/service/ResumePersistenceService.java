@@ -5,12 +5,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
-import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.mapper.ResumeMapper;
-import interview.guide.modules.resume.repository.ResumeAnalysisRepository;
-import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.model.ResumeAnalysisEntity;
 import interview.guide.modules.resume.model.ResumeEntity;
+import interview.guide.modules.resume.repository.ResumeAnalysisRepository;
+import interview.guide.modules.resume.repository.ResumeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -162,12 +162,14 @@ public class ResumePersistenceService {
         try {
             List<String> strengths = objectMapper.readValue(
                 entity.getStrengthsJson() != null ? entity.getStrengthsJson() : "[]",
-                new TypeReference<List<String>>() {}
+                    new TypeReference<>() {
+                    }
             );
             
             List<ResumeAnalysisResponse.Suggestion> suggestions = objectMapper.readValue(
                 entity.getSuggestionsJson() != null ? entity.getSuggestionsJson() : "[]",
-                new TypeReference<List<ResumeAnalysisResponse.Suggestion>>() {}
+                    new TypeReference<>() {
+                    }
             );
             
             return new ResumeAnalysisResponse(

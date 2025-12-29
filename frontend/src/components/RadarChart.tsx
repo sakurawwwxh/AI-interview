@@ -1,6 +1,14 @@
-import { useMemo } from 'react';
-import { RadarChart as RechartsRadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, ResponsiveContainer } from 'recharts';
-import { normalizeScore } from '../utils/score';
+import {useMemo} from 'react';
+import {
+    PolarAngleAxis,
+    PolarGrid,
+    PolarRadiusAxis,
+    Radar,
+    RadarChart as RechartsRadarChart,
+    ResponsiveContainer,
+    Tooltip
+} from 'recharts';
+import {normalizeScore} from '../utils/score';
 
 interface RadarDataItem {
   subject: string;

@@ -1,8 +1,8 @@
 package interview.guide.modules.resume;
 
 import interview.guide.common.result.Result;
-import interview.guide.modules.resume.service.ResumeUploadService;
 import interview.guide.modules.resume.service.ResumeDeleteService;
+import interview.guide.modules.resume.service.ResumeUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

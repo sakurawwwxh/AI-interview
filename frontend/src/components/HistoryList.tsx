@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { historyApi, ResumeListItem } from '../api/history';
+import {useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {historyApi, ResumeListItem} from '../api/history';
 import ConfirmDialog from './ConfirmDialog';
-import { formatDateOnly } from '../utils/date';
-import { getScoreColor } from '../utils/score';
+import {getScoreColor} from '../utils/score';
 
 interface HistoryListProps {
   onSelectResume: (id: number) => void;

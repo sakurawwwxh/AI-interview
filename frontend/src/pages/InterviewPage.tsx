@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { interviewApi } from '../api/interview';
+import {useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {interviewApi} from '../api/interview';
 import ConfirmDialog from '../components/ConfirmDialog';
 import InterviewConfigPanel from '../components/InterviewConfigPanel';
 import InterviewChatPanel from '../components/InterviewChatPanel';
 import InterviewReportPanel from '../components/InterviewReportPanel';
-import type { 
-  InterviewSession, 
-  InterviewQuestion,
-  InterviewReport 
-} from '../types/interview';
+import type {InterviewQuestion, InterviewReport, InterviewSession} from '../types/interview';
 
 type InterviewStage = 'config' | 'interview' | 'loading-report' | 'report';
 

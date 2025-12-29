@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import { calculatePercentage } from '../utils/score';
+import {motion} from 'framer-motion';
+import {calculatePercentage} from '../utils/score';
 
 interface ScoreProgressBarProps {
   label: string;

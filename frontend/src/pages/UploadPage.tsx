@@ -1,7 +1,7 @@
-import { useState, useCallback, DragEvent, ChangeEvent } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { resumeApi } from '../api/resume';
-import type { ResumeAnalysisResponse, StorageInfo } from '../types/resume';
+import {ChangeEvent, DragEvent, useCallback, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {resumeApi} from '../api/resume';
+import type {ResumeAnalysisResponse, StorageInfo} from '../types/resume';
 
 interface UploadPageProps {
   onAnalysisComplete: (result: ResumeAnalysisResponse, storage: StorageInfo) => void;

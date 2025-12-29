@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { historyApi, ResumeDetail, InterviewDetail } from '../api/history';
+import {useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {historyApi, InterviewDetail, ResumeDetail} from '../api/history';
 import AnalysisPanel from '../components/AnalysisPanel';
 import InterviewPanel from '../components/InterviewPanel';
 import InterviewDetailPanel from '../components/InterviewDetailPanel';
-import { formatDateOnly } from '../utils/date';
+import {formatDateOnly} from '../utils/date';
 
 interface ResumeDetailPageProps {
   resumeId: number;

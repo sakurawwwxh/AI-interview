@@ -1,8 +1,8 @@
 package interview.guide.infrastructure.storage;
 
+import interview.guide.common.config.StorageConfigProperties;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
-import interview.guide.common.config.StorageConfigProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

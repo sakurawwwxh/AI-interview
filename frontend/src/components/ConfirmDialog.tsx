@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import {AnimatePresence, motion} from 'framer-motion';
 
 export interface ConfirmDialogProps {
   open: boolean;

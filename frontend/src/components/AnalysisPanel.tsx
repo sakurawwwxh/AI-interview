@@ -1,9 +1,8 @@
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import {useMemo} from 'react';
+import {motion} from 'framer-motion';
 import RadarChart from './RadarChart';
 import ScoreProgressBar from './ScoreProgressBar';
-import { formatDateTime } from '../utils/date';
-import { normalizeScore } from '../utils/score';
+import {formatDateTime} from '../utils/date';
 
 interface AnalysisPanelProps {
   analysis: any;

@@ -2,6 +2,7 @@ package interview.guide.modules.interview.model;
 
 import interview.guide.modules.resume.model.ResumeEntity;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;

@@ -17,9 +17,9 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
-import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.model.ResumeEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -137,11 +137,11 @@ public class PdfExportService {
             
             Table scoreTable = new Table(UnitValue.createPercentArray(new float[]{2, 1}))
                 .useAllAvailableWidth();
-            addScoreRow(scoreTable, "内容完整性", analysis.scoreDetail().contentScore(), 25);
-            addScoreRow(scoreTable, "结构清晰度", analysis.scoreDetail().structureScore(), 20);
-            addScoreRow(scoreTable, "技能匹配度", analysis.scoreDetail().skillMatchScore(), 25);
-            addScoreRow(scoreTable, "表达专业性", analysis.scoreDetail().expressionScore(), 15);
-            addScoreRow(scoreTable, "项目经验", analysis.scoreDetail().projectScore(), 15);
+            addScoreRow(scoreTable, "项目经验", analysis.scoreDetail().projectScore(), 40);
+            addScoreRow(scoreTable, "技能匹配度", analysis.scoreDetail().skillMatchScore(), 20);
+            addScoreRow(scoreTable, "内容完整性", analysis.scoreDetail().contentScore(), 15);
+            addScoreRow(scoreTable, "结构清晰度", analysis.scoreDetail().structureScore(), 15);
+            addScoreRow(scoreTable, "表达专业性", analysis.scoreDetail().expressionScore(), 10);
             document.add(scoreTable);
         }
         
@@ -233,7 +233,8 @@ public class PdfExportService {
         if (session.getStrengthsJson() != null) {
             try {
                 List<String> strengths = objectMapper.readValue(session.getStrengthsJson(),
-                    new TypeReference<List<String>>() {});
+                        new TypeReference<>() {
+                        });
                 if (!strengths.isEmpty()) {
                     document.add(new Paragraph("\n"));
                     document.add(createSectionTitle("表现优势"));
@@ -250,7 +251,8 @@ public class PdfExportService {
         if (session.getImprovementsJson() != null) {
             try {
                 List<String> improvements = objectMapper.readValue(session.getImprovementsJson(),
-                    new TypeReference<List<String>>() {});
+                        new TypeReference<>() {
+                        });
                 if (!improvements.isEmpty()) {
                     document.add(new Paragraph("\n"));
                     document.add(createSectionTitle("改进建议"));
