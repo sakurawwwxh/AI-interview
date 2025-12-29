@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080/api/history';
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:8080';
 
 // 统一响应结果类型
 interface Result<T> {
@@ -94,28 +94,28 @@ export const historyApi = {
    * 获取所有简历列表
    */
   async getResumes(): Promise<ResumeListItem[]> {
-    return fetchWithResult<ResumeListItem[]>(`${API_BASE}/resumes`);
+    return fetchWithResult<ResumeListItem[]>(`${API_BASE}/api/resume/list`);
   },
 
   /**
    * 获取简历详情
    */
   async getResumeDetail(id: number): Promise<ResumeDetail> {
-    return fetchWithResult<ResumeDetail>(`${API_BASE}/resumes/${id}`);
+    return fetchWithResult<ResumeDetail>(`${API_BASE}/api/resume/${id}/detail`);
   },
 
   /**
    * 获取面试详情
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
-    return fetchWithResult<InterviewDetail>(`${API_BASE}/interviews/${sessionId}`);
+    return fetchWithResult<InterviewDetail>(`${API_BASE}/api/interview/${sessionId}/detail`);
   },
 
   /**
    * 导出简历分析报告PDF
    */
   async exportAnalysisPdf(resumeId: number): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/export/analysis/${resumeId}`);
+    const response = await fetch(`${API_BASE}/api/resume/${resumeId}/export`);
     if (!response.ok) {
       throw new Error('导出PDF失败');
     }
@@ -126,7 +126,7 @@ export const historyApi = {
    * 导出面试报告PDF
    */
   async exportInterviewPdf(sessionId: string): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/export/interview/${sessionId}`);
+    const response = await fetch(`${API_BASE}/api/interview/${sessionId}/export`);
     if (!response.ok) {
       throw new Error('导出PDF失败');
     }
@@ -137,8 +137,7 @@ export const historyApi = {
    * 删除简历
    */
   async deleteResume(id: number): Promise<void> {
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
-    const response = await fetch(`${API_BASE_URL}/api/resume/${id}`, {
+    const response = await fetch(`${API_BASE}/api/resume/${id}`, {
       method: 'DELETE',
     });
     if (!response.ok) {

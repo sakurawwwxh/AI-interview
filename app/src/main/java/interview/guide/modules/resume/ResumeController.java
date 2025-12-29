@@ -1,14 +1,22 @@
 package interview.guide.modules.resume;
 
 import interview.guide.common.result.Result;
+import interview.guide.modules.resume.model.ResumeDetailDTO;
+import interview.guide.modules.resume.model.ResumeListItemDTO;
 import interview.guide.modules.resume.service.ResumeDeleteService;
+import interview.guide.modules.resume.service.ResumeHistoryService;
 import interview.guide.modules.resume.service.ResumeUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,6 +30,7 @@ public class ResumeController {
     
     private final ResumeUploadService uploadService;
     private final ResumeDeleteService deleteService;
+    private final ResumeHistoryService historyService;
     
     /**
      * 上传简历并获取分析结果
@@ -51,6 +60,46 @@ public class ResumeController {
     public Result<Void> deleteResume(@PathVariable Long id) {
         deleteService.deleteResume(id);
         return Result.success(null);
+    }
+    
+    /**
+     * 获取所有简历列表
+     * GET /api/resume/list
+     */
+    @GetMapping("/api/resume/list")
+    public Result<List<ResumeListItemDTO>> getAllResumes() {
+        List<ResumeListItemDTO> resumes = historyService.getAllResumes();
+        return Result.success(resumes);
+    }
+    
+    /**
+     * 获取简历详情（包含分析历史）
+     * GET /api/resume/{id}/detail
+     */
+    @GetMapping("/api/resume/{id}/detail")
+    public Result<ResumeDetailDTO> getResumeDetail(@PathVariable Long id) {
+        ResumeDetailDTO detail = historyService.getResumeDetail(id);
+        return Result.success(detail);
+    }
+    
+    /**
+     * 导出简历分析报告为PDF
+     * GET /api/resume/{id}/export
+     */
+    @GetMapping("/api/resume/{id}/export")
+    public ResponseEntity<byte[]> exportAnalysisPdf(@PathVariable Long id) {
+        try {
+            var result = historyService.exportAnalysisPdf(id);
+            String filename = URLEncoder.encode(result.filename(), StandardCharsets.UTF_8);
+            
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(result.pdfBytes());
+        } catch (Exception e) {
+            log.error("导出PDF失败", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
     
     /**

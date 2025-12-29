@@ -1,4 +1,4 @@
-package interview.guide.mapper;
+package interview.guide.infrastructure.mapper;
 
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.model.ResumeAnalysisEntity;
