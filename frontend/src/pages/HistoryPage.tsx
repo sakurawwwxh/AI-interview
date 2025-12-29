@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { historyApi, ResumeListItem } from '../api/history';
-import ConfirmDialog from './ConfirmDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { formatDateOnly } from '../utils/date';
-import { getScoreColor } from '../utils/score';
+import { getScoreProgressColor } from '../utils/score';
 
 interface HistoryListProps {
   onSelectResume: (id: number) => void;
@@ -170,13 +170,13 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                         <span className="font-medium text-slate-800">{resume.filename}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-slate-500">{formatDate(resume.uploadedAt)}</td>
+                    <td className="px-6 py-5 text-slate-500">{formatDateOnly(resume.uploadedAt)}</td>
                     <td className="px-6 py-5">
                       {resume.latestScore !== undefined ? (
                         <div className="flex items-center gap-3">
                           <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
                             <motion.div 
-                              className={`h-full ${getScoreColor(resume.latestScore).split(' ')[0]} rounded-full`}
+                              className={`h-full ${getScoreProgressColor(resume.latestScore)} rounded-full`}
                               initial={{ width: 0 }}
                               animate={{ width: `${resume.latestScore}%` }}
                               transition={{ duration: 0.8, delay: index * 0.05 }}

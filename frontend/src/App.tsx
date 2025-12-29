@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
-import UploadPage from './components/UploadPage';
-import HistoryList from './components/HistoryList';
-import ResumeDetailPage from './components/ResumeDetailPage';
-import Interview from './components/Interview';
+import UploadPage from './pages/UploadPage';
+import HistoryList from './pages/HistoryPage';
+import ResumeDetailPage from './pages/ResumeDetailPage';
+import Interview from './pages/InterviewPage';
 import { historyApi } from './api/history';
 import { useState, useEffect } from 'react';
 import type { ResumeAnalysisResponse, StorageInfo } from './types/resume';
@@ -12,7 +12,7 @@ import type { ResumeAnalysisResponse, StorageInfo } from './types/resume';
 function UploadPageWrapper() {
   const navigate = useNavigate();
   
-  const handleAnalysisComplete = (result: ResumeAnalysisResponse, storage: StorageInfo) => {
+  const handleAnalysisComplete = (_result: ResumeAnalysisResponse, storage: StorageInfo) => {
     // 直接跳转到详情页
     if (storage.resumeId) {
       navigate(`/history/${storage.resumeId}`);
