@@ -37,7 +37,7 @@ export function normalizeScore(
  */
 export function getScoreColor(
   score: number,
-  thresholds: [number, number] = [85, 70]
+  thresholds: [number, number] = [80, 70]
 ): string {
   if (score >= thresholds[0]) return 'bg-emerald-100 text-emerald-600';
   if (score >= thresholds[1]) return 'bg-amber-100 text-amber-600';
@@ -64,7 +64,7 @@ export function getScoreBadgeColor(
  */
 export function getScoreProgressColor(
   score: number,
-  thresholds: [number, number] = [85, 70]
+  thresholds: [number, number] = [80, 70]
 ): string {
   if (score >= thresholds[0]) return 'bg-emerald-500';
   if (score >= thresholds[1]) return 'bg-amber-500';

@@ -2,11 +2,17 @@ package interview.guide.modules.interview;
 
 import interview.guide.common.result.Result;
 import interview.guide.modules.interview.model.*;
+import interview.guide.modules.interview.service.InterviewHistoryService;
 import interview.guide.modules.interview.service.InterviewSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -19,6 +25,7 @@ import java.util.Map;
 public class InterviewController {
     
     private final InterviewSessionService sessionService;
+    private final InterviewHistoryService historyService;
     
     /**
      * 创建面试会话
@@ -101,5 +108,36 @@ public class InterviewController {
         log.info("提前交卷: {}", sessionId);
         sessionService.completeInterview(sessionId);
         return Result.success(null);
+    }
+    
+    /**
+     * 获取面试会话详情
+     * GET /api/interview/{sessionId}/detail
+     */
+    @GetMapping("/api/interview/{sessionId}/detail")
+    public Result<InterviewDetailDTO> getInterviewDetail(@PathVariable String sessionId) {
+        InterviewDetailDTO detail = historyService.getInterviewDetail(sessionId);
+        return Result.success(detail);
+    }
+    
+    /**
+     * 导出面试报告为PDF
+     * GET /api/interview/{sessionId}/export
+     */
+    @GetMapping("/api/interview/{sessionId}/export")
+    public ResponseEntity<byte[]> exportInterviewPdf(@PathVariable String sessionId) {
+        try {
+            byte[] pdfBytes = historyService.exportInterviewPdf(sessionId);
+            String filename = URLEncoder.encode("模拟面试报告_" + sessionId + ".pdf", 
+                StandardCharsets.UTF_8);
+            
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("导出PDF失败", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }
