@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { historyApi, ResumeDetail, InterviewItem, InterviewDetail } from '../api/history';
 
 interface ResumeDetailPageProps {
@@ -310,74 +310,306 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
     );
   }
 
+  // 准备雷达图数据
+  // 后端返回的数据中，各维度分数直接在analysis对象上，不在scoreDetail中
+  const projectScore = analysis.projectScore || 0;
+  const skillMatchScore = analysis.skillMatchScore || 0;
+  const contentScore = analysis.contentScore || 0;
+  const structureScore = analysis.structureScore || 0;
+  const expressionScore = analysis.expressionScore || 0;
+  
+  const radarData = [
+    {
+      subject: '项目经验',
+      score: projectScore,
+      fullMark: 40
+    },
+    {
+      subject: '技能匹配',
+      score: skillMatchScore,
+      fullMark: 20
+    },
+    {
+      subject: '内容完整性',
+      score: contentScore,
+      fullMark: 15
+    },
+    {
+      subject: '结构清晰度',
+      score: structureScore,
+      fullMark: 15
+    },
+    {
+      subject: '表达专业性',
+      score: expressionScore,
+      fullMark: 10
+    }
+  ];
+
+  // 按优先级分类建议
+  const suggestions = analysis.suggestions || [];
+  const highPriority = suggestions.filter((s: any) => s.priority === '高');
+  const mediumPriority = suggestions.filter((s: any) => s.priority === '中');
+  const lowPriority = suggestions.filter((s: any) => s.priority === '低');
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case '高':
+        return 'bg-red-50 border-red-200 text-red-700';
+      case '中':
+        return 'bg-amber-50 border-amber-200 text-amber-700';
+      case '低':
+        return 'bg-blue-50 border-blue-200 text-blue-700';
+      default:
+        return 'bg-slate-50 border-slate-200 text-slate-700';
+    }
+  };
+
+  const getPriorityBadgeColor = (priority: string) => {
+    switch (priority) {
+      case '高':
+        return 'bg-red-500 text-white';
+      case '中':
+        return 'bg-amber-500 text-white';
+      case '低':
+        return 'bg-blue-500 text-white';
+      default:
+        return 'bg-slate-500 text-white';
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      '项目': 'bg-purple-100 text-purple-700',
+      '技能': 'bg-indigo-100 text-indigo-700',
+      '内容': 'bg-emerald-100 text-emerald-700',
+      '格式': 'bg-pink-100 text-pink-700',
+      '结构': 'bg-cyan-100 text-cyan-700',
+      '表达': 'bg-orange-100 text-orange-700'
+    };
+    return colors[category] || 'bg-slate-100 text-slate-700';
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 核心评价 */}
-      <motion.div 
-        className="bg-white rounded-2xl p-6 lg:col-span-2"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2 text-slate-500">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="font-semibold">核心评价</span>
-          </div>
-          <motion.button
-            onClick={onExport}
-            disabled={exporting}
-            className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            {exporting ? '导出中...' : '导出分析报告'}
-          </motion.button>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-6">
-          <p className="text-lg text-slate-800 leading-relaxed mb-6">
-            {analysis.summary || '候选人具备扎实的技术基础，有大型项目架构经验。'}
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl p-5">
-              <span className="text-sm font-semibold text-emerald-600 block mb-2">匹配度评分</span>
-              <span className="text-4xl font-bold text-slate-900">{analysis.overallScore}%</span>
+    <div className="space-y-6">
+      {/* 核心评价和雷达图 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* 核心评价 */}
+        <motion.div 
+          className="bg-white rounded-2xl p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2 text-slate-500">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="font-semibold">核心评价</span>
             </div>
-            <div className="bg-white rounded-xl p-5">
-              <span className="text-sm font-semibold text-emerald-600 block mb-3">技能标签</span>
-              <div className="flex flex-wrap gap-2">
-                {analysis.strengths?.slice(0, 4).map((s: string, i: number) => (
-                  <span key={i} className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600">
-                    {s.length > 10 ? s.substring(0, 10) + '...' : s}
-                  </span>
-                )) || (
-                  <>
-                    <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600">Java</span>
-                    <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600">Spring</span>
-                  </>
-                )}
+            <motion.button
+              onClick={onExport}
+              disabled={exporting}
+              className="px-4 py-2 border border-slate-200 bg-white rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {exporting ? '导出中...' : '导出分析报告'}
+            </motion.button>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-6">
+            <p className="text-lg text-slate-800 leading-relaxed mb-6">
+              {analysis.summary || '候选人具备扎实的技术基础，有大型项目架构经验。'}
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="bg-white rounded-xl p-5">
+                <span className="text-sm font-semibold text-emerald-600 block mb-2">总分</span>
+                <span className="text-4xl font-bold text-slate-900">{analysis.overallScore || 0}</span>
+                <span className="text-sm text-slate-500">/ 100</span>
+              </div>
+              <div className="bg-white rounded-xl p-5">
+                <span className="text-sm font-semibold text-emerald-600 block mb-2">分析时间</span>
+                <span className="text-sm text-slate-700">
+                  {analysis.analyzedAt 
+                    ? new Date(analysis.analyzedAt).toLocaleString('zh-CN', { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : '-'}
+                </span>
+              </div>
+            </div>
+
+            {/* 优势标签 */}
+            {analysis.strengths && analysis.strengths.length > 0 && (
+              <div className="bg-white rounded-xl p-4">
+                <span className="text-sm font-semibold text-emerald-600 block mb-3">优势亮点</span>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.strengths.map((s: string, i: number) => (
+                    <span key={i} className="px-3 py-1.5 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-medium">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* 多维度评分雷达图 */}
+        <motion.div 
+          className="bg-white rounded-2xl p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="flex items-center gap-2 text-slate-500 mb-6">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+            </svg>
+            <span className="font-semibold">多维度评分</span>
+          </div>
+
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData}>
+                <PolarGrid stroke="#e2e8f0" />
+                <PolarAngleAxis 
+                  dataKey="subject" 
+                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                />
+                <PolarRadiusAxis 
+                  angle={90} 
+                  domain={[0, 40]}
+                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                />
+                <Radar
+                  name="得分"
+                  dataKey="score"
+                  stroke="#6366f1"
+                  fill="#6366f1"
+                  fillOpacity={0.6}
+                  strokeWidth={2}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  formatter={(value: number | undefined) => [`${value ?? 0} 分`, '得分']}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* 维度得分详情 */}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">项目经验</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-purple-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(projectScore / 40) * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.3 }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 w-8 text-right">
+                  {projectScore}/40
+                </span>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">技能匹配</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-indigo-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(skillMatchScore / 20) * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.4 }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 w-8 text-right">
+                  {skillMatchScore}/20
+                </span>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">内容完整性</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-emerald-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(contentScore / 15) * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.5 }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 w-8 text-right">
+                  {contentScore}/15
+                </span>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">结构清晰度</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-cyan-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(structureScore / 15) * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.6 }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 w-8 text-right">
+                  {structureScore}/15
+                </span>
+              </div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+              <div className="text-xs text-slate-500 mb-1">表达专业性</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-orange-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(expressionScore / 10) * 100}%` }}
+                    transition={{ duration: 0.8, delay: 0.7 }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 w-8 text-right">
+                  {expressionScore}/10
+                </span>
               </div>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
-      {/* 改进建议 */}
+      {/* 改进建议 - 按优先级分类 */}
       <motion.div 
-        className="bg-white rounded-2xl p-6 lg:col-span-2"
+        className="bg-white rounded-2xl p-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.3 }}
       >
         <div className="flex items-center gap-2 text-slate-500 mb-6">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
@@ -385,23 +617,119 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
             <polyline points="9,12 11,14 15,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span className="font-semibold">改进建议</span>
+          <span className="text-sm text-slate-400">({suggestions.length} 条)</span>
         </div>
 
-        <div className="space-y-3">
-          {analysis.suggestions?.map((s: any, i: number) => (
-            <motion.div 
-              key={i}
-              className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
-            >
-              <span className="w-7 h-7 bg-primary-500 text-white rounded-lg flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                {i + 1}
-              </span>
-              <span className="text-slate-600">{s.recommendation || s}</span>
-            </motion.div>
-          )) || (
+        <div className="space-y-6">
+          {/* 高优先级 */}
+          {highPriority.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+                  高优先级 ({highPriority.length})
+                </span>
+                <div className="flex-1 h-px bg-red-100"></div>
+              </div>
+              <div className="space-y-3">
+                {highPriority.map((s: any, i: number) => (
+                  <motion.div 
+                    key={`high-${i}`}
+                    className={`p-4 rounded-xl border-2 ${getPriorityColor('高')}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.1 }}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getPriorityBadgeColor('高')}`}>
+                        高
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(s.category || '其他')}`}>
+                        {s.category || '其他'}
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <p className="font-semibold text-slate-900 mb-1">{s.issue || '问题描述'}</p>
+                      <p className="text-sm leading-relaxed">{s.recommendation || s}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 中优先级 */}
+          {mediumPriority.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
+                  中优先级 ({mediumPriority.length})
+                </span>
+                <div className="flex-1 h-px bg-amber-100"></div>
+              </div>
+              <div className="space-y-3">
+                {mediumPriority.map((s: any, i: number) => (
+                  <motion.div 
+                    key={`medium-${i}`}
+                    className={`p-4 rounded-xl border-2 ${getPriorityColor('中')}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 + i * 0.1 }}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getPriorityBadgeColor('中')}`}>
+                        中
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(s.category || '其他')}`}>
+                        {s.category || '其他'}
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <p className="font-semibold text-slate-900 mb-1">{s.issue || '问题描述'}</p>
+                      <p className="text-sm leading-relaxed">{s.recommendation || s}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 低优先级 */}
+          {lowPriority.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                  低优先级 ({lowPriority.length})
+                </span>
+                <div className="flex-1 h-px bg-blue-100"></div>
+              </div>
+              <div className="space-y-3">
+                {lowPriority.map((s: any, i: number) => (
+                  <motion.div 
+                    key={`low-${i}`}
+                    className={`p-4 rounded-xl border-2 ${getPriorityColor('低')}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 + i * 0.1 }}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getPriorityBadgeColor('低')}`}>
+                        低
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(s.category || '其他')}`}>
+                        {s.category || '其他'}
+                      </span>
+                    </div>
+                    <div className="mb-2">
+                      <p className="font-semibold text-slate-900 mb-1">{s.issue || '问题描述'}</p>
+                      <p className="text-sm leading-relaxed">{s.recommendation || s}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {suggestions.length === 0 && (
             <div className="text-center py-8 text-slate-500">暂无改进建议</div>
           )}
         </div>
