@@ -1,11 +1,7 @@
 package interview.guide.modules.interview;
 
 import interview.guide.common.result.Result;
-import interview.guide.modules.interview.model.CreateInterviewRequest;
-import interview.guide.modules.interview.model.SubmitAnswerRequest;
-import interview.guide.modules.interview.model.InterviewReportDTO;
-import interview.guide.modules.interview.model.InterviewSessionDTO;
-import interview.guide.modules.interview.model.SubmitAnswerResponse;
+import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.service.InterviewSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

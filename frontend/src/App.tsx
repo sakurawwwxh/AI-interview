@@ -1,12 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useLocation } from 'react-router-dom';
+import {BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams} from 'react-router-dom';
 import Layout from './components/Layout';
 import UploadPage from './pages/UploadPage';
 import HistoryList from './pages/HistoryPage';
 import ResumeDetailPage from './pages/ResumeDetailPage';
 import Interview from './pages/InterviewPage';
-import { historyApi } from './api/history';
-import { useState, useEffect } from 'react';
-import type { ResumeAnalysisResponse, StorageInfo } from './types/resume';
+import {historyApi} from './api/history';
+import {useEffect, useState} from 'react';
+import type {ResumeAnalysisResponse, StorageInfo} from './types/resume';
 
 // 上传页面包装器
 function UploadPageWrapper() {

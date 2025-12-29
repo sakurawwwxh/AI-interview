@@ -1,8 +1,8 @@
 package interview.guide.modules.resume.service;
 
+import interview.guide.infrastructure.storage.FileStorageService;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.resume.model.ResumeEntity;
-import interview.guide.infrastructure.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

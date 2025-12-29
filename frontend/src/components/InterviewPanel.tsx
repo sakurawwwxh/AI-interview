@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatDateOnly } from '../utils/date';
-import { getScoreColor } from '../utils/score';
-import type { InterviewItem } from '../api/history';
+import {useMemo} from 'react';
+import {motion} from 'framer-motion';
+import {CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
+import {formatDateOnly} from '../utils/date';
+import {getScoreColor} from '../utils/score';
+import type {InterviewItem} from '../api/history';
 
 interface InterviewPanelProps {
   interviews: InterviewItem[];

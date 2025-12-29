@@ -1,6 +1,6 @@
-import { useRef, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import type { InterviewSession, InterviewQuestion } from '../types/interview';
+import {useEffect, useMemo, useRef} from 'react';
+import {motion} from 'framer-motion';
+import type {InterviewQuestion, InterviewSession} from '../types/interview';
 
 interface Message {
   type: 'interviewer' | 'user';

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { UploadResponse } from '../types/resume';
+import type {UploadResponse} from '../types/resume';
 
 const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
 

@@ -2,7 +2,9 @@ package interview.guide.modules.interview.service;
 
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO;
-import interview.guide.modules.interview.model.InterviewReportDTO.*;
+import interview.guide.modules.interview.model.InterviewReportDTO.CategoryScore;
+import interview.guide.modules.interview.model.InterviewReportDTO.QuestionEvaluation;
+import interview.guide.modules.interview.model.InterviewReportDTO.ReferenceAnswer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;

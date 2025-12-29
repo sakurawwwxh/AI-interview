@@ -1,5 +1,5 @@
-import { Link, useLocation, Outlet } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import {Link, Outlet, useLocation} from 'react-router-dom';
+import {motion} from 'framer-motion';
 
 // Layout不再需要children prop，使用Outlet渲染子路由
 interface LayoutProps {}

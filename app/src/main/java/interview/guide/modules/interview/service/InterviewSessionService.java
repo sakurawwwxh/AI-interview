@@ -1,20 +1,11 @@
 package interview.guide.modules.interview.service;
 
-import interview.guide.common.exception.BusinessException;
-import interview.guide.common.exception.ErrorCode;
-
-import java.util.Map;
-import interview.guide.modules.interview.model.CreateInterviewRequest;
-import interview.guide.modules.interview.model.SubmitAnswerRequest;
-import interview.guide.modules.interview.model.InterviewQuestionDTO;
-import interview.guide.modules.interview.model.InterviewReportDTO;
-import interview.guide.modules.interview.model.InterviewSessionDTO;
-import interview.guide.modules.interview.model.SubmitAnswerResponse;
-import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
-import interview.guide.modules.interview.model.InterviewSessionEntity;
-import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import interview.guide.common.exception.BusinessException;
+import interview.guide.common.exception.ErrorCode;
+import interview.guide.modules.interview.model.*;
+import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -156,10 +147,7 @@ public class InterviewSessionService {
     private InterviewSession restoreSessionFromDatabase(String sessionId) {
         try {
             Optional<InterviewSessionEntity> entityOpt = persistenceService.findBySessionId(sessionId);
-            if (entityOpt.isEmpty()) {
-                return null;
-            }
-            return restoreSessionFromEntity(entityOpt.get());
+            return entityOpt.map(this::restoreSessionFromEntity).orElse(null);
         } catch (Exception e) {
             log.error("从数据库恢复会话失败: {}", e.getMessage(), e);
             return null;
@@ -174,7 +162,8 @@ public class InterviewSessionService {
             // 解析问题列表
             List<InterviewQuestionDTO> questions = objectMapper.readValue(
                 entity.getQuestionsJson(),
-                new TypeReference<List<InterviewQuestionDTO>>() {}
+                    new TypeReference<>() {
+                    }
             );
             
             // 恢复已保存的答案

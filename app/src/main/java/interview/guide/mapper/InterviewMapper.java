@@ -1,7 +1,7 @@
 package interview.guide.mapper;
 
-import interview.guide.modules.interview.model.InterviewReportDTO;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
+import interview.guide.modules.interview.model.InterviewReportDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;

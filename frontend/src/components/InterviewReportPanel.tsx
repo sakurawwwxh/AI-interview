@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import type { InterviewReport, InterviewSession } from '../types/interview';
+import {motion} from 'framer-motion';
+import type {InterviewReport, InterviewSession} from '../types/interview';
 
 interface InterviewReportPanelProps {
   report: InterviewReport;

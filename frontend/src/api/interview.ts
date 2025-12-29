@@ -1,11 +1,11 @@
 import axios from 'axios';
-import type { 
-  InterviewSession, 
-  CreateInterviewRequest, 
-  SubmitAnswerRequest,
-  SubmitAnswerResponse,
-  CurrentQuestionResponse,
-  InterviewReport 
+import type {
+    CreateInterviewRequest,
+    CurrentQuestionResponse,
+    InterviewReport,
+    InterviewSession,
+    SubmitAnswerRequest,
+    SubmitAnswerResponse
 } from '../types/interview';
 
 const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
