@@ -1,19 +1,22 @@
 package interview.guide.modules.interview.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO.QuestionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 面试问题生成服务
@@ -25,11 +28,11 @@ public class InterviewQuestionService {
     private static final Logger log = LoggerFactory.getLogger(InterviewQuestionService.class);
     
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
+    private final PromptTemplate systemPromptTemplate;
+    private final PromptTemplate userPromptTemplate;
+    private final BeanOutputConverter<QuestionListDTO> outputConverter;
     
     // 问题类型权重分配（按优先级）
-    // MySQL + Redis >= Java > Spring + Spring Boot
-    // 假设总题目数为10：项目2题，MySQL 2题，Redis 2题，Java基础1题，集合1题，并发1题，Spring/Boot 1题
     private static final double PROJECT_RATIO = 0.20;      // 20% 项目经历
     private static final double MYSQL_RATIO = 0.20;        // 20% MySQL
     private static final double REDIS_RATIO = 0.20;        // 20% Redis
@@ -38,37 +41,25 @@ public class InterviewQuestionService {
     private static final double JAVA_CONCURRENT_RATIO = 0.10; // 10% 并发
     private static final double SPRING_RATIO = 0.10;       // 10% Spring/SpringBoot
     
-    private static final String SYSTEM_PROMPT = """
-        你是一位资深的Java后端技术面试官，拥有10年以上的面试经验。
-        你需要根据候选人的简历内容，生成针对性的面试问题。
-        
-        问题生成要求：
-        1. 项目经历问题：深入候选人的项目经验，考察真实性和深度
-        2. MySQL问题：考察索引、事务、锁、优化、主从复制等
-        3. Redis问题：考察数据结构、持久化、集群、缓存策略等
-        4. Java基础：考察面向对象、异常处理、IO、反射等
-        5. Java集合：考察List、Map、Set实现原理和使用场景
-        6. Java并发：考察线程、锁、线程池、并发工具类等
-        7. Spring/SpringBoot：考察IoC、AOP、事务、自动配置等
-        
-        问题难度应该循序渐进，从基础到深入。
-        每个问题应该简洁明确，便于候选人理解。
-        
-        请严格按照以下JSON格式输出，不要有任何额外文字：
-        {
-            "questions": [
-                {
-                    "question": "问题内容",
-                    "type": "问题类型(PROJECT/JAVA_BASIC/JAVA_COLLECTION/JAVA_CONCURRENT/MYSQL/REDIS/SPRING/SPRING_BOOT)",
-                    "category": "问题类别中文名称"
-                }
-            ]
-        }
-        """;
+    // 中间DTO用于接收AI响应
+    private record QuestionListDTO(
+        List<QuestionDTO> questions
+    ) {}
     
-    public InterviewQuestionService(ChatClient.Builder chatClientBuilder) {
+    private record QuestionDTO(
+        String question,
+        String type,
+        String category
+    ) {}
+    
+    public InterviewQuestionService(
+            ChatClient.Builder chatClientBuilder,
+            @Value("classpath:prompts/interview-question-system.st") Resource systemPromptResource,
+            @Value("classpath:prompts/interview-question-user.st") Resource userPromptResource) throws IOException {
         this.chatClient = chatClientBuilder.build();
-        this.objectMapper = new ObjectMapper();
+        this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.outputConverter = new BeanOutputConverter<>(QuestionListDTO.class);
     }
     
     /**
@@ -84,47 +75,37 @@ public class InterviewQuestionService {
         // 计算各类型问题数量
         QuestionDistribution distribution = calculateDistribution(questionCount);
         
-        String userPrompt = """
-            请根据以下简历内容，生成%d个面试问题。
-            
-            问题分布要求：
-            - 项目经历相关: %d题（基于简历中的具体项目提问）
-            - MySQL: %d题
-            - Redis: %d题
-            - Java基础: %d题
-            - Java集合: %d题
-            - Java并发: %d题
-            - Spring/SpringBoot: %d题
-            
-            ---简历内容---
-            %s
-            ---简历结束---
-            
-            请生成问题列表，严格按照JSON格式输出。
-            """.formatted(
-                questionCount,
-                distribution.project,
-                distribution.mysql,
-                distribution.redis,
-                distribution.javaBasic,
-                distribution.javaCollection,
-                distribution.javaConcurrent,
-                distribution.spring,
-                resumeText
-            );
-        
         try {
-            SystemMessage systemMessage = new SystemMessage(SYSTEM_PROMPT);
-            UserMessage userMessage = new UserMessage(userPrompt);
-            Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
+            // 加载系统提示词
+            String systemPrompt = systemPromptTemplate.render();
             
-            String response = chatClient.prompt(prompt)
-                    .call()
-                    .content();
+            // 加载用户提示词并填充变量
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("questionCount", questionCount);
+            variables.put("projectCount", distribution.project);
+            variables.put("mysqlCount", distribution.mysql);
+            variables.put("redisCount", distribution.redis);
+            variables.put("javaBasicCount", distribution.javaBasic);
+            variables.put("javaCollectionCount", distribution.javaCollection);
+            variables.put("javaConcurrentCount", distribution.javaConcurrent);
+            variables.put("springCount", distribution.spring);
+            variables.put("resumeText", resumeText);
+            String userPrompt = userPromptTemplate.render(variables);
             
-            log.debug("LLM响应: {}", response);
+            // 添加格式指令到系统提示词
+            String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
             
-            List<InterviewQuestionDTO> questions = parseQuestions(response);
+            // 调用AI
+            QuestionListDTO dto = chatClient.prompt()
+                .system(systemPromptWithFormat)
+                .user(userPrompt)
+                .call()
+                .entity(outputConverter);
+            
+            log.debug("AI响应解析成功: questions count={}", dto.questions().size());
+            
+            // 转换为业务对象
+            List<InterviewQuestionDTO> questions = convertToQuestions(dto);
             log.info("成功生成 {} 个面试问题", questions.size());
             
             return questions;
@@ -160,29 +141,15 @@ public class InterviewQuestionService {
     ) {}
     
     /**
-     * 解析LLM响应
+     * 转换DTO为业务对象
      */
-    private List<InterviewQuestionDTO> parseQuestions(String response) {
+    private List<InterviewQuestionDTO> convertToQuestions(QuestionListDTO dto) {
         List<InterviewQuestionDTO> questions = new ArrayList<>();
+        int index = 0;
         
-        try {
-            String jsonStr = extractJson(response);
-            JsonNode root = objectMapper.readTree(jsonStr);
-            JsonNode questionsNode = root.get("questions");
-            
-            if (questionsNode != null && questionsNode.isArray()) {
-                int index = 0;
-                for (JsonNode qNode : questionsNode) {
-                    String question = qNode.get("question").asText();
-                    String typeStr = qNode.get("type").asText();
-                    String category = qNode.get("category").asText();
-                    
-                    QuestionType type = parseQuestionType(typeStr);
-                    questions.add(InterviewQuestionDTO.create(index++, question, type, category));
-                }
-            }
-        } catch (Exception e) {
-            log.error("解析问题列表失败: {}", e.getMessage());
+        for (QuestionDTO q : dto.questions()) {
+            QuestionType type = parseQuestionType(q.type());
+            questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category()));
         }
         
         return questions;
@@ -194,15 +161,6 @@ public class InterviewQuestionService {
         } catch (Exception e) {
             return QuestionType.JAVA_BASIC;
         }
-    }
-    
-    private String extractJson(String response) {
-        int start = response.indexOf('{');
-        int end = response.lastIndexOf('}');
-        if (start != -1 && end != -1 && end > start) {
-            return response.substring(start, end + 1);
-        }
-        return response;
     }
     
     /**
