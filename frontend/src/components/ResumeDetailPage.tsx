@@ -318,31 +318,56 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
   const structureScore = analysis.structureScore || 0;
   const expressionScore = analysis.expressionScore || 0;
   
+  // 各维度的满分
+  const projectFullMark = 40;
+  const skillMatchFullMark = 20;
+  const contentFullMark = 15;
+  const structureFullMark = 15;
+  const expressionFullMark = 10;
+  
+  // 将所有维度归一化到40分满分，以便在雷达图上公平比较
+  const normalizedFullMark = 40;
+  const normalizedProjectScore = (projectScore / projectFullMark) * normalizedFullMark;
+  const normalizedSkillMatchScore = (skillMatchScore / skillMatchFullMark) * normalizedFullMark;
+  const normalizedContentScore = (contentScore / contentFullMark) * normalizedFullMark;
+  const normalizedStructureScore = (structureScore / structureFullMark) * normalizedFullMark;
+  const normalizedExpressionScore = (expressionScore / expressionFullMark) * normalizedFullMark;
+  
   const radarData = [
     {
       subject: '项目经验',
-      score: projectScore,
-      fullMark: 40
+      score: normalizedProjectScore,
+      fullMark: normalizedFullMark,
+      originalScore: projectScore,
+      originalFullMark: projectFullMark
     },
     {
       subject: '技能匹配',
-      score: skillMatchScore,
-      fullMark: 20
+      score: normalizedSkillMatchScore,
+      fullMark: normalizedFullMark,
+      originalScore: skillMatchScore,
+      originalFullMark: skillMatchFullMark
     },
     {
       subject: '内容完整性',
-      score: contentScore,
-      fullMark: 15
+      score: normalizedContentScore,
+      fullMark: normalizedFullMark,
+      originalScore: contentScore,
+      originalFullMark: contentFullMark
     },
     {
       subject: '结构清晰度',
-      score: structureScore,
-      fullMark: 15
+      score: normalizedStructureScore,
+      fullMark: normalizedFullMark,
+      originalScore: structureScore,
+      originalFullMark: structureFullMark
     },
     {
       subject: '表达专业性',
-      score: expressionScore,
-      fullMark: 10
+      score: normalizedExpressionScore,
+      fullMark: normalizedFullMark,
+      originalScore: expressionScore,
+      originalFullMark: expressionFullMark
     }
   ];
 
@@ -512,7 +537,11 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
                     borderRadius: '12px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                   }}
-                  formatter={(value: number | undefined) => [`${value ?? 0} 分`, '得分']}
+                  formatter={(value: number | undefined, _name: string | undefined, props: any) => {
+                    const originalScore = props?.payload?.originalScore ?? 0;
+                    const originalFullMark = props?.payload?.originalFullMark ?? 40;
+                    return [`${originalScore}/${originalFullMark} (归一化: ${Math.round(value ?? 0)}/40)`, '得分'];
+                  }}
                 />
               </RadarChart>
             </ResponsiveContainer>
@@ -520,7 +549,8 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
 
           {/* 维度得分详情 */}
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 rounded-lg p-3">
+            {/* 项目经验 - 占据一整行 */}
+            <div className="bg-slate-50 rounded-lg p-3 col-span-2">
               <div className="text-xs text-slate-500 mb-1">项目经验</div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -536,6 +566,7 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
                 </span>
               </div>
             </div>
+            {/* 技能匹配 */}
             <div className="bg-slate-50 rounded-lg p-3">
               <div className="text-xs text-slate-500 mb-1">技能匹配</div>
               <div className="flex items-center gap-2">
@@ -552,6 +583,7 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
                 </span>
               </div>
             </div>
+            {/* 内容完整性 */}
             <div className="bg-slate-50 rounded-lg p-3">
               <div className="text-xs text-slate-500 mb-1">内容完整性</div>
               <div className="flex items-center gap-2">
@@ -568,6 +600,7 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
                 </span>
               </div>
             </div>
+            {/* 结构清晰度 */}
             <div className="bg-slate-50 rounded-lg p-3">
               <div className="text-xs text-slate-500 mb-1">结构清晰度</div>
               <div className="flex items-center gap-2">
@@ -584,7 +617,8 @@ function AnalysisPanel({ analysis, onExport, exporting }: { analysis: any, onExp
                 </span>
               </div>
             </div>
-            <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+            {/* 表达专业性 */}
+            <div className="bg-slate-50 rounded-lg p-3">
               <div className="text-xs text-slate-500 mb-1">表达专业性</div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
