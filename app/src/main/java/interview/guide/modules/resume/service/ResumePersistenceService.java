@@ -66,7 +66,7 @@ public class ResumePersistenceService {
     /**
      * 保存新简历
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResumeEntity saveResume(MultipartFile file, String resumeText, 
                                    String storageKey, String storageUrl) {
         try {
@@ -94,7 +94,7 @@ public class ResumePersistenceService {
     /**
      * 保存简历评测结果
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ResumeAnalysisEntity saveAnalysis(ResumeEntity resume, ResumeAnalysisResponse analysis) {
         try {
             ResumeAnalysisEntity entity = new ResumeAnalysisEntity();
@@ -195,7 +195,7 @@ public class ResumePersistenceService {
      * 删除简历及其所有关联数据
      * 包括：简历分析记录、面试会话（会自动删除面试答案）
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteResume(Long id) {
         Optional<ResumeEntity> resumeOpt = resumeRepository.findById(id);
         if (resumeOpt.isEmpty()) {

@@ -29,7 +29,6 @@ import java.util.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/history")
 @RequiredArgsConstructor
 public class HistoryController {
     
@@ -42,7 +41,7 @@ public class HistoryController {
      * 获取所有简历列表
      * GET /api/history/resumes
      */
-    @GetMapping("/resumes")
+    @GetMapping("/api/history/resumes")
     public Result<List<Map<String, Object>>> getAllResumes() {
         List<ResumeEntity> resumes = resumeService.findAllResumes();
         
@@ -74,7 +73,7 @@ public class HistoryController {
      * 获取简历详情（包含分析历史）
      * GET /api/history/resumes/{id}
      */
-    @GetMapping("/resumes/{id}")
+    @GetMapping("/api/history/resumes/{id}")
     public Result<Map<String, Object>> getResumeDetail(@PathVariable Long id) {
         Optional<ResumeEntity> resumeOpt = resumeService.findById(id);
         if (resumeOpt.isEmpty()) {
@@ -134,7 +133,7 @@ public class HistoryController {
      * 获取面试会话详情
      * GET /api/history/interviews/{sessionId}
      */
-    @GetMapping("/interviews/{sessionId}")
+    @GetMapping("/api/history/interviews/{sessionId}")
     public Result<Map<String, Object>> getInterviewDetail(@PathVariable String sessionId) {
         Optional<InterviewSessionEntity> sessionOpt = interviewService.findBySessionId(sessionId);
         if (sessionOpt.isEmpty()) {
@@ -176,7 +175,7 @@ public class HistoryController {
      * 导出简历分析报告为PDF
      * GET /api/history/export/analysis/{resumeId}
      */
-    @GetMapping("/export/analysis/{resumeId}")
+    @GetMapping("/api/history/export/analysis/{resumeId}")
     public ResponseEntity<byte[]> exportAnalysisPdf(@PathVariable Long resumeId) {
         Optional<ResumeEntity> resumeOpt = resumeService.findById(resumeId);
         if (resumeOpt.isEmpty()) {
@@ -208,7 +207,7 @@ public class HistoryController {
      * 导出面试报告为PDF
      * GET /api/history/export/interview/{sessionId}
      */
-    @GetMapping("/export/interview/{sessionId}")
+    @GetMapping("/api/history/export/interview/{sessionId}")
     public ResponseEntity<byte[]> exportInterviewPdf(@PathVariable String sessionId) {
         Optional<InterviewSessionEntity> sessionOpt = interviewService.findBySessionId(sessionId);
         if (sessionOpt.isEmpty()) {
