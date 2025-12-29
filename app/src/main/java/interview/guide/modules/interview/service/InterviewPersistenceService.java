@@ -38,7 +38,7 @@ public class InterviewPersistenceService {
     /**
      * 保存新的面试会话
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public InterviewSessionEntity saveSession(String sessionId, Long resumeId, 
                                               int totalQuestions, 
                                               List<InterviewQuestionDTO> questions) {
@@ -69,7 +69,7 @@ public class InterviewPersistenceService {
     /**
      * 更新会话状态
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateSessionStatus(String sessionId, InterviewSessionEntity.SessionStatus status) {
         Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
         if (sessionOpt.isPresent()) {
@@ -86,7 +86,7 @@ public class InterviewPersistenceService {
     /**
      * 更新当前问题索引
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateCurrentQuestionIndex(String sessionId, int index) {
         Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
         if (sessionOpt.isPresent()) {
@@ -100,7 +100,7 @@ public class InterviewPersistenceService {
     /**
      * 保存面试答案
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public InterviewAnswerEntity saveAnswer(String sessionId, int questionIndex,
                                             String question, String category,
                                             String userAnswer, int score, String feedback) {
@@ -128,7 +128,7 @@ public class InterviewPersistenceService {
     /**
      * 保存面试报告
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveReport(String sessionId, InterviewReportDTO report) {
         try {
             Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
@@ -211,7 +211,7 @@ public class InterviewPersistenceService {
      * 由于InterviewSessionEntity设置了cascade = CascadeType.ALL, orphanRemoval = true
      * 删除会话会自动删除关联的答案
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteSessionsByResumeId(Long resumeId) {
         List<InterviewSessionEntity> sessions = sessionRepository.findByResumeIdOrderByCreatedAtDesc(resumeId);
         if (!sessions.isEmpty()) {

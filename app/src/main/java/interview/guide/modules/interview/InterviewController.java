@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 面试控制器
@@ -21,7 +20,6 @@ import java.util.Optional;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/interview")
 @RequiredArgsConstructor
 public class InterviewController {
     
@@ -31,7 +29,7 @@ public class InterviewController {
      * 创建面试会话
      * POST /api/interview/session
      */
-    @PostMapping("/session")
+    @PostMapping("/api/interview/session")
     public Result<InterviewSessionDTO> createSession(@RequestBody CreateInterviewRequest request) {
         log.info("创建面试会话，题目数量: {}", request.questionCount());
         InterviewSessionDTO session = sessionService.createSession(request);
@@ -42,7 +40,7 @@ public class InterviewController {
      * 获取会话信息
      * GET /api/interview/session/{sessionId}
      */
-    @GetMapping("/session/{sessionId}")
+    @GetMapping("/api/interview/session/{sessionId}")
     public Result<InterviewSessionDTO> getSession(@PathVariable String sessionId) {
         InterviewSessionDTO session = sessionService.getSession(sessionId);
         return Result.success(session);
@@ -52,26 +50,16 @@ public class InterviewController {
      * 获取当前问题
      * GET /api/interview/session/{sessionId}/question
      */
-    @GetMapping("/session/{sessionId}/question")
+    @GetMapping("/api/interview/session/{sessionId}/question")
     public Result<Map<String, Object>> getCurrentQuestion(@PathVariable String sessionId) {
-        InterviewQuestionDTO question = sessionService.getCurrentQuestion(sessionId);
-        if (question == null) {
-            return Result.success(Map.of(
-                "completed", true,
-                "message", "所有问题已回答完毕"
-            ));
-        }
-        return Result.success(Map.of(
-            "completed", false,
-            "question", question
-        ));
+        return Result.success(sessionService.getCurrentQuestionResponse(sessionId));
     }
     
     /**
      * 提交答案
      * POST /api/interview/answer
      */
-    @PostMapping("/answer")
+    @PostMapping("/api/interview/answer")
     public Result<SubmitAnswerResponse> submitAnswer(@RequestBody SubmitAnswerRequest request) {
         log.info("提交答案: 会话{}, 问题{}", request.sessionId(), request.questionIndex());
         SubmitAnswerResponse response = sessionService.submitAnswer(request);
@@ -82,7 +70,7 @@ public class InterviewController {
      * 生成面试报告
      * GET /api/interview/session/{sessionId}/report
      */
-    @GetMapping("/session/{sessionId}/report")
+    @GetMapping("/api/interview/session/{sessionId}/report")
     public Result<InterviewReportDTO> getReport(@PathVariable String sessionId) {
         log.info("生成面试报告: {}", sessionId);
         InterviewReportDTO report = sessionService.generateReport(sessionId);
@@ -93,21 +81,16 @@ public class InterviewController {
      * 查找未完成的面试会话
      * GET /api/interview/unfinished/{resumeId}
      */
-    @GetMapping("/unfinished/{resumeId}")
+    @GetMapping("/api/interview/unfinished/{resumeId}")
     public Result<InterviewSessionDTO> findUnfinishedSession(@PathVariable Long resumeId) {
-        log.info("查找未完成的面试会话: resumeId={}", resumeId);
-        Optional<InterviewSessionDTO> sessionOpt = sessionService.findUnfinishedSession(resumeId);
-        if (sessionOpt.isEmpty()) {
-            return Result.error(404, "未找到未完成的面试会话");
-        }
-        return Result.success(sessionOpt.get());
+        return Result.success(sessionService.findUnfinishedSessionOrThrow(resumeId));
     }
     
     /**
      * 暂存答案（不进入下一题）
      * POST /api/interview/save-answer
      */
-    @PostMapping("/save-answer")
+    @PostMapping("/api/interview/save-answer")
     public Result<Void> saveAnswer(@RequestBody SubmitAnswerRequest request) {
         log.info("暂存答案: 会话{}, 问题{}", request.sessionId(), request.questionIndex());
         sessionService.saveAnswer(request);
@@ -118,7 +101,7 @@ public class InterviewController {
      * 提前交卷
      * POST /api/interview/{sessionId}/complete
      */
-    @PostMapping("/{sessionId}/complete")
+    @PostMapping("/api/interview/{sessionId}/complete")
     public Result<Void> completeInterview(@PathVariable String sessionId) {
         log.info("提前交卷: {}", sessionId);
         sessionService.completeInterview(sessionId);

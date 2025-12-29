@@ -2,6 +2,8 @@ package interview.guide.modules.interview.service;
 
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+
+import java.util.Map;
 import interview.guide.modules.interview.model.CreateInterviewRequest;
 import interview.guide.modules.interview.model.SubmitAnswerRequest;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
@@ -141,6 +143,14 @@ public class InterviewSessionService {
     }
     
     /**
+     * 查找并恢复未完成的面试会话，如果不存在则抛出异常
+     */
+    public InterviewSessionDTO findUnfinishedSessionOrThrow(Long resumeId) {
+        return findUnfinishedSession(resumeId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND, "未找到未完成的面试会话"));
+    }
+    
+    /**
      * 从数据库恢复会话
      */
     private InterviewSession restoreSessionFromDatabase(String sessionId) {
@@ -203,6 +213,23 @@ public class InterviewSessionService {
             case COMPLETED -> SessionStatus.COMPLETED;
             case EVALUATED -> SessionStatus.EVALUATED;
         };
+    }
+    
+    /**
+     * 获取当前问题的响应（包含完成状态）
+     */
+    public Map<String, Object> getCurrentQuestionResponse(String sessionId) {
+        InterviewQuestionDTO question = getCurrentQuestion(sessionId);
+        if (question == null) {
+            return Map.of(
+                "completed", true,
+                "message", "所有问题已回答完毕"
+            );
+        }
+        return Map.of(
+            "completed", false,
+            "question", question
+        );
     }
     
     /**
