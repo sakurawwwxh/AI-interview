@@ -117,5 +117,79 @@ export const knowledgeBaseApi = {
     const response = await api.post<QueryResponse>('/api/knowledgebase/query', request);
     return response.data;
   },
+  
+  /**
+   * 基于知识库回答问题（流式SSE）
+   */
+  async queryKnowledgeBaseStream(
+    request: QueryRequest,
+    onMessage: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: Error) => void
+  ): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/knowledgebase/query/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法获取响应流');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          onComplete();
+          break;
+        }
+        
+        // 解码数据块
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 按行分割处理 SSE 格式
+        const lines = buffer.split('\n');
+        // 保留最后一行（可能不完整）
+        buffer = lines.pop() || '';
+        
+        // 处理每一行
+        for (const line of lines) {
+          // SSE 格式：data: content
+          if (line.startsWith('data:')) {
+            const content = line.substring(5).trim(); // 移除 "data:" 前缀
+            if (content) {
+              onMessage(content);
+            }
+          }
+        }
+      }
+      
+      // 处理剩余的 buffer
+      if (buffer.trim()) {
+        if (buffer.startsWith('data:')) {
+          const content = buffer.substring(5).trim();
+          if (content) {
+            onMessage(content);
+          }
+        }
+      }
+    } catch (error) {
+      onError(error as Error);
+    } finally {
+      reader.releaseLock();
+    }
+  },
 };
 
