@@ -11,6 +11,7 @@ export default function Layout({}: LayoutProps) {
   const navItems = [
     { id: 'upload', path: '/upload', label: '上传分析', icon: UploadIcon },
     { id: 'history', path: '/history', label: '历史记录', icon: HistoryIcon },
+    { id: 'knowledgebase', path: '/knowledgebase', label: '知识库', icon: KnowledgeBaseIcon },
   ] as const;
 
   // 判断当前页面是否匹配导航项
@@ -97,6 +98,16 @@ function HistoryIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
       <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function KnowledgeBaseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 19.5C4 18.837 4.263 18.201 4.732 17.732C5.201 17.263 5.837 17 6.5 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M6.5 2H20V22H6.5C5.837 22 5.201 21.737 4.732 21.268C4.263 20.799 4 20.163 4 19.5V4.5C4 3.837 4.263 3.201 4.732 2.732C5.201 2.263 5.837 2 6.5 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M8 7H16M8 11H16M8 15H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }

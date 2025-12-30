@@ -28,8 +28,22 @@ public class FileStorageService {
     private final StorageConfigProperties storageConfig;
     
     public String uploadResume(MultipartFile file) {
+        return uploadFile(file, "resumes");
+    }
+    
+    /**
+     * 上传知识库文件到RustFS
+     */
+    public String uploadKnowledgeBase(MultipartFile file) {
+        return uploadFile(file, "knowledgebases");
+    }
+    
+    /**
+     * 通用文件上传方法
+     */
+    private String uploadFile(MultipartFile file, String prefix) {
         String originalFilename = file.getOriginalFilename();
-        String fileKey = generateFileKey(originalFilename);
+        String fileKey = generateFileKey(originalFilename, prefix);
         
         try {
             PutObjectRequest putRequest = PutObjectRequest.builder()
@@ -40,7 +54,7 @@ public class FileStorageService {
                 .build();
             
             s3Client.putObject(putRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-            log.info("简历上传成功: {} -> {}", originalFilename, fileKey);
+            log.info("文件上传成功: {} -> {}", originalFilename, fileKey);
             return fileKey;
         } catch (IOException e) {
             log.error("读取上传文件失败: {}", e.getMessage(), e);
@@ -65,6 +79,20 @@ public class FileStorageService {
     }
     
     public void deleteResume(String fileKey) {
+        deleteFile(fileKey);
+    }
+    
+    /**
+     * 删除知识库文件
+     */
+    public void deleteKnowledgeBase(String fileKey) {
+        deleteFile(fileKey);
+    }
+    
+    /**
+     * 通用文件删除方法
+     */
+    private void deleteFile(String fileKey) {
         try {
             DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                 .bucket(storageConfig.getBucket())
@@ -101,12 +129,12 @@ public class FileStorageService {
         }
     }
     
-    private String generateFileKey(String originalFilename) {
+    private String generateFileKey(String originalFilename, String prefix) {
         LocalDateTime now = LocalDateTime.now();
         String datePath = now.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         String uuid = UUID.randomUUID().toString().substring(0, 8);
         String safeName = sanitizeFilename(originalFilename);
-        return String.format("resumes/%s/%s_%s", datePath, uuid, safeName);
+        return String.format("%s/%s/%s_%s", prefix, datePath, uuid, safeName);
     }
     
     private String sanitizeFilename(String filename) {

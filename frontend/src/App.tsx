@@ -4,9 +4,12 @@ import UploadPage from './pages/UploadPage';
 import HistoryList from './pages/HistoryPage';
 import ResumeDetailPage from './pages/ResumeDetailPage';
 import Interview from './pages/InterviewPage';
+import KnowledgeBaseQueryPage from './pages/KnowledgeBaseQueryPage';
+import KnowledgeBaseUploadPage from './pages/KnowledgeBaseUploadPage';
 import {historyApi} from './api/history';
 import {useEffect, useState} from 'react';
 import type {ResumeAnalysisResponse, StorageInfo} from './types/resume';
+import type {UploadKnowledgeBaseResponse} from './api/knowledgebase';
 
 // 上传页面包装器
 function UploadPageWrapper() {
@@ -137,10 +140,47 @@ function App() {
           
           {/* 模拟面试 */}
           <Route path="interview/:resumeId" element={<InterviewWrapper />} />
+          
+          {/* 知识库问答 */}
+          <Route path="knowledgebase" element={<KnowledgeBaseQueryPageWrapper />} />
+          
+          {/* 知识库上传 */}
+          <Route path="knowledgebase/upload" element={<KnowledgeBaseUploadPageWrapper />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
+}
+
+// 知识库问答页面包装器
+function KnowledgeBaseQueryPageWrapper() {
+  const navigate = useNavigate();
+  
+  const handleBack = () => {
+    navigate('/upload');
+  };
+  
+  const handleUpload = () => {
+    navigate('/knowledgebase/upload');
+  };
+  
+  return <KnowledgeBaseQueryPage onBack={handleBack} onUpload={handleUpload} />;
+}
+
+// 知识库上传页面包装器
+function KnowledgeBaseUploadPageWrapper() {
+  const navigate = useNavigate();
+  
+  const handleUploadComplete = (result: UploadKnowledgeBaseResponse) => {
+    // 上传完成后返回问答页面
+    navigate('/knowledgebase');
+  };
+  
+  const handleBack = () => {
+    navigate('/knowledgebase');
+  };
+  
+  return <KnowledgeBaseUploadPage onUploadComplete={handleUploadComplete} onBack={handleBack} />;
 }
 
 export default App;
