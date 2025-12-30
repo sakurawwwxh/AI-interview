@@ -36,6 +36,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   const [checkingUnfinished, setCheckingUnfinished] = useState(false);
   const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [forceCreateNew, setForceCreateNew] = useState(false);
   
   // 检查是否有未完成的面试（组件挂载时和resumeId变化时）
   useEffect(() => {
@@ -63,12 +64,14 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   
   const handleContinueUnfinished = () => {
     if (!unfinishedSession) return;
+    setForceCreateNew(false);  // 重置强制创建标志
     restoreSession(unfinishedSession);
     setUnfinishedSession(null);
   };
   
   const handleStartNew = () => {
     setUnfinishedSession(null);
+    setForceCreateNew(true);  // 标记需要强制创建新会话
   };
   
   const restoreSession = (sessionToRestore: InterviewSession) => {
@@ -112,12 +115,16 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     setError('');
     
     try {
-      // 创建新面试（后端会自动检查未完成的会话）
+      // 创建新面试（如果 forceCreateNew 为 true，则强制创建新会话）
       const newSession = await interviewApi.createSession({
         resumeText,
         questionCount,
-        resumeId
+        resumeId,
+        forceCreate: forceCreateNew
       });
+      
+      // 重置强制创建标志
+      setForceCreateNew(false);
       
       // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
       const hasProgress = newSession.currentQuestionIndex > 0 || 
@@ -147,6 +154,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
     } catch (err) {
       setError('创建面试失败，请重试');
       console.error(err);
+      setForceCreateNew(false);  // 出错时也重置标志
     } finally {
       setIsCreating(false);
     }

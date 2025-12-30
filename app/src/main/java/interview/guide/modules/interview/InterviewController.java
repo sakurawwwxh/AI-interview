@@ -3,6 +3,7 @@ package interview.guide.modules.interview;
 import interview.guide.common.result.Result;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.service.InterviewHistoryService;
+import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.interview.service.InterviewSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ public class InterviewController {
     
     private final InterviewSessionService sessionService;
     private final InterviewHistoryService historyService;
+    private final InterviewPersistenceService persistenceService;
     
     /**
      * 创建面试会话
@@ -139,5 +141,16 @@ public class InterviewController {
             log.error("导出PDF失败", e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+    
+    /**
+     * 删除面试会话
+     * DELETE /api/interview/{sessionId}
+     */
+    @DeleteMapping("/api/interview/{sessionId}")
+    public Result<Void> deleteInterview(@PathVariable String sessionId) {
+        log.info("删除面试会话: {}", sessionId);
+        persistenceService.deleteSessionBySessionId(sessionId);
+        return Result.success(null);
     }
 }

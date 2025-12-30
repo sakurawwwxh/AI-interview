@@ -31,7 +31,7 @@ export default function InterviewConfigPanel({
   onBack,
   error
 }: InterviewConfigPanelProps) {
-  const questionCounts = [5, 8, 10, 12, 15];
+  const questionCounts = [6, 8, 10, 12, 15];
 
   return (
     <motion.div 

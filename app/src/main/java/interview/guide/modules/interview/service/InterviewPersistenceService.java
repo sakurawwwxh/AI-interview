@@ -221,6 +221,22 @@ public class InterviewPersistenceService {
     }
     
     /**
+     * 删除单个面试会话
+     * 由于InterviewSessionEntity设置了cascade = CascadeType.ALL, orphanRemoval = true
+     * 删除会话会自动删除关联的答案
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteSessionBySessionId(String sessionId) {
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
+        if (sessionOpt.isPresent()) {
+            sessionRepository.delete(sessionOpt.get());
+            log.info("已删除面试会话: sessionId={}", sessionId);
+        } else {
+            throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
+        }
+    }
+    
+    /**
      * 查找未完成的面试会话（CREATED或IN_PROGRESS状态）
      */
     public Optional<InterviewSessionEntity> findUnfinishedSession(Long resumeId) {
