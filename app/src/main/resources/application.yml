@@ -49,8 +49,8 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 1024  # text-embedding-v3实际生成的向量维度
-        initialize-schema: true  # 自动初始化schema
-        remove-existing-vector-store-table: true  # 删除现有表并重建
+        initialize-schema: false  # 表已创建，不需要再初始化
+        remove-existing-vector-store-table: false  # 保留现有表和数据
 
 # Application custom configuration
 app:
@@ -65,8 +65,8 @@ app:
   # RustFS (S3兼容) 存储配置
   storage:
     endpoint: http://localhost:9000
-    access-key: 6UaOsZz0M3PCSNomcVXL
-    secret-key: GnRYDbQ6fVqOorZeitIm9yhu1BTkMv7U35cpdLSz
+    access-key: YlRUvwxer9TKuWg6DyhB
+    secret-key: D5ULeVM72EzTQpK1OdtxYNnoSwl46gIyribvZuqJ
     bucket: interview-guide
     region: us-east-1
   

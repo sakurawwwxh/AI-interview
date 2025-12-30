@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,15 @@ public class KnowledgeBaseController {
     @PostMapping("/api/knowledgebase/query")
     public Result<QueryResponse> queryKnowledgeBase(@Valid @RequestBody QueryRequest request) {
         return Result.success(queryService.queryKnowledgeBase(request));
+    }
+    
+    /**
+     * 基于知识库回答问题（流式SSE，支持多知识库）
+     */
+    @PostMapping(value = "/api/knowledgebase/query/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> queryKnowledgeBaseStream(@Valid @RequestBody QueryRequest request) {
+        log.info("收到知识库流式查询请求: kbIds={}, question={}", request.knowledgeBaseIds(), request.question());
+        return queryService.answerQuestionStream(request.knowledgeBaseIds(), request.question());
     }
 }
 

@@ -12,6 +12,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -149,6 +150,57 @@ public class KnowledgeBaseQueryService {
         Long primaryKbId = request.knowledgeBaseIds().get(0);
         
         return new QueryResponse(answer, primaryKbId, kbNamesStr);
+    }
+    
+    /**
+     * 流式查询知识库（SSE）
+     * 
+     * @param knowledgeBaseIds 知识库ID列表
+     * @param question 用户问题
+     * @return 流式响应
+     */
+    public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question) {
+        log.info("收到知识库流式提问: kbIds={}, question={}", knowledgeBaseIds, question);
+        
+        try {
+            // 1. 验证知识库是否存在并更新问题计数
+            updateQuestionCounts(knowledgeBaseIds);
+            
+            // 2. 使用向量搜索检索相关文档
+            List<Document> relevantDocs = vectorService.similaritySearch(question, knowledgeBaseIds, 5);
+            
+            if (relevantDocs.isEmpty()) {
+                return Flux.just("抱歉，在选定的知识库中没有找到相关信息。请尝试调整问题或选择其他知识库。");
+            }
+            
+            // 3. 构建上下文
+            String context = relevantDocs.stream()
+                .map(Document::getText)
+                .collect(Collectors.joining("\n\n---\n\n"));
+            
+            log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
+            
+            // 4. 构建提示词
+            String systemPrompt = buildSystemPrompt();
+            String userPrompt = buildUserPrompt(context, question, knowledgeBaseIds);
+            
+            // 5. 流式调用AI生成回答
+            Flux<String> responseFlux = chatClient.prompt()
+                .system(systemPrompt)
+                .user(userPrompt)
+                .stream()
+                .content();
+            
+            log.info("开始流式输出知识库回答: kbIds={}", knowledgeBaseIds);
+            
+            return responseFlux
+                .doOnComplete(() -> log.info("流式输出完成: kbIds={}", knowledgeBaseIds))
+                .doOnError(e -> log.error("流式输出失败: kbIds={}, error={}", knowledgeBaseIds, e.getMessage()));
+                
+        } catch (Exception e) {
+            log.error("知识库流式问答失败: {}", e.getMessage(), e);
+            return Flux.just("回答问题失败: " + e.getMessage());
+        }
     }
     
     /**

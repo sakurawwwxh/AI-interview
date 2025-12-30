@@ -1,6 +1,8 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useRef} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
-import {knowledgeBaseApi, type KnowledgeBaseItem, type QueryResponse} from '../api/knowledgebase';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import {knowledgeBaseApi, type KnowledgeBaseItem} from '../api/knowledgebase';
 import {formatDateOnly} from '../utils/date';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -24,10 +26,16 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [loadingList, setLoadingList] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadKnowledgeBases();
   }, []);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const loadKnowledgeBases = async () => {
     setLoadingList(true);
@@ -68,26 +76,62 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     setQuestion('');
     setLoading(true);
 
-    try {
-      const response: QueryResponse = await knowledgeBaseApi.queryKnowledgeBase({
-        knowledgeBaseIds: Array.from(selectedKbIds),
-        question: userMessage.content,
-      });
+    // 创建一个临时的助手消息用于流式更新
+    const assistantMessage: Message = {
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, assistantMessage]);
 
-      const assistantMessage: Message = {
-        type: 'assistant',
-        content: response.answer,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, assistantMessage]);
+    let fullContent = '';
+
+    try {
+      await knowledgeBaseApi.queryKnowledgeBaseStream(
+        {
+          knowledgeBaseIds: Array.from(selectedKbIds),
+          question: userMessage.content,
+        },
+        // onMessage: 收到流式数据块
+        (chunk: string) => {
+          fullContent += chunk;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              ...assistantMessage,
+              content: fullContent,
+            };
+            return newMessages;
+          });
+        },
+        // onComplete: 流式传输完成
+        () => {
+          setLoading(false);
+        },
+        // onError: 错误处理
+        (error: Error) => {
+          console.error('流式查询失败:', error);
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              ...assistantMessage,
+              content: fullContent || error.message || '回答失败，请重试',
+            };
+            return newMessages;
+          });
+          setLoading(false);
+        }
+      );
     } catch (err) {
-      const errorMessage: Message = {
-        type: 'assistant',
-        content: err instanceof Error ? err.message : '回答失败，请重试',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      console.error('发起流式查询失败:', err);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          ...assistantMessage,
+          content: err instanceof Error ? err.message : '回答失败，请重试',
+        };
+        return newMessages;
+      });
       setLoading(false);
     }
   };
@@ -288,7 +332,26 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                 : 'bg-slate-100 text-slate-800'
                             }`}
                           >
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            {msg.type === 'user' ? (
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                            ) : (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 prose-headings:my-3 prose-strong:text-slate-900 prose-strong:font-semibold"
+                                components={{
+                                  // 自定义样式
+                                  p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                                  strong: ({children}) => <strong className="font-semibold text-slate-900">{children}</strong>,
+                                  ul: ({children}) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                                  ol: ({children}) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                                  li: ({children}) => <li className="mb-1">{children}</li>,
+                                  code: ({children}) => <code className="bg-slate-200 px-1.5 py-0.5 rounded text-sm">{children}</code>,
+                                  pre: ({children}) => <pre className="bg-slate-200 p-3 rounded-lg overflow-x-auto my-2">{children}</pre>,
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            )}
                           </div>
                         </motion.div>
                       ))}
@@ -317,6 +380,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* 输入区域 */}
