@@ -27,7 +27,9 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
     
     // Spring AI - OpenAI兼容模式 (阿里云DashScope)
-    implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M4'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai:1.1.2'    
+    // Spring AI - PostgreSQL Vector Store (pgvector)
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.2'
     
     // Apache Tika for document parsing (PDF, DOCX, TXT)
     implementation libs.tika.core
