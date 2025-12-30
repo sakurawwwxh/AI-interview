@@ -149,4 +149,21 @@ export const historyApi = {
       throw new Error(result.message || '删除简历失败');
     }
   },
+
+  /**
+   * 删除面试记录
+   */
+  async deleteInterview(sessionId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/interview/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const result: Result<void> = await response.json();
+      throw new Error(result.message || '删除面试记录失败');
+    }
+    const result: Result<void> = await response.json();
+    if (result.code !== 200) {
+      throw new Error(result.message || '删除面试记录失败');
+    }
+  },
 };

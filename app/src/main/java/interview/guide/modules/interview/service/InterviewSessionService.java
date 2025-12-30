@@ -44,8 +44,8 @@ public class InterviewSessionService {
      * 前端应该先调用 findUnfinishedSession 检查，或者使用 forceCreate 参数强制创建
      */
     public InterviewSessionDTO createSession(CreateInterviewRequest request) {
-        // 如果指定了resumeId，检查是否有未完成的会话
-        if (request.resumeId() != null) {
+        // 如果指定了resumeId且未强制创建，检查是否有未完成的会话
+        if (request.resumeId() != null && !Boolean.TRUE.equals(request.forceCreate())) {
             Optional<InterviewSessionDTO> unfinishedOpt = findUnfinishedSession(request.resumeId());
             if (unfinishedOpt.isPresent()) {
                 log.info("检测到未完成的面试会话，返回现有会话: resumeId={}, sessionId={}", 

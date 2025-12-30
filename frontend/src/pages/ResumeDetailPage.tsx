@@ -97,6 +97,16 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
     setSelectedInterview(null);
   };
 
+  const handleDeleteInterview = async (sessionId: string) => {
+    // 删除后重新加载简历详情
+    await loadResumeDetail();
+    // 如果删除的是当前查看的面试，返回列表
+    if (selectedInterview?.sessionId === sessionId) {
+      setDetailView('list');
+      setSelectedInterview(null);
+    }
+  };
+
   const handleTabChange = (tab: TabType) => {
     const newPage = tab === 'analysis' ? 0 : 1;
     setPage([newPage, newPage > page ? 1 : -1]);
@@ -277,6 +287,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
                   onStartInterview={() => onStartInterview(resume.resumeText, resumeId)}
                   onViewInterview={handleViewInterview}
                   onExportInterview={handleExportInterviewPdf}
+                  onDeleteInterview={handleDeleteInterview}
                   exporting={exporting}
                   loadingInterview={loadingInterview}
                 />
