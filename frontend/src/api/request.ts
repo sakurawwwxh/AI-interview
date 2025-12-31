@@ -55,7 +55,8 @@ instance.interceptors.response.use(
     }
 
     // 没有响应的情况：真正的网络错误或连接被重置
-    // 检查是否是文件上传请求，可能是文件太大导致连接被重置
+    // 对于文件上传，可能是网络超时或连接中断，但不一定是文件大小问题
+    // 让后端返回真实的错误信息，而不是在这里假设
     const config = error.config;
     const isUpload = config && (
       config.url?.includes('/upload') ||
@@ -63,8 +64,9 @@ instance.interceptors.response.use(
     );
 
     if (isUpload) {
-      // 文件上传失败且没有响应，很可能是文件太大
-      return Promise.reject(new Error('文件大小超过限制'));
+      // 文件上传失败且没有响应，可能是网络超时或连接中断
+      // 不直接假设是文件大小问题，返回更通用的错误信息
+      return Promise.reject(new Error('上传失败，可能是网络超时或连接中断，请重试'));
     }
 
     // 其他网络错误

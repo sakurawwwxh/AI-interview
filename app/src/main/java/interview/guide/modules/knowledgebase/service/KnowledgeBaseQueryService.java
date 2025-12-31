@@ -9,12 +9,19 @@ import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseListService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -29,16 +36,22 @@ public class KnowledgeBaseQueryService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseVectorService vectorService;
     private final KnowledgeBaseListService listService;
+    private final PromptTemplate systemPromptTemplate;
+    private final PromptTemplate userPromptTemplate;
     
     public KnowledgeBaseQueryService(
             ChatClient.Builder chatClientBuilder,
             KnowledgeBaseRepository knowledgeBaseRepository,
             KnowledgeBaseVectorService vectorService,
-            KnowledgeBaseListService listService) {
+            KnowledgeBaseListService listService,
+            @Value("classpath:prompts/knowledgebase-query-system.st") Resource systemPromptResource,
+            @Value("classpath:prompts/knowledgebase-query-user.st") Resource userPromptResource) throws IOException {
         this.chatClient = chatClientBuilder.build();
         this.knowledgeBaseRepository = knowledgeBaseRepository;
         this.vectorService = vectorService;
         this.listService = listService;
+        this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
     }
     
     /**
@@ -104,62 +117,17 @@ public class KnowledgeBaseQueryService {
      * 构建系统提示词
      */
     private String buildSystemPrompt() {
-        return """
-            你是一个专业的知识库问答助手。你的任务是基于提供的知识库内容，准确、详细地回答用户的问题。
-            
-            要求：
-            1. 只基于提供的知识库内容回答问题，不要编造信息
-            2. 如果知识库中没有相关信息，明确告知用户
-            3. 回答要清晰、有条理，尽量引用知识库中的具体内容
-            4. 如果问题涉及多个方面，请分点说明
-            5. 如果涉及多个知识库，需要综合多个知识库的信息
-            6. 使用中文回答
-            
-            **Markdown 格式要求（必须严格遵守）**：
-            
-            1. 标题格式：
-               - 必须使用：## 标题（注意：# 号后必须有空格）
-               - 错误示例：##标题（没有空格，这是错误的）
-            
-            2. 列表格式：
-               - 有序列表：必须使用 "1. "（数字+点+空格），例如：1. **文本**
-               - 无序列表：必须使用 "- "（减号+空格），例如：- **文本**
-               - 每个列表项必须独立成行
-               - 列表前后必须各有一个空行
-            
-            3. 段落格式：
-               - 段落之间必须用两个换行符分隔（空一行）
-               - 段落内不要使用换行符
-            
-            4. 强调格式：
-               - 加粗：**文本**（两个星号包围）
-               - 代码：`代码`（反引号包围）
-            
-            **关键规则**：
-            - 标题的 # 号后必须有空格
-            - 列表项的点号或减号后必须有空格
-            - 列表项必须独立成行，不能在同一行
-            - 在流式输出时，必须严格按照上述格式输出，不要省略任何空格
-            """;
+        return systemPromptTemplate.render();
     }
     
     /**
      * 构建用户提示词
      */
     private String buildUserPrompt(String context, String question, List<Long> knowledgeBaseIds) {
-        String kbInfo = knowledgeBaseIds.size() == 1 
-            ? "知识库ID: " + knowledgeBaseIds.get(0)
-            : "知识库ID: " + knowledgeBaseIds;
-        
-        return String.format("""
-            相关文档内容（来自向量检索）：
-            %s
-            
-            用户问题：
-            %s
-            
-            请基于上述知识库内容回答用户的问题。如果知识库中没有相关信息，请明确说明。
-            """, context, question);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("context", context);
+        variables.put("question", question);
+        return userPromptTemplate.render(variables);
     }
     
     /**
