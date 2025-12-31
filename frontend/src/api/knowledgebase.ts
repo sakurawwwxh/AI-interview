@@ -122,41 +122,57 @@ export const knowledgeBaseApi = {
       const decoder = new TextDecoder();
       let buffer = '';
 
+      // 辅助函数：处理 data: 行并提取内容
+      const extractContent = (line: string): string | null => {
+        if (!line.startsWith('data:')) {
+          return null;
+        }
+        let content = line.substring(5); // 移除 "data:" 前缀
+        // SSE 标准：如果 data: 后第一个字符是空格，这是协议层面的空格，应该移除
+        // 但这是可选的，有些实现可能没有这个空格
+        if (content.startsWith(' ')) {
+          content = content.substring(1);
+        }
+        // 如果内容为空（data: 或 data: ），可能表示换行，返回换行符
+        if (content.length === 0) {
+          return '\n';
+        }
+        return content;
+      };
+
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) {
-          onComplete();
-          break;
-        }
-
-        // 解码数据块
-        buffer += decoder.decode(value, { stream: true });
-
-        // 按行分割处理 SSE 格式
-        const lines = buffer.split('\n');
-        // 保留最后一行（可能不完整）
-        buffer = lines.pop() || '';
-
-        // 处理每一行
-        for (const line of lines) {
-          // SSE 格式：data: content
-          if (line.startsWith('data:')) {
-            const content = line.substring(5).trim(); // 移除 "data:" 前缀
+          // 处理剩余的 buffer
+          if (buffer) {
+            const content = extractContent(buffer);
             if (content) {
               onMessage(content);
             }
           }
+          onComplete();
+          break;
         }
-      }
 
-      // 处理剩余的 buffer
-      if (buffer.trim()) {
-        if (buffer.startsWith('data:')) {
-          const content = buffer.substring(5).trim();
-          if (content) {
+        // 解码数据块并添加到 buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // 按行分割处理 SSE 格式
+        // SSE 格式：data: content\n 或 data:content\n，空行 \n\n 表示事件结束
+        const lines = buffer.split('\n');
+        // 保留最后一行（可能不完整，等待更多数据）
+        buffer = lines.pop() || '';
+
+        // 处理完整的行
+        for (const line of lines) {
+          const content = extractContent(line);
+          if (content !== null) {
+            // 发送内容（保留所有格式，包括空格、换行等，因为 Markdown 需要）
             onMessage(content);
           }
+          // 空行（line === ''）在 SSE 中表示事件结束，但我们不需要特殊处理
+          // 因为每个 data: 行已经是一个完整的数据块
         }
       }
     } catch (error) {
