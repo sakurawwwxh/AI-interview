@@ -1,4 +1,4 @@
-import {useEffect, useState, useRef} from 'react';
+import {useEffect, useState, useRef, useTransition} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,15 +28,59 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
+  const rafRef = useRef<number>();
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // 使用 React 18 的并发特性优化渲染
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     loadKnowledgeBases();
   }, []);
 
-  // 自动滚动到底部
+  // 智能滚动：检测用户是否在手动滚动
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      isUserScrollingRef.current = !isNearBottom;
+      
+      // 如果用户滚动到底部附近，重置标志
+      if (isNearBottom) {
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          isUserScrollingRef.current = false;
+        }, 1000);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 注意：updateMessageContent 已改为内联实现，这里保留作为备用
+
+  // 智能滚动到底部：只在用户没有手动滚动时自动滚动
+  useEffect(() => {
+    if (!isUserScrollingRef.current && !isPending) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end'
+        });
+      });
+    }
+  }, [messages, isPending]);
 
   const loadKnowledgeBases = async () => {
     setLoadingList(true);
@@ -116,9 +160,28 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       content: '',
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, assistantMessage]);
+    
+    // 先添加助手消息，然后获取其索引
+    setMessages(prev => {
+      const newMessages = [...prev, assistantMessage];
+      return newMessages;
+    });
 
     let fullContent = '';
+    // 使用函数式更新，确保获取正确的索引
+    const updateAssistantMessage = (content: string) => {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const lastIndex = newMessages.length - 1;
+        if (lastIndex >= 0 && newMessages[lastIndex].type === 'assistant') {
+          newMessages[lastIndex] = {
+            ...newMessages[lastIndex],
+            content: content,
+          };
+        }
+        return newMessages;
+      });
+    };
 
     try {
       await knowledgeBaseApi.queryKnowledgeBaseStream(
@@ -126,21 +189,27 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
           knowledgeBaseIds: Array.from(selectedKbIds),
           question: userMessage.content,
         },
-        // onMessage: 收到流式数据块
+        // onMessage: 收到流式数据块（使用优化的更新方法）
         (chunk: string) => {
           fullContent += chunk;
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1] = {
-              ...assistantMessage,
-              content: fullContent,
-            };
-            return newMessages;
+          // 使用 requestAnimationFrame 优化更新
+          if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+          }
+          rafRef.current = requestAnimationFrame(() => {
+            startTransition(() => {
+              updateAssistantMessage(fullContent);
+            });
           });
         },
         // onComplete: 流式传输完成
         () => {
           setLoading(false);
+          // 最终确保滚动到底部
+          setTimeout(() => {
+            isUserScrollingRef.current = false;
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
         },
         // onError: 错误处理
         (error: Error) => {
@@ -342,7 +411,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 </div>
 
                 {/* 消息列表 */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div 
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-6 space-y-4"
+                >
                   {messages.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
                       <svg className="w-16 h-16 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none">
@@ -380,6 +452,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                                   {formatMarkdown(msg.content)}
                                 </ReactMarkdown>
+                                {/* NextChat 风格的光标动画 */}
+                                {loading && index === messages.length - 1 && (
+                                  <span className="inline-block w-0.5 h-5 bg-primary-500 ml-1 animate-pulse" style={{ animation: 'blink 1s infinite' }} />
+                                )}
                               </div>
                             )}
                           </div>
@@ -387,29 +463,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                       ))}
                     </AnimatePresence>
                   )}
-                  {loading && (
-                    <div className="flex justify-start">
-                      <div className="bg-slate-100 rounded-2xl p-4">
-                        <div className="flex items-center gap-2">
-                          <motion.div
-                            className="w-2 h-2 bg-slate-400 rounded-full"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                          />
-                          <motion.div
-                            className="w-2 h-2 bg-slate-400 rounded-full"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                          />
-                          <motion.div
-                            className="w-2 h-2 bg-slate-400 rounded-full"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* 加载动画已集成到消息中，这里可以移除或保留作为备用 */}
                   <div ref={messagesEndRef} />
                 </div>
 
