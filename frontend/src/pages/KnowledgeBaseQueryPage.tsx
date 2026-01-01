@@ -20,7 +20,6 @@ interface Message {
   timestamp: Date;
 }
 
-// 分类分组结构
 interface CategoryGroup {
   name: string;
   items: KnowledgeBaseItem[];
@@ -39,6 +38,15 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [searchKeyword, setSearchKeyword] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('time');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['未分类']));
+
+  // 右侧面板状态
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+
+  // 分类管理状态
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingKbCategory, setEditingKbCategory] = useState<{ id: number; name: string } | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
 
   // 会话状态
   const [sessions, setSessions] = useState<RagChatSessionListItem[]>([]);
@@ -64,16 +72,15 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   useEffect(() => {
     loadKnowledgeBases();
     loadSessions();
+    loadCategories();
   }, []);
 
-  // 排序变化时重新加载
   useEffect(() => {
     if (!searchKeyword) {
       loadKnowledgeBases();
     }
   }, [sortBy]);
 
-  // 智能滚动检测
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -100,7 +107,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     };
   }, []);
 
-  // 智能滚动到底部
   useEffect(() => {
     if (!isUserScrollingRef.current && !isPending) {
       requestAnimationFrame(() => {
@@ -124,7 +130,15 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
-  // 搜索知识库
+  const loadCategories = async () => {
+    try {
+      const list = await knowledgeBaseApi.getAllCategories();
+      setCategories(list);
+    } catch (err) {
+      console.error('加载分类列表失败', err);
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchKeyword.trim()) {
       loadKnowledgeBases();
@@ -141,7 +155,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
-  // 按分类分组知识库
   const groupedKnowledgeBases = useMemo((): CategoryGroup[] => {
     const groups: Map<string, KnowledgeBaseItem[]> = new Map();
 
@@ -153,7 +166,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       groups.get(category)!.push(kb);
     });
 
-    // 转换为数组并排序（未分类放最后）
     const result: CategoryGroup[] = [];
     const sortedCategories = Array.from(groups.keys()).sort((a, b) => {
       if (a === '未分类') return 1;
@@ -172,7 +184,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     return result;
   }, [knowledgeBases, expandedCategories]);
 
-  // 切换分类展开状态
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -205,7 +216,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       } else {
         newSet.add(kbId);
       }
-      // 切换知识库时重置当前会话
       if (newSet.size !== prev.size && currentSessionId) {
         setCurrentSessionId(null);
         setCurrentSessionTitle('');
@@ -252,9 +262,29 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return;
+    const trimmed = newCategoryName.trim();
+    if (!categories.includes(trimmed)) {
+      setCategories(prev => [...prev, trimmed]);
+    }
+    setNewCategoryName('');
+    setShowAddCategory(false);
+  };
+
+  const handleUpdateKbCategory = async (kbId: number, category: string | null) => {
+    try {
+      await knowledgeBaseApi.updateCategory(kbId, category);
+      await loadKnowledgeBases();
+      await loadCategories();
+      setEditingKbCategory(null);
+    } catch (err) {
+      console.error('更新分类失败', err);
+    }
+  };
+
   const formatMarkdown = (text: string): string => {
     if (!text) return '';
-
     return text
       .replace(/\\n/g, '\n')
       .replace(/^(#{1,6})([^\s#\n])/gm, '$1 $2')
@@ -275,7 +305,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     setQuestion('');
     setLoading(true);
 
-    // 如果没有当前会话，先创建
     let sessionId = currentSessionId;
     if (!sessionId) {
       try {
@@ -290,7 +319,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       }
     }
 
-    // 添加用户消息
     const userMessage: Message = {
       type: 'user',
       content: userQuestion,
@@ -298,7 +326,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     };
     setMessages(prev => [...prev, userMessage]);
 
-    // 创建助手消息占位
     const assistantMessage: Message = {
       type: 'assistant',
       content: '',
@@ -338,7 +365,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         },
         () => {
           setLoading(false);
-          loadSessions(); // 刷新会话列表
+          loadSessions();
           setTimeout(() => {
             isUserScrollingRef.current = false;
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -380,7 +407,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       }
       setDeleteConfirm(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败，请稍后重试');
+      alert(err instanceof Error ? err.message : '删除失败，请稀后重试');
     } finally {
       setDeletingId(null);
     }
@@ -408,17 +435,17 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   };
 
   return (
-    <div className="max-w-7xl mx-auto pt-8 pb-10">
+    <div className="max-w-7xl mx-auto pt-8 pb-10 px-4">
       {/* 头部 */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">知识库问答</h1>
-          <p className="text-slate-500">选择知识库，向 AI 提问</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">知识库问答</h1>
+          <p className="text-slate-500 text-sm">选择知识库，向 AI 提问</p>
         </div>
         <div className="flex gap-3">
           <motion.button
             onClick={onUpload}
-            className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all"
+            className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all text-sm"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -426,7 +453,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
           </motion.button>
           <motion.button
             onClick={onBack}
-            className="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all"
+            className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all text-sm"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
@@ -435,151 +462,16 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* 左侧：知识库列表 + 会话历史 */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* 知识库列表 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">知识库</h2>
-
-            {/* 搜索框 */}
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="搜索知识库..."
-                className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-              <button
-                onClick={handleSearch}
-                className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
-              >
-                搜索
-              </button>
-            </div>
-
-            {/* 排序选择 */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-slate-500">排序:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value as SortOption);
-                  setSearchKeyword('');
-                }}
-                className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="time">上传时间</option>
-                <option value="size">文件大小</option>
-                <option value="access">访问次数</option>
-                <option value="question">提问次数</option>
-              </select>
-            </div>
-
-            {loadingList ? (
-              <div className="text-center py-6">
-                <motion.div
-                  className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-              </div>
-            ) : knowledgeBases.length === 0 ? (
-              <div className="text-center py-6 text-slate-500">
-                <p className="mb-3 text-sm">{searchKeyword ? '未找到匹配的知识库' : '暂无知识库'}</p>
-                {!searchKeyword && (
-                  <button onClick={onUpload} className="text-primary-500 hover:text-primary-600 font-medium text-sm">
-                    立即上传
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {groupedKnowledgeBases.map((group) => (
-                  <div key={group.name} className="border border-slate-100 rounded-lg overflow-hidden">
-                    {/* 分类标题 */}
-                    <button
-                      onClick={() => toggleCategory(group.name)}
-                      className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <svg
-                          className={`w-4 h-4 text-slate-400 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`}
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span className="font-medium text-slate-700 text-sm">{group.name}</span>
-                      </div>
-                      <span className="text-xs text-slate-400">{group.items.length}</span>
-                    </button>
-
-                    {/* 分类下的知识库列表 */}
-                    <AnimatePresence>
-                      {group.isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="p-2 space-y-1">
-                            {group.items.map((kb) => (
-                              <div
-                                key={kb.id}
-                                onClick={() => handleToggleKb(kb.id)}
-                                className={`p-2 rounded-lg cursor-pointer transition-all ${
-                                  selectedKbIds.has(kb.id)
-                                    ? 'bg-primary-50 border border-primary-500'
-                                    : 'bg-white hover:bg-slate-50 border border-transparent'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedKbIds.has(kb.id)}
-                                      onChange={() => handleToggleKb(kb.id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
-                                    />
-                                    <span className="font-medium text-slate-800 text-xs truncate">{kb.name}</span>
-                                  </div>
-                                  <button
-                                    onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
-                                    disabled={deletingId === kb.id}
-                                    className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
-                                  >
-                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                                      <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                    </svg>
-                                  </button>
-                                </div>
-                                <p className="text-xs text-slate-400 mt-0.5 ml-6">{formatFileSize(kb.fileSize)}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 会话历史 */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <div className="flex gap-4 h-[calc(100vh-10rem)]">
+        {/* 左侧：对话历史 */}
+        <div className="w-64 flex-shrink-0">
+          <div className="bg-white rounded-2xl p-4 shadow-sm h-full flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-800">对话历史</h2>
+              <h2 className="text-base font-semibold text-slate-800">对话历史</h2>
               <motion.button
                 onClick={handleNewSession}
                 disabled={selectedKbIds.size === 0}
-                className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-1.5 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 title="新建对话"
@@ -590,73 +482,75 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
               </motion.button>
             </div>
 
-            {loadingSessions ? (
-              <div className="text-center py-6">
-                <motion.div
-                  className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                />
-              </div>
-            ) : sessions.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-sm">
-                暂无对话历史
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => handleLoadSession(session.id)}
-                    className={`p-3 rounded-lg cursor-pointer transition-all group ${
-                      currentSessionId === session.id
-                        ? 'bg-primary-50 border border-primary-500'
-                        : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-slate-800 text-sm truncate">{session.title}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {session.messageCount} 条消息 · {formatTimeAgo(session.updatedAt)}
-                        </p>
+            <div className="flex-1 overflow-y-auto">
+              {loadingSessions ? (
+                <div className="text-center py-6">
+                  <motion.div
+                    className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-sm">
+                  暂无对话历史
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={() => handleLoadSession(session.id)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all group ${
+                        currentSessionId === session.id
+                          ? 'bg-primary-50 border border-primary-500'
+                          : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-800 text-sm truncate">{session.title}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {session.messageCount} 条消息 · {formatTimeAgo(session.updatedAt)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSessionDeleteConfirm({ id: session.id, title: session.title });
+                          }}
+                          className="p-1 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSessionDeleteConfirm({ id: session.id, title: session.title });
-                        }}
-                        className="p-1 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                          <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* 右侧：问答区域 */}
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-2xl shadow-sm flex flex-col h-[calc(100vh-12rem)]">
+        {/* 中间：聊天区域 */}
+        <div className="flex-1 min-w-0">
+          <div className="bg-white rounded-2xl shadow-sm flex flex-col h-full">
             {selectedKbIds.size > 0 ? (
               <>
                 {/* 会话信息 */}
-                <div className="p-5 border-b border-slate-200">
-                  <h2 className="text-lg font-semibold text-slate-800">
+                <div className="p-4 border-b border-slate-200">
+                  <h2 className="text-base font-semibold text-slate-800">
                     {currentSessionTitle || (selectedKbIds.size === 1
                       ? knowledgeBases.find(kb => kb.id === Array.from(selectedKbIds)[0])?.name || '新对话'
                       : `${selectedKbIds.size} 个知识库 - 新对话`)}
                   </h2>
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {Array.from(selectedKbIds).map(kbId => {
                       const kb = knowledgeBases.find(k => k.id === kbId);
                       return kb ? (
-                        <span key={kbId} className="px-2 py-1 bg-primary-50 text-primary-600 text-xs rounded-full">
+                        <span key={kbId} className="px-2 py-0.5 bg-primary-50 text-primary-600 text-xs rounded-full">
                           {kb.name}
                         </span>
                       ) : null;
@@ -667,14 +561,14 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 {/* 消息列表 */}
                 <div
                   ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-5 space-y-4"
+                  className="flex-1 overflow-y-auto p-4 space-y-4"
                 >
                   {messages.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
-                      <svg className="w-16 h-16 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none">
                         <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
-                      <p>开始提问吧！</p>
+                      <p className="text-sm">开始提问吧！</p>
                     </div>
                   ) : (
                     <AnimatePresence>
@@ -693,14 +587,14 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                             }`}
                           >
                             {msg.type === 'user' ? (
-                              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                              <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</p>
                             ) : (
-                              <div className="prose prose-slate max-w-none
-                                prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-3 prose-headings:mt-6
-                                prose-p:leading-7 prose-p:text-slate-700 prose-p:mb-4
+                              <div className="prose prose-slate prose-sm max-w-none
+                                prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
+                                prose-p:leading-7 prose-p:text-slate-700 prose-p:mb-3
                                 prose-strong:text-slate-900 prose-strong:font-bold
-                                prose-ul:my-4 prose-ol:my-4
-                                prose-li:my-2 prose-li:leading-7
+                                prose-ul:my-3 prose-ol:my-3
+                                prose-li:my-1 prose-li:leading-7
                                 prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
                                 marker:text-primary-500 marker:font-bold">
                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
@@ -720,7 +614,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 </div>
 
                 {/* 输入区域 */}
-                <div className="p-5 border-t border-slate-200">
+                <div className="p-4 border-t border-slate-200">
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -728,13 +622,13 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                       onChange={(e) => setQuestion(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmitQuestion()}
                       placeholder="输入您的问题..."
-                      className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
                       disabled={loading}
                     />
                     <motion.button
                       onClick={handleSubmitQuestion}
                       disabled={!question.trim() || selectedKbIds.size === 0 || loading}
-                      className="px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                       whileHover={{ scale: loading ? 1 : 1.02 }}
                       whileTap={{ scale: loading ? 1 : 0.98 }}
                     >
@@ -746,15 +640,250 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
             ) : (
               <div className="flex-1 flex items-center justify-center text-slate-400">
                 <div className="text-center">
-                  <svg className="w-16 h-16 mx-auto mb-4 opacity-50" viewBox="0 0 24 24" fill="none">
+                  <svg className="w-12 h-12 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none">
                     <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  <p>请先选择一个知识库</p>
+                  <p className="text-sm">请先在右侧选择知识库</p>
                 </div>
               </div>
             )}
           </div>
         </div>
+
+        {/* 右侧：知识库管理（可收起） */}
+        <AnimatePresence>
+          {rightPanelOpen && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 280, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex-shrink-0 overflow-hidden"
+            >
+              <div className="bg-white rounded-2xl p-4 shadow-sm h-full flex flex-col w-[280px]">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-semibold text-slate-800">知识库</h2>
+                  <button
+                    onClick={() => setRightPanelOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                      <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* 搜索框 */}
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="搜索..."
+                    className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                  <button
+                    onClick={handleSearch}
+                    className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+                  >
+                    搜索
+                  </button>
+                </div>
+
+                {/* 排序和添加分类 */}
+                <div className="flex items-center gap-2 mb-3">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => {
+                      setSortBy(e.target.value as SortOption);
+                      setSearchKeyword('');
+                    }}
+                    className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  >
+                    <option value="time">时间排序</option>
+                    <option value="size">大小排序</option>
+                    <option value="access">访问排序</option>
+                    <option value="question">提问排序</option>
+                  </select>
+                  <button
+                    onClick={() => setShowAddCategory(true)}
+                    className="p-1.5 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+                    title="添加分类"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* 添加分类输入框 */}
+                <AnimatePresence>
+                  {showAddCategory && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="mb-3 overflow-hidden"
+                    >
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                          placeholder="新分类名称"
+                          className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleAddCategory}
+                          className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+                        >
+                          添加
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddCategory(false);
+                            setNewCategoryName('');
+                          }}
+                          className="px-2 py-1.5 text-sm text-slate-500 hover:text-slate-700"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* 知识库列表 */}
+                <div className="flex-1 overflow-y-auto">
+                  {loadingList ? (
+                    <div className="text-center py-6">
+                      <motion.div
+                        className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                    </div>
+                  ) : knowledgeBases.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500">
+                      <p className="mb-2 text-sm">{searchKeyword ? '未找到' : '暂无知识库'}</p>
+                      {!searchKeyword && (
+                        <button onClick={onUpload} className="text-primary-500 hover:text-primary-600 font-medium text-sm">
+                          立即上传
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupedKnowledgeBases.map((group) => (
+                        <div key={group.name} className="border border-slate-100 rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => toggleCategory(group.name)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <svg
+                                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              <span className="font-medium text-slate-700 text-sm">{group.name}</span>
+                            </div>
+                            <span className="text-xs text-slate-400">{group.items.length}</span>
+                          </button>
+
+                          <AnimatePresence>
+                            {group.isExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="p-2 space-y-1">
+                                  {group.items.map((kb) => (
+                                    <div
+                                      key={kb.id}
+                                      className={`p-2 rounded-lg transition-all ${
+                                        selectedKbIds.has(kb.id)
+                                          ? 'bg-primary-50 border border-primary-500'
+                                          : 'bg-white hover:bg-slate-50 border border-transparent'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-1">
+                                        <div
+                                          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
+                                          onClick={() => handleToggleKb(kb.id)}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedKbIds.has(kb.id)}
+                                            onChange={() => handleToggleKb(kb.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="w-3.5 h-3.5 text-primary-500 rounded focus:ring-primary-500"
+                                          />
+                                          <span className="font-medium text-slate-800 text-xs truncate">{kb.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-0.5">
+                                          {/* 修改分类按钮 */}
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditingKbCategory({ id: kb.id, name: kb.name });
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-primary-500 rounded transition-colors"
+                                            title="修改分类"
+                                          >
+                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                              <path d="M22 19C22 19.5304 21.7893 20.0391 21.4142 20.4142C21.0391 20.7893 20.5304 21 20 21H4C3.46957 21 2.96086 20.7893 2.58579 20.4142C2.21071 20.0391 2 19.5304 2 19V5C2 4.46957 2.21071 3.96086 2.58579 3.58579C2.96086 3.21071 3.46957 3 4 3H9L11 6H20C20.5304 6 21.0391 6.21071 21.4142 6.58579C21.7893 6.96086 22 7.46957 22 8V19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                          </button>
+                                          {/* 删除按钮 */}
+                                          <button
+                                            onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
+                                            disabled={deletingId === kb.id}
+                                            className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                          >
+                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                              <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-slate-400 mt-0.5 ml-5">{formatFileSize(kb.fileSize)}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 收起状态下的展开按钮 */}
+        {!rightPanelOpen && (
+          <button
+            onClick={() => setRightPanelOpen(true)}
+            className="flex-shrink-0 w-10 bg-white rounded-2xl shadow-sm flex items-center justify-center hover:bg-slate-50 transition-colors"
+            title="展开知识库面板"
+          >
+            <svg className="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* 知识库删除确认对话框 */}
@@ -781,6 +910,43 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         loading={false}
         onConfirm={handleDeleteSession}
         onCancel={() => setSessionDeleteConfirm(null)}
+      />
+
+      {/* 修改分类对话框 */}
+      <ConfirmDialog
+        open={editingKbCategory !== null}
+        title="修改分类"
+        message=""
+        confirmText="确定"
+        cancelText="取消"
+        onConfirm={() => {}}
+        onCancel={() => setEditingKbCategory(null)}
+        customContent={
+          editingKbCategory && (
+            <div className="mt-4">
+              <p className="text-sm text-slate-600 mb-3">
+                为 "{editingKbCategory.name}" 选择分类：
+              </p>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                <button
+                  onClick={() => handleUpdateKbCategory(editingKbCategory.id, null)}
+                  className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  未分类
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => handleUpdateKbCategory(editingKbCategory.id, cat)}
+                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        }
       />
     </div>
   );

@@ -10,6 +10,8 @@ export interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  customContent?: React.ReactNode;
+  hideButtons?: boolean;
 }
 
 export default function ConfirmDialog({
@@ -21,7 +23,9 @@ export default function ConfirmDialog({
   confirmVariant = 'primary',
   onConfirm,
   onCancel,
-  loading = false
+  loading = false,
+  customContent,
+  hideButtons = false
 }: ConfirmDialogProps) {
   if (!open) return null;
 
@@ -61,44 +65,59 @@ export default function ConfirmDialog({
               {/* 内容 */}
               <div className="text-slate-600 mb-6">
                 {typeof message === 'string' ? (
-                  <p className="whitespace-pre-line">{message}</p>
+                  message && <p className="whitespace-pre-line">{message}</p>
                 ) : (
                   message
                 )}
+                {customContent}
               </div>
-              
+
               {/* 按钮 */}
-              <div className="flex gap-3 justify-end">
-                <motion.button
-                  onClick={onCancel}
-                  disabled={loading}
-                  className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {cancelText}
-                </motion.button>
-                <motion.button
-                  onClick={onConfirm}
-                  disabled={loading}
-                  className={`px-5 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[confirmVariant]}`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <motion.span 
-                        className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      />
-                      处理中...
-                    </span>
-                  ) : (
-                    confirmText
-                  )}
-                </motion.button>
-              </div>
+              {!hideButtons && !customContent && (
+                <div className="flex gap-3 justify-end">
+                  <motion.button
+                    onClick={onCancel}
+                    disabled={loading}
+                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {cancelText}
+                  </motion.button>
+                  <motion.button
+                    onClick={onConfirm}
+                    disabled={loading}
+                    className={`px-5 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[confirmVariant]}`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        <motion.span
+                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                        处理中...
+                      </span>
+                    ) : (
+                      confirmText
+                    )}
+                  </motion.button>
+                </div>
+              )}
+              {customContent && (
+                <div className="flex gap-3 justify-end mt-4">
+                  <motion.button
+                    onClick={onCancel}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    关闭
+                  </motion.button>
+                </div>
+              )}
             </motion.div>
           </div>
         </>
