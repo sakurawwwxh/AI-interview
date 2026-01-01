@@ -73,7 +73,7 @@ export default function ConfirmDialog({
               </div>
 
               {/* 按钮 */}
-              {!hideButtons && !customContent && (
+              {!hideButtons && (
                 <div className="flex gap-3 justify-end">
                   <motion.button
                     onClick={onCancel}
@@ -103,18 +103,6 @@ export default function ConfirmDialog({
                     ) : (
                       confirmText
                     )}
-                  </motion.button>
-                </div>
-              )}
-              {customContent && (
-                <div className="flex gap-3 justify-end mt-4">
-                  <motion.button
-                    onClick={onCancel}
-                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all text-sm"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    关闭
                   </motion.button>
                 </div>
               )}

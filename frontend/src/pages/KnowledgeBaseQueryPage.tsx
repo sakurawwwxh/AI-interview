@@ -13,7 +13,8 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
-  Edit
+  Edit,
+  Pin
 } from 'lucide-react';
 
 interface KnowledgeBaseQueryPageProps {
@@ -62,6 +63,8 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [currentSessionTitle, setCurrentSessionTitle] = useState<string>('');
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [sessionDeleteConfirm, setSessionDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
+  const [editingSessionTitle, setEditingSessionTitle] = useState<{ id: number; title: string } | null>(null);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
 
   // 消息状态
   const [question, setQuestion] = useState('');
@@ -267,6 +270,36 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       setSessionDeleteConfirm(null);
     } catch (err) {
       console.error('删除会话失败', err);
+    }
+  };
+
+  const handleEditSessionTitle = (sessionId: number, currentTitle: string) => {
+    setEditingSessionTitle({ id: sessionId, title: currentTitle });
+    setNewSessionTitle(currentTitle);
+  };
+
+  const handleSaveSessionTitle = async () => {
+    if (!editingSessionTitle || !newSessionTitle.trim()) return;
+    try {
+      await ragChatApi.updateSessionTitle(editingSessionTitle.id, newSessionTitle.trim());
+      await loadSessions();
+      if (currentSessionId === editingSessionTitle.id) {
+        setCurrentSessionTitle(newSessionTitle.trim());
+      }
+      setEditingSessionTitle(null);
+      setNewSessionTitle('');
+    } catch (err) {
+      console.error('更新会话标题失败', err);
+    }
+  };
+
+  const handleTogglePin = async (sessionId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await ragChatApi.togglePin(sessionId);
+      await loadSessions();
+    } catch (err) {
+      console.error('切换置顶状态失败', err);
     }
   };
 
@@ -511,24 +544,53 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                         currentSessionId === session.id
                           ? 'bg-primary-50 border border-primary-500'
                           : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
-                      }`}
+                      } ${session.isPinned ? 'border-l-4 border-l-primary-500' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 text-sm truncate">{session.title}</p>
+                          <div className="flex items-center gap-1.5">
+                            {session.isPinned && (
+                              <Pin className="w-3.5 h-3.5 text-primary-500 fill-primary-500 flex-shrink-0" />
+                            )}
+                            <p className="font-medium text-slate-800 text-sm truncate">{session.title}</p>
+                          </div>
                           <p className="text-xs text-slate-500 mt-1">
                             {session.messageCount} 条消息 · {formatTimeAgo(session.updatedAt)}
                           </p>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSessionDeleteConfirm({ id: session.id, title: session.title });
-                          }}
-                          className="p-1 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={(e) => handleTogglePin(session.id, e)}
+                            className={`p-1 rounded transition-colors ${
+                              session.isPinned
+                                ? 'text-primary-500 hover:text-primary-600'
+                                : 'text-slate-400 hover:text-primary-500'
+                            }`}
+                            title={session.isPinned ? '取消置顶' : '置顶'}
+                          >
+                            <Pin className={`w-4 h-4 ${session.isPinned ? 'fill-primary-500' : ''}`} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSessionTitle(session.id, session.title);
+                            }}
+                            className="p-1 text-slate-400 hover:text-primary-500 rounded transition-colors"
+                            title="编辑标题"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSessionDeleteConfirm({ id: session.id, title: session.title });
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                            title="删除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -973,6 +1035,39 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                   </button>
                 ))}
               </div>
+            </div>
+          )
+        }
+      />
+
+      {/* 编辑会话标题对话框 */}
+      <ConfirmDialog
+        open={editingSessionTitle !== null}
+        title="编辑对话标题"
+        message=""
+        confirmText="保存"
+        cancelText="取消"
+        onConfirm={handleSaveSessionTitle}
+        onCancel={() => {
+          setEditingSessionTitle(null);
+          setNewSessionTitle('');
+        }}
+        customContent={
+          editingSessionTitle && (
+            <div className="mt-4 mb-6">
+              <input
+                type="text"
+                value={newSessionTitle}
+                onChange={(e) => setNewSessionTitle(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && newSessionTitle.trim()) {
+                    handleSaveSessionTitle();
+                  }
+                }}
+                placeholder="输入新标题"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                autoFocus
+              />
             </div>
           )
         }

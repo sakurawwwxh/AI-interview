@@ -75,6 +75,12 @@ public class RagChatSessionEntity {
      */
     private Integer messageCount = 0;
 
+    /**
+     * 是否置顶
+     */
+    @Column(columnDefinition = "boolean default false")
+    private Boolean isPinned = false;
+
     public enum SessionStatus {
         ACTIVE,    // 活跃会话
         ARCHIVED   // 已归档
@@ -89,6 +95,14 @@ public class RagChatSessionEntity {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    @PostLoad
+    protected void onLoad() {
+        // 确保 isPinned 字段始终有值（兼容旧数据）
+        if (isPinned == null) {
+            isPinned = false;
+        }
     }
 
     /**

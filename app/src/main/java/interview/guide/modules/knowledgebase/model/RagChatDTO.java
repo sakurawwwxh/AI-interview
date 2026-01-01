@@ -67,7 +67,8 @@ public class RagChatDTO {
         String title,
         Integer messageCount,
         List<String> knowledgeBaseNames,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Boolean isPinned
     ) {}
 
     /**
