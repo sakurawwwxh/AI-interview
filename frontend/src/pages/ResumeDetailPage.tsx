@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {useLocation} from 'react-router-dom';
 import {AnimatePresence, motion} from 'framer-motion';
 import {historyApi, InterviewDetail, ResumeDetail} from '../api/history';
 import AnalysisPanel from '../components/AnalysisPanel';
@@ -16,6 +17,7 @@ type TabType = 'analysis' | 'interview';
 type DetailViewType = 'list' | 'interviewDetail';
 
 export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }: ResumeDetailPageProps) {
+  const location = useLocation();
   const [resume, setResume] = useState<ResumeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('analysis');
@@ -28,6 +30,29 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
   useEffect(() => {
     loadResumeDetail();
   }, [resumeId]);
+
+  // 检查是否需要自动打开面试详情
+  useEffect(() => {
+    const viewInterview = (location.state as { viewInterview?: string })?.viewInterview;
+    if (viewInterview && resume) {
+      // 切换到面试标签页
+      setActiveTab('interview');
+      // 加载并显示面试详情
+      const loadAndViewInterview = async () => {
+        setLoadingInterview(true);
+        try {
+          const detail = await historyApi.getInterviewDetail(viewInterview);
+          setSelectedInterview(detail);
+          setDetailView('interviewDetail');
+        } catch (err) {
+          console.error('加载面试详情失败', err);
+        } finally {
+          setLoadingInterview(false);
+        }
+      };
+      loadAndViewInterview();
+    }
+  }, [location.state, resume]);
 
   const loadResumeDetail = async () => {
     setLoading(true);
