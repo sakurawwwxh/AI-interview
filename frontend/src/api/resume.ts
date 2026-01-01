@@ -8,13 +8,13 @@ export const resumeApi = {
   async uploadAndAnalyze(file: File): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
-    return request.upload<UploadResponse>('/api/resume/upload', formData);
+    return request.upload<UploadResponse>('/api/resumes/upload', formData);
   },
 
   /**
    * 健康检查
    */
   async healthCheck(): Promise<{ status: string; service: string }> {
-    return request.get('/api/resume/health');
+    return request.get('/api/resumes/health');
   },
 };
