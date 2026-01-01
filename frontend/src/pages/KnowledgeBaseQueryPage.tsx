@@ -1,9 +1,9 @@
-import {useEffect, useState, useRef, useTransition} from 'react';
+import {useEffect, useState, useRef, useTransition, useMemo} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import {knowledgeBaseApi, type KnowledgeBaseItem} from '../api/knowledgebase';
+import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/knowledgebase';
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -20,6 +20,13 @@ interface Message {
   timestamp: Date;
 }
 
+// 分类分组结构
+interface CategoryGroup {
+  name: string;
+  items: KnowledgeBaseItem[];
+  isExpanded: boolean;
+}
+
 export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBaseQueryPageProps) {
   // 知识库状态
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
@@ -27,6 +34,11 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [loadingList, setLoadingList] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+
+  // 搜索和排序状态
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('time');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['未分类']));
 
   // 会话状态
   const [sessions, setSessions] = useState<RagChatSessionListItem[]>([]);
@@ -53,6 +65,13 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     loadKnowledgeBases();
     loadSessions();
   }, []);
+
+  // 排序变化时重新加载
+  useEffect(() => {
+    if (!searchKeyword) {
+      loadKnowledgeBases();
+    }
+  }, [sortBy]);
 
   // 智能滚动检测
   useEffect(() => {
@@ -96,13 +115,74 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const loadKnowledgeBases = async () => {
     setLoadingList(true);
     try {
-      const list = await knowledgeBaseApi.getAllKnowledgeBases();
+      const list = await knowledgeBaseApi.getAllKnowledgeBases(sortBy);
       setKnowledgeBases(list);
     } catch (err) {
       console.error('加载知识库列表失败', err);
     } finally {
       setLoadingList(false);
     }
+  };
+
+  // 搜索知识库
+  const handleSearch = async () => {
+    if (!searchKeyword.trim()) {
+      loadKnowledgeBases();
+      return;
+    }
+    setLoadingList(true);
+    try {
+      const list = await knowledgeBaseApi.search(searchKeyword.trim());
+      setKnowledgeBases(list);
+    } catch (err) {
+      console.error('搜索知识库失败', err);
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  // 按分类分组知识库
+  const groupedKnowledgeBases = useMemo((): CategoryGroup[] => {
+    const groups: Map<string, KnowledgeBaseItem[]> = new Map();
+
+    knowledgeBases.forEach(kb => {
+      const category = kb.category || '未分类';
+      if (!groups.has(category)) {
+        groups.set(category, []);
+      }
+      groups.get(category)!.push(kb);
+    });
+
+    // 转换为数组并排序（未分类放最后）
+    const result: CategoryGroup[] = [];
+    const sortedCategories = Array.from(groups.keys()).sort((a, b) => {
+      if (a === '未分类') return 1;
+      if (b === '未分类') return -1;
+      return a.localeCompare(b);
+    });
+
+    sortedCategories.forEach(name => {
+      result.push({
+        name,
+        items: groups.get(name)!,
+        isExpanded: expandedCategories.has(name),
+      });
+    });
+
+    return result;
+  }, [knowledgeBases, expandedCategories]);
+
+  // 切换分类展开状态
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
   };
 
   const loadSessions = async () => {
@@ -362,6 +442,42 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
           <div className="bg-white rounded-2xl p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">知识库</h2>
 
+            {/* 搜索框 */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="搜索知识库..."
+                className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <button
+                onClick={handleSearch}
+                className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+              >
+                搜索
+              </button>
+            </div>
+
+            {/* 排序选择 */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-slate-500">排序:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as SortOption);
+                  setSearchKeyword('');
+                }}
+                className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+              >
+                <option value="time">上传时间</option>
+                <option value="size">文件大小</option>
+                <option value="access">访问次数</option>
+                <option value="question">提问次数</option>
+              </select>
+            </div>
+
             {loadingList ? (
               <div className="text-center py-6">
                 <motion.div
@@ -372,45 +488,84 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
               </div>
             ) : knowledgeBases.length === 0 ? (
               <div className="text-center py-6 text-slate-500">
-                <p className="mb-3 text-sm">暂无知识库</p>
-                <button onClick={onUpload} className="text-primary-500 hover:text-primary-600 font-medium text-sm">
-                  立即上传
-                </button>
+                <p className="mb-3 text-sm">{searchKeyword ? '未找到匹配的知识库' : '暂无知识库'}</p>
+                {!searchKeyword && (
+                  <button onClick={onUpload} className="text-primary-500 hover:text-primary-600 font-medium text-sm">
+                    立即上传
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {knowledgeBases.map((kb) => (
-                  <div
-                    key={kb.id}
-                    onClick={() => handleToggleKb(kb.id)}
-                    className={`p-3 rounded-lg cursor-pointer transition-all ${
-                      selectedKbIds.has(kb.id)
-                        ? 'bg-primary-50 border border-primary-500'
-                        : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          checked={selectedKbIds.has(kb.id)}
-                          onChange={() => handleToggleKb(kb.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
-                        />
-                        <span className="font-medium text-slate-800 text-sm truncate">{kb.name}</span>
-                      </div>
-                      <button
-                        onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
-                        disabled={deletingId === kb.id}
-                        className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                          <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {groupedKnowledgeBases.map((group) => (
+                  <div key={group.name} className="border border-slate-100 rounded-lg overflow-hidden">
+                    {/* 分类标题 */}
+                    <button
+                      onClick={() => toggleCategory(group.name)}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className={`w-4 h-4 text-slate-400 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                        >
+                          <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1 ml-6">{formatFileSize(kb.fileSize)}</p>
+                        <span className="font-medium text-slate-700 text-sm">{group.name}</span>
+                      </div>
+                      <span className="text-xs text-slate-400">{group.items.length}</span>
+                    </button>
+
+                    {/* 分类下的知识库列表 */}
+                    <AnimatePresence>
+                      {group.isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="p-2 space-y-1">
+                            {group.items.map((kb) => (
+                              <div
+                                key={kb.id}
+                                onClick={() => handleToggleKb(kb.id)}
+                                className={`p-2 rounded-lg cursor-pointer transition-all ${
+                                  selectedKbIds.has(kb.id)
+                                    ? 'bg-primary-50 border border-primary-500'
+                                    : 'bg-white hover:bg-slate-50 border border-transparent'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedKbIds.has(kb.id)}
+                                      onChange={() => handleToggleKb(kb.id)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
+                                    />
+                                    <span className="font-medium text-slate-800 text-xs truncate">{kb.name}</span>
+                                  </div>
+                                  <button
+                                    onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
+                                    disabled={deletingId === kb.id}
+                                    className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                  >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                                      <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-0.5 ml-6">{formatFileSize(kb.fileSize)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ))}
               </div>

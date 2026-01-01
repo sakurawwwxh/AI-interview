@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
 export interface KnowledgeBaseItem {
   id: number;
   name: string;
+  category: string | null;
   originalFilename: string;
   fileSize: number;
   contentType: string;
@@ -14,10 +15,13 @@ export interface KnowledgeBaseItem {
   questionCount: number;
 }
 
+export type SortOption = 'time' | 'size' | 'access' | 'question';
+
 export interface UploadKnowledgeBaseResponse {
   knowledgeBase: {
     id: number;
     name: string;
+    category: string;
     fileSize: number;
     contentLength: number;
   };
@@ -43,11 +47,14 @@ export const knowledgeBaseApi = {
   /**
    * 上传知识库文件
    */
-  async uploadKnowledgeBase(file: File, name?: string): Promise<UploadKnowledgeBaseResponse> {
+  async uploadKnowledgeBase(file: File, name?: string, category?: string): Promise<UploadKnowledgeBaseResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (name) {
       formData.append('name', name);
+    }
+    if (category) {
+      formData.append('category', category);
     }
     return request.upload<UploadKnowledgeBaseResponse>('/api/knowledgebase/upload', formData);
   },
@@ -55,8 +62,9 @@ export const knowledgeBaseApi = {
   /**
    * 获取所有知识库列表
    */
-  async getAllKnowledgeBases(): Promise<KnowledgeBaseItem[]> {
-    return request.get<KnowledgeBaseItem[]>('/api/knowledgebase/list');
+  async getAllKnowledgeBases(sortBy?: SortOption): Promise<KnowledgeBaseItem[]> {
+    const params = sortBy ? `?sortBy=${sortBy}` : '';
+    return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/list${params}`);
   },
 
   /**
@@ -71,6 +79,45 @@ export const knowledgeBaseApi = {
    */
   async deleteKnowledgeBase(id: number): Promise<void> {
     return request.delete(`/api/knowledgebase/${id}`);
+  },
+
+  // ========== 分类管理 ==========
+
+  /**
+   * 获取所有分类
+   */
+  async getAllCategories(): Promise<string[]> {
+    return request.get<string[]>('/api/knowledgebase/categories');
+  },
+
+  /**
+   * 根据分类获取知识库
+   */
+  async getByCategory(category: string): Promise<KnowledgeBaseItem[]> {
+    return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/category/${encodeURIComponent(category)}`);
+  },
+
+  /**
+   * 获取未分类的知识库
+   */
+  async getUncategorized(): Promise<KnowledgeBaseItem[]> {
+    return request.get<KnowledgeBaseItem[]>('/api/knowledgebase/uncategorized');
+  },
+
+  /**
+   * 更新知识库分类
+   */
+  async updateCategory(id: number, category: string | null): Promise<void> {
+    return request.put(`/api/knowledgebase/${id}/category`, { category });
+  },
+
+  // ========== 搜索 ==========
+
+  /**
+   * 搜索知识库
+   */
+  async search(keyword: string): Promise<KnowledgeBaseItem[]> {
+    return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/search?keyword=${encodeURIComponent(keyword)}`);
   },
 
   /**

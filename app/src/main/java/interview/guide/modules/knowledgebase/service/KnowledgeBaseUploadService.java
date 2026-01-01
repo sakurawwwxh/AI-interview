@@ -35,22 +35,23 @@ public class KnowledgeBaseUploadService {
     
     /**
      * 上传知识库文件
-     * 
+     *
      * @param file 知识库文件
      * @param name 知识库名称（可选，如果为空则从文件名提取）
+     * @param category 分类（可选）
      * @return 上传结果和存储信息（包含duplicate字段，表示是否为重复上传）
      */
-    public Map<String, Object> uploadKnowledgeBase(MultipartFile file, String name) {
+    public Map<String, Object> uploadKnowledgeBase(MultipartFile file, String name, String category) {
         // 1. 验证文件
         validateFile(file);
-        
+
         String fileName = file.getOriginalFilename();
-        log.info("收到知识库上传请求: {}, 大小: {} bytes", fileName, file.getSize());
-        
+        log.info("收到知识库上传请求: {}, 大小: {} bytes, category: {}", fileName, file.getSize(), category);
+
         // 2. 验证文件类型
         String contentType = parseService.detectContentType(file);
         validateContentType(contentType);
-        
+
         // 3. 检查知识库是否已存在（去重）
         String fileHash = calculateFileHash(file);
         Optional<KnowledgeBaseEntity> existingKb = knowledgeBaseRepository.findByFileHash(fileHash);
@@ -58,21 +59,21 @@ public class KnowledgeBaseUploadService {
             log.info("检测到重复知识库: hash={}", fileHash);
             return handleDuplicateKnowledgeBase(existingKb.get(), fileHash);
         }
-        
+
         // 4. 解析知识库文本（用于向量化）
         String content = parseService.parseContent(file);
         if (content == null || content.trim().isEmpty()) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法从文件中提取文本内容，请确保文件格式正确");
         }
-        
+
         // 5. 保存文件到RustFS
         String fileKey = uploadToStorage(file);
         String fileUrl = storageService.getFileUrl(fileKey);
         log.info("知识库已存储到RustFS: {}", fileKey);
-        
+
         // 6. 保存知识库元数据到数据库（不存储文本内容）
-        KnowledgeBaseEntity savedKb = saveKnowledgeBase(file, name, fileKey, fileUrl, fileHash);
-        
+        KnowledgeBaseEntity savedKb = saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
+
         // 7. 向量化并存储到pgvector
         try {
             vectorService.vectorizeAndStore(savedKb.getId(), content);
@@ -80,14 +81,15 @@ public class KnowledgeBaseUploadService {
             log.error("向量化失败，但知识库已保存: kbId={}, error={}", savedKb.getId(), e.getMessage());
             // 不抛出异常，允许后续手动重新向量化
         }
-        
+
         log.info("知识库上传完成: {}, kbId={}", fileName, savedKb.getId());
-        
+
         // 8. 返回结果
         return Map.of(
             "knowledgeBase", Map.of(
                 "id", savedKb.getId(),
                 "name", savedKb.getName(),
+                "category", savedKb.getCategory() != null ? savedKb.getCategory() : "",
                 "fileSize", savedKb.getFileSize(),
                 "contentLength", content.length()
             ),
@@ -186,20 +188,21 @@ public class KnowledgeBaseUploadService {
      * 保存新知识库元数据到数据库
      */
     @Transactional(rollbackFor = Exception.class)
-    private KnowledgeBaseEntity saveKnowledgeBase(MultipartFile file, String name, 
+    private KnowledgeBaseEntity saveKnowledgeBase(MultipartFile file, String name, String category,
                                                   String storageKey, String storageUrl, String fileHash) {
         try {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
             kb.setFileHash(fileHash);
             kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(file.getOriginalFilename()));
+            kb.setCategory(category != null && !category.trim().isEmpty() ? category.trim() : null);
             kb.setOriginalFilename(file.getOriginalFilename());
             kb.setFileSize(file.getSize());
             kb.setContentType(file.getContentType());
             kb.setStorageKey(storageKey);
             kb.setStorageUrl(storageUrl);
-            
+
             KnowledgeBaseEntity saved = knowledgeBaseRepository.save(kb);
-            log.info("知识库已保存: id={}, name={}, hash={}", saved.getId(), saved.getName(), fileHash);
+            log.info("知识库已保存: id={}, name={}, category={}, hash={}", saved.getId(), saved.getName(), saved.getCategory(), fileHash);
             return saved;
         } catch (Exception e) {
             log.error("保存知识库失败: {}", e.getMessage(), e);

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record KnowledgeBaseListItemDTO(
     Long id,
     String name,
+    String category,
     String originalFilename,
     Long fileSize,
     String contentType,
@@ -20,6 +21,7 @@ public record KnowledgeBaseListItemDTO(
         return new KnowledgeBaseListItemDTO(
             entity.getId(),
             entity.getName(),
+            entity.getCategory(),
             entity.getOriginalFilename(),
             entity.getFileSize(),
             entity.getContentType(),

@@ -31,8 +31,9 @@ public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEn
 
     /**
      * 获取会话详情（带消息列表和知识库）
+     * 注意：使用 DISTINCT 避免笛卡尔积导致的重复数据
      */
-    @Query("SELECT s FROM RagChatSessionEntity s LEFT JOIN FETCH s.messages LEFT JOIN FETCH s.knowledgeBases WHERE s.id = :id")
+    @Query("SELECT DISTINCT s FROM RagChatSessionEntity s LEFT JOIN FETCH s.knowledgeBases WHERE s.id = :id")
     Optional<RagChatSessionEntity> findByIdWithMessagesAndKnowledgeBases(@Param("id") Long id);
 
     /**
