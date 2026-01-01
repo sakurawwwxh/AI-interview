@@ -6,6 +6,15 @@ import {getScoreColor} from '../utils/score';
 import type {InterviewItem} from '../api/history';
 import {historyApi} from '../api/history';
 import ConfirmDialog from './ConfirmDialog';
+import {
+  Mic,
+  TrendingUp,
+  Calendar,
+  MessageSquare,
+  Download,
+  Trash2,
+  ChevronRight
+} from 'lucide-react';
 
 interface InterviewPanelProps {
   interviews: InterviewItem[];
@@ -68,10 +77,7 @@ export default function InterviewPanel({
     return (
       <div className="bg-white rounded-2xl p-12 text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-slate-100 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-slate-400" viewBox="0 0 24 24" fill="none">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Mic className="w-8 h-8 text-slate-400" />
         </div>
         <h3 className="text-xl font-semibold text-slate-700 mb-2">暂无面试记录</h3>
         <p className="text-slate-500 mb-6">开始模拟面试，获取专业评估</p>
@@ -98,10 +104,7 @@ export default function InterviewPanel({
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-primary-500" viewBox="0 0 24 24" fill="none">
-                <path d="M23 6L13.5 15.5L8.5 10.5L1 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M17 6H23V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <TrendingUp className="w-5 h-5 text-primary-500" />
               <span className="font-semibold text-slate-800">面试表现趋势</span>
             </div>
             <span className="text-sm text-slate-500">共 {chartData.length} 场练习</span>
@@ -247,18 +250,11 @@ function InterviewItemCard({
         </p>
         <div className="flex items-center gap-4 text-sm text-slate-500">
           <span className="flex items-center gap-1">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-              <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-              <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
-              <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
-            </svg>
+            <Calendar className="w-4 h-4" />
             {formatDateOnly(interview.createdAt)}
           </span>
           <span className="flex items-center gap-1">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-              <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <MessageSquare className="w-4 h-4" />
             {interview.totalQuestions} 题
           </span>
         </div>
@@ -274,11 +270,7 @@ function InterviewItemCard({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <Download className="w-5 h-5" />
       </motion.button>
         
         {/* 删除按钮 */}
@@ -295,18 +287,13 @@ function InterviewItemCard({
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
           ) : (
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 11V17M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Trash2 className="w-5 h-5" />
           )}
         </button>
       </div>
 
       {/* 箭头 */}
-      <svg className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all flex-shrink-0" viewBox="0 0 24 24" fill="none">
-        <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
     </motion.div>
   );
 }

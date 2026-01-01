@@ -2,6 +2,10 @@ import {ChangeEvent, DragEvent, useCallback, useState} from 'react';
 import {motion} from 'framer-motion';
 import {knowledgeBaseApi} from '../api/knowledgebase';
 import type {UploadKnowledgeBaseResponse} from '../api/knowledgebase';
+import {
+  FileText,
+  Upload
+} from 'lucide-react';
 
 interface KnowledgeBaseUploadPageProps {
   onUploadComplete: (result: UploadKnowledgeBaseResponse) => void;
@@ -121,10 +125,7 @@ export default function KnowledgeBaseUploadPage({ onUploadComplete, onBack }: Kn
             {selectedFile ? (
               <div className="space-y-4">
                 <div className="w-20 h-20 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-primary-600" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <FileText className="w-10 h-10 text-primary-600" />
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800">{selectedFile.name}</p>
@@ -144,11 +145,7 @@ export default function KnowledgeBaseUploadPage({ onUploadComplete, onBack }: Kn
             ) : (
               <div className="space-y-4">
                 <div className="w-20 h-20 mx-auto bg-slate-100 rounded-full flex items-center justify-center">
-                  <svg className="w-10 h-10 text-slate-400" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <Upload className="w-10 h-10 text-slate-400" />
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800 mb-1">拖拽文件到此处或点击上传</p>

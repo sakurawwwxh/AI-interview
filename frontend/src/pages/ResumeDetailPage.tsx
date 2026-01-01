@@ -6,6 +6,14 @@ import AnalysisPanel from '../components/AnalysisPanel';
 import InterviewPanel from '../components/InterviewPanel';
 import InterviewDetailPanel from '../components/InterviewDetailPanel';
 import {formatDateOnly} from '../utils/date';
+import {
+  ChevronLeft,
+  Clock,
+  Download,
+  Mic,
+  CheckSquare,
+  MessageSquare
+} from 'lucide-react';
 
 interface ResumeDetailPageProps {
   resumeId: number;
@@ -178,8 +186,8 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
 
   const latestAnalysis = resume.analyses?.[0];
   const tabs = [
-    { id: 'analysis' as const, label: '简历分析', icon: AnalysisIcon },
-    { id: 'interview' as const, label: '面试记录', icon: InterviewIcon, count: resume.interviews?.length || 0 },
+    { id: 'analysis' as const, label: '简历分析', icon: CheckSquare },
+    { id: 'interview' as const, label: '面试记录', icon: MessageSquare, count: resume.interviews?.length || 0 },
   ];
 
   return (
@@ -197,19 +205,14 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <polyline points="15,18 9,12 15,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <ChevronLeft className="w-5 h-5" />
           </motion.button>
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               {detailView === 'interviewDetail' ? `面试详情 #${selectedInterview?.sessionId?.slice(-6) || ''}` : resume.filename}
             </h2>
             <p className="text-sm text-slate-500 flex items-center gap-1.5">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Clock className="w-4 h-4" />
               {detailView === 'interviewDetail' 
                 ? `完成于 ${formatDateOnly(selectedInterview?.completedAt || selectedInterview?.createdAt || '')}`
                 : `上传于 ${formatDateOnly(resume.uploadedAt)}`
@@ -227,11 +230,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Download className="w-4 h-4" />
               {exporting === selectedInterview.sessionId ? '导出中...' : '导出 PDF'}
             </motion.button>
           )}
@@ -242,12 +241,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
               whileHover={{ scale: 1.02, y: -1 }}
               whileTap={{ scale: 0.98 }}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Mic className="w-4 h-4" />
               开始模拟面试
             </motion.button>
           )}
@@ -322,23 +316,5 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
         )}
       </div>
     </motion.div>
-  );
-}
-
-// Icons
-function AnalysisIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M9 11L12 14L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-function InterviewIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
   );
 }

@@ -3,6 +3,12 @@ import {AnimatePresence, motion} from 'framer-motion';
 import {resumeApi} from '../api/resume';
 import {getErrorMessage} from '../api/request';
 import type {ResumeAnalysisResponse, StorageInfo} from '../types/resume';
+import {
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  X
+} from 'lucide-react';
 
 interface UploadPageProps {
   onAnalysisComplete: (result: ResumeAnalysisResponse, storage: StorageInfo) => void;
@@ -128,11 +134,7 @@ export default function UploadPage({ onAnalysisComplete }: UploadPageProps) {
               ${dragOver ? 'bg-primary-100 text-primary-600' : 'bg-slate-100 text-slate-400'}`}
             animate={{ y: dragOver ? -5 : 0 }}
           >
-            <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="17,8 12,3 7,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Upload className="w-10 h-10" />
           </motion.div>
 
           <AnimatePresence mode="wait">
@@ -153,7 +155,7 @@ export default function UploadPage({ onAnalysisComplete }: UploadPageProps) {
                   className="w-8 h-8 bg-red-100 text-red-500 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center"
                   onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </motion.div>
             ) : (
@@ -195,9 +197,10 @@ export default function UploadPage({ onAnalysisComplete }: UploadPageProps) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-center"
+            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-center flex items-center justify-center gap-2"
           >
-            ⚠️ {error}
+            <AlertCircle className="w-5 h-5" />
+            {error}
           </motion.div>
         )}
       </AnimatePresence>
@@ -217,10 +220,7 @@ export default function UploadPage({ onAnalysisComplete }: UploadPageProps) {
               whileTap={{ scale: 0.98 }}
               onClick={handleUpload}
             >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <CheckCircle2 className="w-6 h-6" />
               开始 AI 分析
             </motion.button>
           </motion.div>
@@ -259,11 +259,7 @@ export default function UploadPage({ onAnalysisComplete }: UploadPageProps) {
             <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
-                  <svg className="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 8V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 16H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <AlertCircle className="w-6 h-6 text-red-500" />
                 </div>
                 <div className="flex-1">
                   <h4 className="text-red-800 font-semibold mb-1">分析失败</h4>
