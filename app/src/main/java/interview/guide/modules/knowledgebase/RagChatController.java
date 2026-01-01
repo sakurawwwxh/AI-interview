@@ -62,6 +62,16 @@ public class RagChatController {
     }
 
     /**
+     * 切换会话置顶状态
+     * PUT /api/rag-chat/sessions/{sessionId}/pin
+     */
+    @PutMapping("/api/rag-chat/sessions/{sessionId}/pin")
+    public Result<Void> togglePin(@PathVariable Long sessionId) {
+        sessionService.togglePin(sessionId);
+        return Result.success(null);
+    }
+
+    /**
      * 更新会话知识库
      * PUT /api/rag-chat/sessions/{sessionId}/knowledge-bases
      */

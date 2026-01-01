@@ -61,7 +61,7 @@ public class RagChatSessionService {
      * 获取会话列表
      */
     public List<SessionListItemDTO> listSessions() {
-        return sessionRepository.findAllByOrderByUpdatedAtDesc()
+        return sessionRepository.findAllOrderByPinnedAndUpdatedAtDesc()
             .stream()
             .map(this::toSessionListItemDTO)
             .collect(Collectors.toList());
@@ -166,6 +166,22 @@ public class RagChatSessionService {
     }
 
     /**
+     * 切换会话置顶状态
+     */
+    @Transactional
+    public void togglePin(Long sessionId) {
+        RagChatSessionEntity session = sessionRepository.findById(sessionId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在"));
+
+        // 处理 null 值（兼容旧数据）
+        Boolean currentPinned = session.getIsPinned() != null ? session.getIsPinned() : false;
+        session.setIsPinned(!currentPinned);
+        sessionRepository.save(session);
+
+        log.info("切换会话置顶状态: sessionId={}, isPinned={}", sessionId, session.getIsPinned());
+    }
+
+    /**
      * 更新会话的知识库关联
      */
     @Transactional
@@ -226,7 +242,8 @@ public class RagChatSessionService {
             session.getTitle(),
             session.getMessageCount(),
             kbNames,
-            session.getUpdatedAt()
+            session.getUpdatedAt(),
+            session.getIsPinned() != null ? session.getIsPinned() : false
         );
     }
 

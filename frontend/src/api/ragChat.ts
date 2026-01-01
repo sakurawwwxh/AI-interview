@@ -17,6 +17,7 @@ export interface RagChatSessionListItem {
   messageCount: number;
   knowledgeBaseNames: string[];
   updatedAt: string;
+  isPinned: boolean;
 }
 
 export interface RagChatMessage {
@@ -88,6 +89,13 @@ export const ragChatApi = {
     return request.put(`/api/rag-chat/sessions/${sessionId}/knowledge-bases`, {
       knowledgeBaseIds,
     });
+  },
+
+  /**
+   * 切换会话置顶状态
+   */
+  async togglePin(sessionId: number): Promise<void> {
+    return request.put(`/api/rag-chat/sessions/${sessionId}/pin`);
   },
 
   /**
