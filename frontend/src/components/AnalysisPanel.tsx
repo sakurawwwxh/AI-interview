@@ -3,6 +3,13 @@ import {motion} from 'framer-motion';
 import RadarChart from './RadarChart';
 import ScoreProgressBar from './ScoreProgressBar';
 import {formatDateTime} from '../utils/date';
+import {
+  AlertCircle,
+  TrendingUp,
+  Download,
+  Target,
+  CheckCircle2
+} from 'lucide-react';
 
 interface AnalysisPanelProps {
   analysis: any;
@@ -127,11 +134,7 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
     return (
       <div className="bg-white rounded-2xl p-12 text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-red-500" viewBox="0 0 24 24" fill="none">
-            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12 8V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12 16H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <AlertCircle className="w-8 h-8 text-red-500" />
         </div>
         <h3 className="text-xl font-semibold text-slate-700 mb-2">分析失败</h3>
         <p className="text-slate-500 mb-4">AI 服务暂时不可用，请稍后重试</p>
@@ -163,10 +166,7 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2 text-slate-500">
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                <path d="M3 3V21H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18 9L12 15L9 12L3 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <TrendingUp className="w-5 h-5" />
               <span className="font-semibold">核心评价</span>
             </div>
             <motion.button
@@ -176,11 +176,7 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Download className="w-4 h-4" />
               {exporting ? '导出中...' : '导出分析报告'}
             </motion.button>
           </div>
@@ -228,11 +224,7 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
           transition={{ delay: 0.2 }}
         >
           <div className="flex items-center gap-2 text-slate-500 mb-6">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="2" fill="currentColor"/>
-            </svg>
+            <Target className="w-5 h-5" />
             <span className="font-semibold">多维度评分</span>
           </div>
 
@@ -288,10 +280,7 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
         transition={{ delay: 0.3 }}
       >
         <div className="flex items-center gap-2 text-slate-500 mb-6">
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-            <polyline points="9,12 11,14 15,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <CheckCircle2 className="w-5 h-5" />
           <span className="font-semibold">改进建议</span>
           <span className="text-sm text-slate-400">
             ({analysis.suggestions?.length || 0} 条)

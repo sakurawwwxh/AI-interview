@@ -1,6 +1,10 @@
 import {useEffect, useMemo, useRef} from 'react';
 import {motion} from 'framer-motion';
 import type {InterviewQuestion, InterviewSession} from '../types/interview';
+import {
+  Send,
+  User
+} from 'lucide-react';
 
 interface Message {
   type: 'interviewer' | 'user';
@@ -120,10 +124,7 @@ export default function InterviewChatPanel({
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <Send className="w-4 h-4" />
                     提交
                   </>
                 )}
@@ -155,10 +156,7 @@ function MessageBubble({ message }: { message: Message }) {
         className="flex items-start gap-3"
       >
         <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-primary-600" viewBox="0 0 24 24" fill="none">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-          </svg>
+          <User className="w-4 h-4 text-primary-600" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
