@@ -50,7 +50,7 @@ public class KnowledgeBaseUploadService {
 
         // 2. 验证文件类型
         String contentType = parseService.detectContentType(file);
-        validateContentType(contentType);
+        validateContentType(contentType, fileName);
 
         // 3. 检查知识库是否已存在（去重）
         String fileHash = calculateFileHash(file);
@@ -132,11 +132,33 @@ public class KnowledgeBaseUploadService {
     /**
      * 验证文件类型
      */
-    private void validateContentType(String contentType) {
-        if (!isAllowedType(contentType)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的文件类型: " + contentType + 
-                "，支持的类型：PDF、DOCX、DOC、TXT、MD等");
+    private void validateContentType(String contentType, String fileName) {
+        // 先检查MIME类型
+        if (isAllowedType(contentType)) {
+            return;
         }
+        
+        // 如果MIME类型不支持，再检查文件扩展名（用于Markdown等文件）
+        if (fileName != null && isAllowedByExtension(fileName)) {
+            return;
+        }
+        
+        throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的文件类型: " + contentType + 
+            "，支持的类型：PDF、DOCX、DOC、TXT、MD等");
+    }
+    
+    /**
+     * 根据文件扩展名判断是否允许
+     */
+    private boolean isAllowedByExtension(String fileName) {
+        if (fileName == null) {
+            return false;
+        }
+        
+        String lowerFileName = fileName.toLowerCase();
+        return lowerFileName.endsWith(".md") ||
+               lowerFileName.endsWith(".markdown") ||
+               lowerFileName.endsWith(".mdown");
     }
     
     /**
@@ -181,6 +203,8 @@ public class KnowledgeBaseUploadService {
                lowerContentType.contains("wordprocessingml") ||
                lowerContentType.contains("text/plain") ||
                lowerContentType.contains("text/markdown") ||
+               lowerContentType.contains("text/x-markdown") ||
+               lowerContentType.contains("text/x-web-markdown") ||
                lowerContentType.contains("application/rtf");
     }
     
