@@ -142,15 +142,24 @@ export const ragChatApi = {
       const extractEventContent = (event: string): string | null => {
         if (!event.trim()) return null;
 
-        let content = event;
-        if (content.startsWith('data:')) {
-          content = content.substring(5);
-          if (content.startsWith(' ')) {
-            content = content.substring(1);
+        // 处理多行 SSE 格式，每行可能以 "data:" 开头
+        const lines = event.split('\n');
+        const contentLines: string[] = [];
+
+        for (const line of lines) {
+          let content = line.trim();
+          // 移除 "data:" 前缀
+          if (content.startsWith('data:')) {
+            content = content.substring(5).trim();
+          }
+          // 跳过空行和事件类型行（如 "event: message"）
+          if (content && !content.startsWith('event:') && !content.startsWith('id:')) {
+            contentLines.push(content);
           }
         }
 
-        return content || null;
+        const result = contentLines.join('\n');
+        return result || null;
       };
 
       while (true) {
@@ -169,15 +178,29 @@ export const ragChatApi = {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // SSE 事件以 \n\n 分隔
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const event of events) {
-          const content = extractEventContent(event);
-          if (content !== null) {
-            onMessage(content);
+        // SSE 事件以 \n\n 分隔，但也需要处理单行的情况
+        let newlineIndex = buffer.indexOf('\n\n');
+        if (newlineIndex === -1) {
+          // 如果没有找到 \n\n，尝试处理单行 data: 格式
+          const singleLineIndex = buffer.indexOf('\n');
+          if (singleLineIndex !== -1 && buffer.substring(0, singleLineIndex).startsWith('data:')) {
+            const line = buffer.substring(0, singleLineIndex);
+            const content = extractEventContent(line);
+            if (content) {
+              onMessage(content);
+            }
+            buffer = buffer.substring(singleLineIndex + 1);
           }
+          continue;
+        }
+
+        // 处理完整的事件块
+        const eventBlock = buffer.substring(0, newlineIndex);
+        buffer = buffer.substring(newlineIndex + 2);
+
+        const content = extractEventContent(eventBlock);
+        if (content !== null) {
+          onMessage(content);
         }
       }
     } catch (error) {

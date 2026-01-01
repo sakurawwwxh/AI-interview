@@ -7,6 +7,14 @@ import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
 import ConfirmDialog from '../components/ConfirmDialog';
+import {
+  Plus,
+  Trash2,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  Edit
+} from 'lucide-react';
 
 interface KnowledgeBaseQueryPageProps {
   onBack: () => void;
@@ -476,9 +484,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 whileTap={{ scale: 0.95 }}
                 title="新建对话"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <Plus className="w-5 h-5" />
               </motion.button>
             </div>
 
@@ -521,9 +527,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                           }}
                           className="p-1 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
                         >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -565,9 +569,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 >
                   {messages.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
-                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none">
-                        <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p className="text-sm">开始提问吧！</p>
                     </div>
                   ) : (
@@ -667,9 +669,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                     onClick={() => setRightPanelOpen(false)}
                     className="p-1 text-slate-400 hover:text-slate-600 rounded"
                   >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                      <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
                 </div>
 
@@ -711,50 +711,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                     className="p-1.5 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
                     title="添加分类"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* 添加分类输入框 */}
-                <AnimatePresence>
-                  {showAddCategory && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="mb-3 overflow-hidden"
-                    >
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
-                          placeholder="新分类名称"
-                          className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          autoFocus
-                        />
-                        <button
-                          onClick={handleAddCategory}
-                          className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
-                        >
-                          添加
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowAddCategory(false);
-                            setNewCategoryName('');
-                          }}
-                          className="px-2 py-1.5 text-sm text-slate-500 hover:text-slate-700"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
                 {/* 知识库列表 */}
                 <div className="flex-1 overflow-y-auto">
@@ -784,13 +744,9 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                             className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
                           >
                             <div className="flex items-center gap-2">
-                              <svg
+                              <ChevronRight
                                 className={`w-3.5 h-3.5 text-slate-400 transition-transform ${group.isExpanded ? 'rotate-90' : ''}`}
-                                viewBox="0 0 24 24"
-                                fill="none"
-                              >
-                                <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
+                              />
                               <span className="font-medium text-slate-700 text-sm">{group.name}</span>
                             </div>
                             <span className="text-xs text-slate-400">{group.items.length}</span>
@@ -839,9 +795,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                             className="p-1 text-slate-400 hover:text-primary-500 rounded transition-colors"
                                             title="修改分类"
                                           >
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-                                              <path d="M22 19C22 19.5304 21.7893 20.0391 21.4142 20.4142C21.0391 20.7893 20.5304 21 20 21H4C3.46957 21 2.96086 20.7893 2.58579 20.4142C2.21071 20.0391 2 19.5304 2 19V5C2 4.46957 2.21071 3.96086 2.58579 3.58579C2.96086 3.21071 3.46957 3 4 3H9L11 6H20C20.5304 6 21.0391 6.21071 21.4142 6.58579C21.7893 6.96086 22 7.46957 22 8V19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
+                                            <Edit className="w-3 h-3" />
                                           </button>
                                           {/* 删除按钮 */}
                                           <button
@@ -849,9 +803,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                             disabled={deletingId === kb.id}
                                             className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
                                           >
-                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none">
-                                              <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            </svg>
+                                            <Trash2 className="w-3 h-3" />
                                           </button>
                                         </div>
                                       </div>
@@ -879,12 +831,89 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
             className="flex-shrink-0 w-10 bg-white rounded-2xl shadow-sm flex items-center justify-center hover:bg-slate-50 transition-colors"
             title="展开知识库面板"
           >
-            <svg className="w-5 h-5 text-slate-400" viewBox="0 0 24 24" fill="none">
-              <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
           </button>
         )}
       </div>
+
+      {/* 添加分类弹窗 */}
+      <AnimatePresence>
+        {showAddCategory && (
+          <>
+            {/* 背景遮罩 */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowAddCategory(false);
+                setNewCategoryName('');
+              }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            />
+            
+            {/* 弹窗 */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+              >
+                {/* 标题 */}
+                <h3 className="text-xl font-bold text-slate-900 mb-4">
+                  新建分类
+                </h3>
+                
+                {/* 输入框 */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    分类名称
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && newCategoryName.trim()) {
+                        handleAddCategory();
+                      }
+                    }}
+                    placeholder="请输入分类名称"
+                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+
+                {/* 按钮 */}
+                <div className="flex gap-3 justify-end">
+                  <motion.button
+                    onClick={() => {
+                      setShowAddCategory(false);
+                      setNewCategoryName('');
+                    }}
+                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    取消
+                  </motion.button>
+                  <motion.button
+                    onClick={handleAddCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    创建
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* 知识库删除确认对话框 */}
       <ConfirmDialog
