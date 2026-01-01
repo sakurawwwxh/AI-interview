@@ -31,9 +31,9 @@ public class InterviewController {
     
     /**
      * 创建面试会话
-     * POST /api/interview/session
+     * POST /api/interview/sessions
      */
-    @PostMapping("/api/interview/session")
+    @PostMapping("/api/interview/sessions")
     public Result<InterviewSessionDTO> createSession(@RequestBody CreateInterviewRequest request) {
         log.info("创建面试会话，题目数量: {}", request.questionCount());
         InterviewSessionDTO session = sessionService.createSession(request);
@@ -42,9 +42,9 @@ public class InterviewController {
     
     /**
      * 获取会话信息
-     * GET /api/interview/session/{sessionId}
+     * GET /api/interview/sessions/{sessionId}
      */
-    @GetMapping("/api/interview/session/{sessionId}")
+    @GetMapping("/api/interview/sessions/{sessionId}")
     public Result<InterviewSessionDTO> getSession(@PathVariable String sessionId) {
         InterviewSessionDTO session = sessionService.getSession(sessionId);
         return Result.success(session);
@@ -52,29 +52,34 @@ public class InterviewController {
     
     /**
      * 获取当前问题
-     * GET /api/interview/session/{sessionId}/question
+     * GET /api/interview/sessions/{sessionId}/question
      */
-    @GetMapping("/api/interview/session/{sessionId}/question")
+    @GetMapping("/api/interview/sessions/{sessionId}/question")
     public Result<Map<String, Object>> getCurrentQuestion(@PathVariable String sessionId) {
         return Result.success(sessionService.getCurrentQuestionResponse(sessionId));
     }
     
     /**
      * 提交答案
-     * POST /api/interview/answer
+     * POST /api/interview/sessions/{sessionId}/answers
      */
-    @PostMapping("/api/interview/answer")
-    public Result<SubmitAnswerResponse> submitAnswer(@RequestBody SubmitAnswerRequest request) {
-        log.info("提交答案: 会话{}, 问题{}", request.sessionId(), request.questionIndex());
+    @PostMapping("/api/interview/sessions/{sessionId}/answers")
+    public Result<SubmitAnswerResponse> submitAnswer(
+            @PathVariable String sessionId,
+            @RequestBody Map<String, Object> body) {
+        Integer questionIndex = (Integer) body.get("questionIndex");
+        String answer = (String) body.get("answer");
+        log.info("提交答案: 会话{}, 问题{}", sessionId, questionIndex);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
         SubmitAnswerResponse response = sessionService.submitAnswer(request);
         return Result.success(response);
     }
     
     /**
      * 生成面试报告
-     * GET /api/interview/session/{sessionId}/report
+     * GET /api/interview/sessions/{sessionId}/report
      */
-    @GetMapping("/api/interview/session/{sessionId}/report")
+    @GetMapping("/api/interview/sessions/{sessionId}/report")
     public Result<InterviewReportDTO> getReport(@PathVariable String sessionId) {
         log.info("生成面试报告: {}", sessionId);
         InterviewReportDTO report = sessionService.generateReport(sessionId);
@@ -83,29 +88,34 @@ public class InterviewController {
     
     /**
      * 查找未完成的面试会话
-     * GET /api/interview/unfinished/{resumeId}
+     * GET /api/interview/sessions/unfinished/{resumeId}
      */
-    @GetMapping("/api/interview/unfinished/{resumeId}")
+    @GetMapping("/api/interview/sessions/unfinished/{resumeId}")
     public Result<InterviewSessionDTO> findUnfinishedSession(@PathVariable Long resumeId) {
         return Result.success(sessionService.findUnfinishedSessionOrThrow(resumeId));
     }
     
     /**
      * 暂存答案（不进入下一题）
-     * POST /api/interview/save-answer
+     * PUT /api/interview/sessions/{sessionId}/answers
      */
-    @PostMapping("/api/interview/save-answer")
-    public Result<Void> saveAnswer(@RequestBody SubmitAnswerRequest request) {
-        log.info("暂存答案: 会话{}, 问题{}", request.sessionId(), request.questionIndex());
+    @PutMapping("/api/interview/sessions/{sessionId}/answers")
+    public Result<Void> saveAnswer(
+            @PathVariable String sessionId,
+            @RequestBody Map<String, Object> body) {
+        Integer questionIndex = (Integer) body.get("questionIndex");
+        String answer = (String) body.get("answer");
+        log.info("暂存答案: 会话{}, 问题{}", sessionId, questionIndex);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
         sessionService.saveAnswer(request);
         return Result.success(null);
     }
     
     /**
      * 提前交卷
-     * POST /api/interview/{sessionId}/complete
+     * POST /api/interview/sessions/{sessionId}/complete
      */
-    @PostMapping("/api/interview/{sessionId}/complete")
+    @PostMapping("/api/interview/sessions/{sessionId}/complete")
     public Result<Void> completeInterview(@PathVariable String sessionId) {
         log.info("提前交卷: {}", sessionId);
         sessionService.completeInterview(sessionId);
@@ -114,9 +124,9 @@ public class InterviewController {
     
     /**
      * 获取面试会话详情
-     * GET /api/interview/{sessionId}/detail
+     * GET /api/interview/sessions/{sessionId}/details
      */
-    @GetMapping("/api/interview/{sessionId}/detail")
+    @GetMapping("/api/interview/sessions/{sessionId}/details")
     public Result<InterviewDetailDTO> getInterviewDetail(@PathVariable String sessionId) {
         InterviewDetailDTO detail = historyService.getInterviewDetail(sessionId);
         return Result.success(detail);
@@ -124,9 +134,9 @@ public class InterviewController {
     
     /**
      * 导出面试报告为PDF
-     * GET /api/interview/{sessionId}/export
+     * GET /api/interview/sessions/{sessionId}/export
      */
-    @GetMapping("/api/interview/{sessionId}/export")
+    @GetMapping("/api/interview/sessions/{sessionId}/export")
     public ResponseEntity<byte[]> exportInterviewPdf(@PathVariable String sessionId) {
         try {
             byte[] pdfBytes = historyService.exportInterviewPdf(sessionId);
@@ -145,9 +155,9 @@ public class InterviewController {
     
     /**
      * 删除面试会话
-     * DELETE /api/interview/{sessionId}
+     * DELETE /api/interview/sessions/{sessionId}
      */
-    @DeleteMapping("/api/interview/{sessionId}")
+    @DeleteMapping("/api/interview/sessions/{sessionId}")
     public Result<Void> deleteInterview(@PathVariable String sessionId) {
         log.info("删除面试会话: {}", sessionId);
         persistenceService.deleteSessionBySessionId(sessionId);

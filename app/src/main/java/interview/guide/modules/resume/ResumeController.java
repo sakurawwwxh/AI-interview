@@ -34,12 +34,12 @@ public class ResumeController {
     
     /**
      * 上传简历并获取分析结果
-     * POST /api/resume/upload
+     * POST /api/resumes/upload
      * 
      * @param file 简历文件（支持PDF、DOCX、DOC、TXT）
      * @return 简历分析结果，包含评分和建议
      */
-    @PostMapping(value = "/api/resume/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/api/resumes/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<Map<String, Object>> uploadAndAnalyze(@RequestParam("file") MultipartFile file) {
         Map<String, Object> result = uploadService.uploadAndAnalyze(file);
         boolean isDuplicate = (Boolean) result.get("duplicate");
@@ -50,23 +50,10 @@ public class ResumeController {
     }
     
     /**
-     * 删除简历
-     * DELETE /api/resume/{id}
-     * 
-     * @param id 简历ID
-     * @return 删除结果
-     */
-    @DeleteMapping("/api/resume/{id}")
-    public Result<Void> deleteResume(@PathVariable Long id) {
-        deleteService.deleteResume(id);
-        return Result.success(null);
-    }
-    
-    /**
      * 获取所有简历列表
-     * GET /api/resume/list
+     * GET /api/resumes
      */
-    @GetMapping("/api/resume/list")
+    @GetMapping("/api/resumes")
     public Result<List<ResumeListItemDTO>> getAllResumes() {
         List<ResumeListItemDTO> resumes = historyService.getAllResumes();
         return Result.success(resumes);
@@ -74,9 +61,9 @@ public class ResumeController {
     
     /**
      * 获取简历详情（包含分析历史）
-     * GET /api/resume/{id}/detail
+     * GET /api/resumes/{id}/detail
      */
-    @GetMapping("/api/resume/{id}/detail")
+    @GetMapping("/api/resumes/{id}/detail")
     public Result<ResumeDetailDTO> getResumeDetail(@PathVariable Long id) {
         ResumeDetailDTO detail = historyService.getResumeDetail(id);
         return Result.success(detail);
@@ -84,9 +71,9 @@ public class ResumeController {
     
     /**
      * 导出简历分析报告为PDF
-     * GET /api/resume/{id}/export
+     * GET /api/resumes/{id}/export
      */
-    @GetMapping("/api/resume/{id}/export")
+    @GetMapping("/api/resumes/{id}/export")
     public ResponseEntity<byte[]> exportAnalysisPdf(@PathVariable Long id) {
         try {
             var result = historyService.exportAnalysisPdf(id);
@@ -103,9 +90,23 @@ public class ResumeController {
     }
     
     /**
-     * 健康检查接口
+     * 删除简历
+     * DELETE /api/resumes/{id}
+     * 
+     * @param id 简历ID
+     * @return 删除结果
      */
-    @GetMapping("/api/resume/health")
+    @DeleteMapping("/api/resumes/{id}")
+    public Result<Void> deleteResume(@PathVariable Long id) {
+        deleteService.deleteResume(id);
+        return Result.success(null);
+    }
+    
+    /**
+     * 健康检查接口
+     * GET /api/resumes/health
+     */
+    @GetMapping("/api/resumes/health")
     public Result<Map<String, String>> health() {
         return Result.success(Map.of(
             "status", "UP",

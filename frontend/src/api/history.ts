@@ -74,28 +74,28 @@ export const historyApi = {
    * 获取所有简历列表
    */
   async getResumes(): Promise<ResumeListItem[]> {
-    return request.get<ResumeListItem[]>('/api/resume/list');
+    return request.get<ResumeListItem[]>('/api/resumes');
   },
 
   /**
    * 获取简历详情
    */
   async getResumeDetail(id: number): Promise<ResumeDetail> {
-    return request.get<ResumeDetail>(`/api/resume/${id}/detail`);
+    return request.get<ResumeDetail>(`/api/resumes/${id}/detail`);
   },
 
   /**
    * 获取面试详情
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
-    return request.get<InterviewDetail>(`/api/interview/${sessionId}/detail`);
+    return request.get<InterviewDetail>(`/api/interview/sessions/${sessionId}/details`);
   },
 
   /**
    * 导出简历分析报告PDF
    */
   async exportAnalysisPdf(resumeId: number): Promise<Blob> {
-    const response = await request.getInstance().get(`/api/resume/${resumeId}/export`, {
+    const response = await request.getInstance().get(`/api/resumes/${resumeId}/export`, {
       responseType: 'blob',
       skipResultTransform: true,
     } as never);
@@ -106,7 +106,7 @@ export const historyApi = {
    * 导出面试报告PDF
    */
   async exportInterviewPdf(sessionId: string): Promise<Blob> {
-    const response = await request.getInstance().get(`/api/interview/${sessionId}/export`, {
+    const response = await request.getInstance().get(`/api/interview/sessions/${sessionId}/export`, {
       responseType: 'blob',
       skipResultTransform: true,
     } as never);
@@ -117,13 +117,13 @@ export const historyApi = {
    * 删除简历
    */
   async deleteResume(id: number): Promise<void> {
-    return request.delete(`/api/resume/${id}`);
+    return request.delete(`/api/resumes/${id}`);
   },
 
   /**
    * 删除面试记录
    */
   async deleteInterview(sessionId: string): Promise<void> {
-    return request.delete(`/api/interview/${sessionId}`);
+    return request.delete(`/api/interview/sessions/${sessionId}`);
   },
 };

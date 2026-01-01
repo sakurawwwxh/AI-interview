@@ -17,7 +17,6 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/rag-chat")
 @RequiredArgsConstructor
 public class RagChatController {
 
@@ -27,7 +26,7 @@ public class RagChatController {
      * 创建新会话
      * POST /api/rag-chat/sessions
      */
-    @PostMapping("/sessions")
+    @PostMapping("/api/rag-chat/sessions")
     public Result<SessionDTO> createSession(@Valid @RequestBody CreateSessionRequest request) {
         return Result.success(sessionService.createSession(request));
     }
@@ -36,7 +35,7 @@ public class RagChatController {
      * 获取会话列表
      * GET /api/rag-chat/sessions
      */
-    @GetMapping("/sessions")
+    @GetMapping("/api/rag-chat/sessions")
     public Result<List<SessionListItemDTO>> listSessions() {
         return Result.success(sessionService.listSessions());
     }
@@ -45,7 +44,7 @@ public class RagChatController {
      * 获取会话详情（包含消息历史）
      * GET /api/rag-chat/sessions/{sessionId}
      */
-    @GetMapping("/sessions/{sessionId}")
+    @GetMapping("/api/rag-chat/sessions/{sessionId}")
     public Result<SessionDetailDTO> getSessionDetail(@PathVariable Long sessionId) {
         return Result.success(sessionService.getSessionDetail(sessionId));
     }
@@ -54,7 +53,7 @@ public class RagChatController {
      * 更新会话标题
      * PUT /api/rag-chat/sessions/{sessionId}/title
      */
-    @PutMapping("/sessions/{sessionId}/title")
+    @PutMapping("/api/rag-chat/sessions/{sessionId}/title")
     public Result<Void> updateSessionTitle(
             @PathVariable Long sessionId,
             @Valid @RequestBody UpdateTitleRequest request) {
@@ -66,7 +65,7 @@ public class RagChatController {
      * 更新会话知识库
      * PUT /api/rag-chat/sessions/{sessionId}/knowledge-bases
      */
-    @PutMapping("/sessions/{sessionId}/knowledge-bases")
+    @PutMapping("/api/rag-chat/sessions/{sessionId}/knowledge-bases")
     public Result<Void> updateSessionKnowledgeBases(
             @PathVariable Long sessionId,
             @Valid @RequestBody UpdateKnowledgeBasesRequest request) {
@@ -78,7 +77,7 @@ public class RagChatController {
      * 删除会话
      * DELETE /api/rag-chat/sessions/{sessionId}
      */
-    @DeleteMapping("/sessions/{sessionId}")
+    @DeleteMapping("/api/rag-chat/sessions/{sessionId}")
     public Result<Void> deleteSession(@PathVariable Long sessionId) {
         sessionService.deleteSession(sessionId);
         return Result.success(null);
@@ -93,7 +92,7 @@ public class RagChatController {
      * 2. 返回流式响应
      * 3. 流式完成后通过回调更新消息
      */
-    @PostMapping(value = "/sessions/{sessionId}/messages/stream",
+    @PostMapping(value = "/api/rag-chat/sessions/{sessionId}/messages/stream",
                  produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> sendMessageStream(
             @PathVariable Long sessionId,
