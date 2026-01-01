@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import {knowledgeBaseApi, type KnowledgeBaseItem} from '../api/knowledgebase';
+import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -13,34 +14,47 @@ interface KnowledgeBaseQueryPageProps {
 }
 
 interface Message {
+  id?: number;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
 
 export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBaseQueryPageProps) {
+  // 知识库状态
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
   const [selectedKbIds, setSelectedKbIds] = useState<Set<number>>(new Set());
-  const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+
+  // 会话状态
+  const [sessions, setSessions] = useState<RagChatSessionListItem[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [currentSessionTitle, setCurrentSessionTitle] = useState<string>('');
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionDeleteConfirm, setSessionDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
+
+  // 消息状态
+  const [question, setQuestion] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
   const rafRef = useRef<number>();
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  // 使用 React 18 的并发特性优化渲染
+
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     loadKnowledgeBases();
+    loadSessions();
   }, []);
 
-  // 智能滚动：检测用户是否在手动滚动
+  // 智能滚动检测
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -49,8 +63,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       const { scrollTop, scrollHeight, clientHeight } = container;
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
       isUserScrollingRef.current = !isNearBottom;
-      
-      // 如果用户滚动到底部附近，重置标志
+
       if (isNearBottom) {
         clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
@@ -68,13 +81,11 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     };
   }, []);
 
-  // 注意：updateMessageContent 已改为内联实现，这里保留作为备用
-
-  // 智能滚动到底部：只在用户没有手动滚动时自动滚动
+  // 智能滚动到底部
   useEffect(() => {
     if (!isUserScrollingRef.current && !isPending) {
       requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ 
+        messagesEndRef.current?.scrollIntoView({
           behavior: 'smooth',
           block: 'end'
         });
@@ -94,6 +105,18 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const list = await ragChatApi.listSessions();
+      setSessions(list);
+    } catch (err) {
+      console.error('加载会话列表失败', err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
   const handleToggleKb = (kbId: number) => {
     setSelectedKbIds(prev => {
       const newSet = new Set(prev);
@@ -102,73 +125,108 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       } else {
         newSet.add(kbId);
       }
-      if (newSet.size !== prev.size) {
-        setMessages([]); // 切换知识库时清空消息
+      // 切换知识库时重置当前会话
+      if (newSet.size !== prev.size && currentSessionId) {
+        setCurrentSessionId(null);
+        setCurrentSessionTitle('');
+        setMessages([]);
       }
       return newSet;
     });
   };
 
-  /**
-   * 极致 Markdown 格式化（流式输出友好）：
-   * 1. 强制在数字列表和圆点列表前增加双换行，确保段落间距。
-   * 2. 修复中文标点符号后的列表粘连。
-   * 3. 优化以处理流式输出时可能不完整的内容。
-   */
+  const handleNewSession = () => {
+    setCurrentSessionId(null);
+    setCurrentSessionTitle('');
+    setMessages([]);
+  };
+
+  const handleLoadSession = async (sessionId: number) => {
+    try {
+      const detail = await ragChatApi.getSessionDetail(sessionId);
+      setCurrentSessionId(detail.id);
+      setCurrentSessionTitle(detail.title);
+      setSelectedKbIds(new Set(detail.knowledgeBases.map(kb => kb.id)));
+      setMessages(detail.messages.map(m => ({
+        id: m.id,
+        type: m.type,
+        content: m.content,
+        timestamp: new Date(m.createdAt),
+      })));
+    } catch (err) {
+      console.error('加载会话失败', err);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionDeleteConfirm) return;
+    try {
+      await ragChatApi.deleteSession(sessionDeleteConfirm.id);
+      await loadSessions();
+      if (currentSessionId === sessionDeleteConfirm.id) {
+        handleNewSession();
+      }
+      setSessionDeleteConfirm(null);
+    } catch (err) {
+      console.error('删除会话失败', err);
+    }
+  };
+
   const formatMarkdown = (text: string): string => {
     if (!text) return '';
-    
+
     return text
-      // 1. 处理基础转义换行
       .replace(/\\n/g, '\n')
-      // 2. 修复标题格式：##标题 -> ## 标题（# 后必须有空格，但避免在流式输出时误处理）
       .replace(/^(#{1,6})([^\s#\n])/gm, '$1 $2')
-      // 3. 修复有序列表标记：行首 "1.内容" -> "1. 内容"（避免 1.1 这种小数，限定行首）
       .replace(/(^|\n)(\s*\d+)\.(?=\S)/g, '$1$2. ')
-      // 4. 修复无序列表标记：行首 "-内容" / "*内容" -> "- 内容" / "* 内容"
       .replace(/(^|\n)(\s*[-*])(?=\S)/g, '$1$2 ')
-      // 5. 修复"粘连"的有序列表：在 "1. " 前强制加两个换行，确保独立成段
       .replace(/([^\n])\s*(\d+\.\s+)/g, '$1\n\n$2')
-      // 6. 修复"粘连"的无序列表（两类）
-      // 6.1) 句末/括号/冒号后紧跟列表： "...：- " / "。* " -> 换行成列表
       .replace(/([。！？）:：])\s*([-*])\s*/g, '$1\n\n$2 ')
-      // 6.2) 文本中出现 "  - " / "  * " 这种行内列表（要求前后至少有空格，避免误伤 MySQL-PostgreSQL）
       .replace(/([^\n])\s+([-*])\s+/g, '$1\n\n$2 ')
-      // 7. 修复加粗冒号后的间距美化
       .replace(/\*\*：/g, '**： ')
-      // 8. 确保标题（#）前后有空行（但避免在流式输出时误处理不完整的标题）
       .replace(/([^\n])\s*(#{1,6}\s+[^\n]+)/g, '$1\n\n$2')
-      // 9. 清理多余的连续空行（超过2个换行变成2个）
       .replace(/\n{3,}/g, '\n\n');
   };
 
   const handleSubmitQuestion = async () => {
     if (!question.trim() || selectedKbIds.size === 0 || loading) return;
 
-    const userMessage: Message = {
-      type: 'user',
-      content: question.trim(),
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, userMessage]);
+    const userQuestion = question.trim();
     setQuestion('');
     setLoading(true);
 
-    // 创建一个临时的助手消息用于流式更新
+    // 如果没有当前会话，先创建
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      try {
+        const session = await ragChatApi.createSession(Array.from(selectedKbIds));
+        sessionId = session.id;
+        setCurrentSessionId(sessionId);
+        setCurrentSessionTitle(session.title);
+      } catch (err) {
+        console.error('创建会话失败', err);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 添加用户消息
+    const userMessage: Message = {
+      type: 'user',
+      content: userQuestion,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    // 创建助手消息占位
     const assistantMessage: Message = {
       type: 'assistant',
       content: '',
       timestamp: new Date(),
     };
-    
-    // 先添加助手消息，然后获取其索引
-    setMessages(prev => {
-      const newMessages = [...prev, assistantMessage];
-      return newMessages;
-    });
+    setMessages(prev => [...prev, assistantMessage]);
 
     let fullContent = '';
-    // 使用函数式更新，确保获取正确的索引
     const updateAssistantMessage = (content: string) => {
       setMessages(prev => {
         const newMessages = [...prev];
@@ -184,15 +242,11 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     };
 
     try {
-      await knowledgeBaseApi.queryKnowledgeBaseStream(
-        {
-          knowledgeBaseIds: Array.from(selectedKbIds),
-          question: userMessage.content,
-        },
-        // onMessage: 收到流式数据块（使用优化的更新方法）
+      await ragChatApi.sendMessageStream(
+        sessionId,
+        userQuestion,
         (chunk: string) => {
           fullContent += chunk;
-          // 使用 requestAnimationFrame 优化更新
           if (rafRef.current) {
             cancelAnimationFrame(rafRef.current);
           }
@@ -202,49 +256,33 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
             });
           });
         },
-        // onComplete: 流式传输完成
         () => {
           setLoading(false);
-          // 最终确保滚动到底部
+          loadSessions(); // 刷新会话列表
           setTimeout(() => {
             isUserScrollingRef.current = false;
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
           }, 100);
         },
-        // onError: 错误处理
         (error: Error) => {
           console.error('流式查询失败:', error);
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1] = {
-              ...assistantMessage,
-              content: fullContent || error.message || '回答失败，请重试',
-            };
-            return newMessages;
-          });
+          updateAssistantMessage(fullContent || error.message || '回答失败，请重试');
           setLoading(false);
         }
       );
     } catch (err) {
       console.error('发起流式查询失败:', err);
-      setMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          ...assistantMessage,
-          content: err instanceof Error ? err.message : '回答失败，请重试',
-        };
-        return newMessages;
-      });
+      updateAssistantMessage(err instanceof Error ? err.message : '回答失败，请重试');
       setLoading(false);
     }
   };
 
-  const handleDeleteClick = (id: number, name: string, e: React.MouseEvent) => {
+  const handleDeleteKbClick = (id: number, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setDeleteConfirm({ id, name });
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteKbConfirm = async () => {
     if (!deleteConfirm) return;
 
     const { id } = deleteConfirm;
@@ -272,6 +310,21 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const formatTimeAgo = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return `${minutes} 分钟前`;
+    if (hours < 24) return `${hours} 小时前`;
+    if (days < 7) return `${days} 天前`;
+    return formatDateOnly(dateStr);
   };
 
   return (
@@ -302,86 +355,130 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左侧：知识库列表 */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-800 mb-4">知识库列表</h2>
-            
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* 左侧：知识库列表 + 会话历史 */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* 知识库列表 */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-800 mb-4">知识库</h2>
+
             {loadingList ? (
-              <div className="text-center py-8">
+              <div className="text-center py-6">
                 <motion.div
-                  className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
+                  className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 />
               </div>
             ) : knowledgeBases.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <p className="mb-4">暂无知识库</p>
-                <button
-                  onClick={onUpload}
-                  className="text-primary-500 hover:text-primary-600 font-medium"
-                >
+              <div className="text-center py-6 text-slate-500">
+                <p className="mb-3 text-sm">暂无知识库</p>
+                <button onClick={onUpload} className="text-primary-500 hover:text-primary-600 font-medium text-sm">
                   立即上传
                 </button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {knowledgeBases.map((kb) => (
-                  <motion.div
+                  <div
                     key={kb.id}
                     onClick={() => handleToggleKb(kb.id)}
-                    className={`p-4 rounded-xl cursor-pointer transition-all ${
+                    className={`p-3 rounded-lg cursor-pointer transition-all ${
                       selectedKbIds.has(kb.id)
-                        ? 'bg-primary-50 border-2 border-primary-500'
-                        : 'bg-slate-50 hover:bg-slate-100 border-2 border-transparent'
+                        ? 'bg-primary-50 border border-primary-500'
+                        : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
                     }`}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedKbIds.has(kb.id)}
+                          onChange={() => handleToggleKb(kb.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
+                        />
+                        <span className="font-medium text-slate-800 text-sm truncate">{kb.name}</span>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
+                        disabled={deletingId === kb.id}
+                        className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                          <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 ml-6">{formatFileSize(kb.fileSize)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 会话历史 */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-800">对话历史</h2>
+              <motion.button
+                onClick={handleNewSession}
+                disabled={selectedKbIds.size === 0}
+                className="p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="新建对话"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </motion.button>
+            </div>
+
+            {loadingSessions ? (
+              <div className="text-center py-6">
+                <motion.div
+                  className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-sm">
+                暂无对话历史
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    onClick={() => handleLoadSession(session.id)}
+                    className={`p-3 rounded-lg cursor-pointer transition-all group ${
+                      currentSessionId === session.id
+                        ? 'bg-primary-50 border border-primary-500'
+                        : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedKbIds.has(kb.id)}
-                            onChange={() => handleToggleKb(kb.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 text-primary-500 rounded focus:ring-primary-500"
-                          />
-                          <h3 className="font-medium text-slate-800 truncate">{kb.name}</h3>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                          <span>{formatFileSize(kb.fileSize)}</span>
-                          <span>•</span>
-                          <span>{kb.questionCount} 次提问</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {formatDateOnly(kb.uploadedAt)}
+                        <p className="font-medium text-slate-800 text-sm truncate">{session.title}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {session.messageCount} 条消息 · {formatTimeAgo(session.updatedAt)}
                         </p>
                       </div>
                       <button
-                        onClick={(e) => handleDeleteClick(kb.id, kb.name, e)}
-                        disabled={deletingId === kb.id}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="删除知识库"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSessionDeleteConfirm({ id: session.id, title: session.title });
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-all"
                       >
-                        {deletingId === kb.id ? (
-                          <motion.div
-                            className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full"
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          />
-                        ) : (
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <path d="M10 11V17M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                          <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
@@ -389,31 +486,33 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         </div>
 
         {/* 右侧：问答区域 */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <div className="bg-white rounded-2xl shadow-sm flex flex-col h-[calc(100vh-12rem)]">
             {selectedKbIds.size > 0 ? (
               <>
-                {/* 知识库信息 */}
-                <div className="p-6 border-b border-slate-200">
-                  <h2 className="text-xl font-semibold text-slate-800">
-                    {selectedKbIds.size === 1 
-                      ? knowledgeBases.find(kb => kb.id === Array.from(selectedKbIds)[0])?.name || '知识库'
-                      : `已选择 ${selectedKbIds.size} 个知识库`}
+                {/* 会话信息 */}
+                <div className="p-5 border-b border-slate-200">
+                  <h2 className="text-lg font-semibold text-slate-800">
+                    {currentSessionTitle || (selectedKbIds.size === 1
+                      ? knowledgeBases.find(kb => kb.id === Array.from(selectedKbIds)[0])?.name || '新对话'
+                      : `${selectedKbIds.size} 个知识库 - 新对话`)}
                   </h2>
-                  <p className="text-sm text-slate-500 mt-1">
-                    {selectedKbIds.size === 1 
-                      ? (() => {
-                          const kb = knowledgeBases.find(kb => kb.id === Array.from(selectedKbIds)[0]);
-                          return kb ? `${formatFileSize(kb.fileSize)} • ${kb.questionCount} 次提问` : '';
-                        })()
-                      : '将综合多个知识库的内容回答您的问题'}
-                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {Array.from(selectedKbIds).map(kbId => {
+                      const kb = knowledgeBases.find(k => k.id === kbId);
+                      return kb ? (
+                        <span key={kbId} className="px-2 py-1 bg-primary-50 text-primary-600 text-xs rounded-full">
+                          {kb.name}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
 
                 {/* 消息列表 */}
-                <div 
+                <div
                   ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-6 space-y-4"
+                  className="flex-1 overflow-y-auto p-5 space-y-4"
                 >
                   {messages.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
@@ -432,7 +531,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                           className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[92%] rounded-2xl p-5 shadow-sm ${
+                            className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
                               msg.type === 'user'
                                 ? 'bg-primary-600 text-white'
                                 : 'bg-white border border-slate-100 text-slate-800'
@@ -442,19 +541,18 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                               <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                             ) : (
                               <div className="prose prose-slate max-w-none
-                                prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-4 prose-headings:mt-8
-                                prose-p:leading-8 prose-p:text-slate-700 prose-p:mb-6
+                                prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-3 prose-headings:mt-6
+                                prose-p:leading-7 prose-p:text-slate-700 prose-p:mb-4
                                 prose-strong:text-slate-900 prose-strong:font-bold
-                                prose-ul:my-6 prose-ol:my-6
-                                prose-li:my-3 prose-li:leading-8
+                                prose-ul:my-4 prose-ol:my-4
+                                prose-li:my-2 prose-li:leading-7
                                 prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
                                 marker:text-primary-500 marker:font-bold">
                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                                   {formatMarkdown(msg.content)}
                                 </ReactMarkdown>
-                                {/* NextChat 风格的光标动画 */}
                                 {loading && index === messages.length - 1 && (
-                                  <span className="inline-block w-0.5 h-5 bg-primary-500 ml-1 animate-pulse" style={{ animation: 'blink 1s infinite' }} />
+                                  <span className="inline-block w-0.5 h-5 bg-primary-500 ml-1 animate-pulse" />
                                 )}
                               </div>
                             )}
@@ -463,12 +561,11 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                       ))}
                     </AnimatePresence>
                   )}
-                  {/* 加载动画已集成到消息中，这里可以移除或保留作为备用 */}
                   <div ref={messagesEndRef} />
                 </div>
 
                 {/* 输入区域 */}
-                <div className="p-6 border-t border-slate-200">
+                <div className="p-5 border-t border-slate-200">
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -505,7 +602,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         </div>
       </div>
 
-      {/* 删除确认对话框 */}
+      {/* 知识库删除确认对话框 */}
       <ConfirmDialog
         open={deleteConfirm !== null}
         title="删除知识库"
@@ -514,10 +611,22 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         cancelText="取消"
         confirmVariant="danger"
         loading={deletingId !== null}
-        onConfirm={handleDeleteConfirm}
+        onConfirm={handleDeleteKbConfirm}
         onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* 会话删除确认对话框 */}
+      <ConfirmDialog
+        open={sessionDeleteConfirm !== null}
+        title="删除对话"
+        message={sessionDeleteConfirm ? `确定要删除对话"${sessionDeleteConfirm.title}"吗？删除后无法恢复。` : ''}
+        confirmText="确定删除"
+        cancelText="取消"
+        confirmVariant="danger"
+        loading={false}
+        onConfirm={handleDeleteSession}
+        onCancel={() => setSessionDeleteConfirm(null)}
       />
     </div>
   );
 }
-

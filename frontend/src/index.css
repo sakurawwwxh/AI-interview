@@ -48,13 +48,3 @@
     @apply bg-slate-300 rounded hover:bg-slate-400;
   }
 }
-
-/* NextChat 风格的光标闪烁动画 */
-@keyframes blink {
-  0%, 50% {
-    opacity: 1;
-  }
-  51%, 100% {
-    opacity: 0;
-  }
-}
