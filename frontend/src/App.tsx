@@ -4,6 +4,7 @@ import UploadPage from './pages/UploadPage';
 import HistoryList from './pages/HistoryPage';
 import ResumeDetailPage from './pages/ResumeDetailPage';
 import Interview from './pages/InterviewPage';
+import InterviewHistoryPage from './pages/InterviewHistoryPage';
 import KnowledgeBaseQueryPage from './pages/KnowledgeBaseQueryPage';
 import KnowledgeBaseUploadPage from './pages/KnowledgeBaseUploadPage';
 import {historyApi} from './api/history';
@@ -132,32 +133,74 @@ function App() {
           {/* 上传页面 */}
           <Route path="upload" element={<UploadPageWrapper />} />
           
-          {/* 历史记录列表 */}
+          {/* 历史记录列表（简历库） */}
           <Route path="history" element={<HistoryListWrapper />} />
           
           {/* 简历详情 */}
           <Route path="history/:resumeId" element={<ResumeDetailWrapper />} />
           
+          {/* 面试记录列表 */}
+          <Route path="interviews" element={<InterviewHistoryWrapper />} />
+          
           {/* 模拟面试 */}
           <Route path="interview/:resumeId" element={<InterviewWrapper />} />
           
-          {/* 知识库问答 */}
+          {/* 知识库管理 */}
           <Route path="knowledgebase" element={<KnowledgeBaseQueryPageWrapper />} />
           
           {/* 知识库上传 */}
           <Route path="knowledgebase/upload" element={<KnowledgeBaseUploadPageWrapper />} />
+          
+          {/* 问答助手（知识库聊天） */}
+          <Route path="knowledgebase/chat" element={<KnowledgeBaseQueryPageWrapper />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
 }
 
-// 知识库问答页面包装器
-function KnowledgeBaseQueryPageWrapper() {
+// 面试记录页面包装器
+function InterviewHistoryWrapper() {
   const navigate = useNavigate();
   
   const handleBack = () => {
     navigate('/upload');
+  };
+  
+  const handleViewInterview = async (sessionId: string, resumeId?: number) => {
+    if (resumeId) {
+      // 如果有简历ID，跳转到简历详情页的面试详情
+      navigate(`/history/${resumeId}`, { 
+        state: { viewInterview: sessionId } 
+      });
+    } else {
+      // 否则尝试从面试详情中获取简历ID
+      try {
+        const detail = await historyApi.getInterviewDetail(sessionId);
+        // 面试详情中没有简历ID，需要从其他地方获取
+        // 暂时跳转到历史记录列表
+        navigate('/history');
+      } catch {
+        navigate('/history');
+      }
+    }
+  };
+  
+  return <InterviewHistoryPage onBack={handleBack} onViewInterview={handleViewInterview} />;
+}
+
+// 知识库问答页面包装器
+function KnowledgeBaseQueryPageWrapper() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isChatMode = location.pathname === '/knowledgebase/chat';
+  
+  const handleBack = () => {
+    if (isChatMode) {
+      navigate('/knowledgebase');
+    } else {
+      navigate('/upload');
+    }
   };
   
   const handleUpload = () => {
