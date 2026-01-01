@@ -10,22 +10,27 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "knowledge_bases", indexes = {
-    @Index(name = "idx_kb_hash", columnList = "fileHash", unique = true)
+    @Index(name = "idx_kb_hash", columnList = "fileHash", unique = true),
+    @Index(name = "idx_kb_category", columnList = "category")
 })
 public class KnowledgeBaseEntity {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     // 文件内容的SHA-256哈希值，用于去重
     @Column(nullable = false, unique = true, length = 64)
     private String fileHash;
-    
+
     // 知识库名称（用户自定义或从文件名提取）
     @Column(nullable = false)
     private String name;
-    
+
+    // 分类/分组（如"Java面试"、"项目文档"等）
+    @Column(length = 100)
+    private String category;
+
     // 原始文件名
     @Column(nullable = false)
     private String originalFilename;
@@ -169,6 +174,14 @@ public class KnowledgeBaseEntity {
     public void incrementQuestionCount() {
         this.questionCount++;
         this.lastAccessedAt = LocalDateTime.now();
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }
 

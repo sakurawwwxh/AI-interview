@@ -69,13 +69,19 @@ public class RagChatSessionService {
 
     /**
      * 获取会话详情（包含消息）
+     * 分两次查询避免笛卡尔积问题
      */
     public SessionDetailDTO getSessionDetail(Long sessionId) {
+        // 先加载会话和知识库
         RagChatSessionEntity session = sessionRepository
-            .findByIdWithMessagesAndKnowledgeBases(sessionId)
+            .findByIdWithKnowledgeBases(sessionId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在"));
 
-        return toSessionDetailDTO(session);
+        // 再单独加载消息（避免笛卡尔积）
+        List<RagChatMessageEntity> messages = messageRepository
+            .findBySessionIdOrderByMessageOrderAsc(sessionId);
+
+        return toSessionDetailDTO(session, messages);
     }
 
     /**
@@ -224,11 +230,12 @@ public class RagChatSessionService {
         );
     }
 
-    private SessionDetailDTO toSessionDetailDTO(RagChatSessionEntity session) {
+    private SessionDetailDTO toSessionDetailDTO(RagChatSessionEntity session, List<RagChatMessageEntity> messages) {
         List<KnowledgeBaseListItemDTO> kbDTOs = session.getKnowledgeBases().stream()
             .map(kb -> new KnowledgeBaseListItemDTO(
                 kb.getId(),
                 kb.getName(),
+                kb.getCategory(),
                 kb.getOriginalFilename(),
                 kb.getFileSize(),
                 kb.getContentType(),
@@ -239,7 +246,7 @@ public class RagChatSessionService {
             ))
             .toList();
 
-        List<MessageDTO> messageDTOs = session.getMessages().stream()
+        List<MessageDTO> messageDTOs = messages.stream()
             .map(m -> new MessageDTO(
                 m.getId(),
                 m.getTypeString(),
