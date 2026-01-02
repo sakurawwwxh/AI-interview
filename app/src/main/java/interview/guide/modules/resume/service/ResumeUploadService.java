@@ -3,7 +3,8 @@ package interview.guide.modules.resume.service;
 import interview.guide.common.config.AppConfigProperties;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
-import interview.guide.infrastructure.storage.FileStorageService;
+import interview.guide.infrastructure.file.FileStorageService;
+import interview.guide.infrastructure.file.FileValidationService;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.model.ResumeEntity;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,9 @@ public class ResumeUploadService {
     private final FileStorageService storageService;
     private final ResumePersistenceService persistenceService;
     private final AppConfigProperties appConfig;
+    private final FileValidationService fileValidationService;
+    
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     
     /**
      * 上传并分析简历
@@ -37,7 +41,7 @@ public class ResumeUploadService {
      */
     public Map<String, Object> uploadAndAnalyze(MultipartFile file) {
         // 1. 验证文件
-        validateFile(file);
+        fileValidationService.validateFile(file, MAX_FILE_SIZE, "简历");
         
         String fileName = file.getOriginalFilename();
         log.info("收到简历上传请求: {}, 大小: {} bytes", fileName, file.getSize());
@@ -87,27 +91,14 @@ public class ResumeUploadService {
     }
     
     /**
-     * 验证文件
-     */
-    private void validateFile(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择要上传的简历文件");
-        }
-        
-        // 检查文件大小（简历限制为10MB）
-        long maxSize = 10 * 1024 * 1024; // 10MB
-        if (file.getSize() > maxSize) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "文件大小超过限制");
-        }
-    }
-    
-    /**
      * 验证文件类型
      */
     private void validateContentType(String contentType) {
-        if (!isAllowedType(contentType)) {
-            throw new BusinessException(ErrorCode.RESUME_UPLOAD_FAILED, "不支持的文件类型: " + contentType);
-        }
+        fileValidationService.validateContentTypeByList(
+            contentType,
+            appConfig.getAllowedTypes(),
+            "不支持的文件类型: " + contentType
+        );
     }
     
     /**
@@ -131,16 +122,5 @@ public class ResumeUploadService {
         );
     }
     
-    /**
-     * 检查文件类型是否允许
-     */
-    private boolean isAllowedType(String contentType) {
-        if (contentType == null || appConfig.getAllowedTypes() == null) {
-            return false;
-        }
-        return appConfig.getAllowedTypes().stream()
-            .anyMatch(allowed -> contentType.toLowerCase().contains(allowed.toLowerCase()) 
-                || allowed.toLowerCase().contains(contentType.toLowerCase()));
-    }
 }
 

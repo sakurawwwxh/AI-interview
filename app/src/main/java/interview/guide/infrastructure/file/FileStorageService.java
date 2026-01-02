@@ -1,4 +1,4 @@
-package interview.guide.infrastructure.storage;
+package interview.guide.infrastructure.file;
 
 import interview.guide.common.config.StorageConfigProperties;
 import interview.guide.common.exception.BusinessException;
