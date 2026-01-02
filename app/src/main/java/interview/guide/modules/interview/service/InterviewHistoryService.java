@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.export.PdfExportService;
+import interview.guide.infrastructure.mapper.InterviewMapper;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewDetailDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
@@ -24,11 +25,12 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class InterviewHistoryService {
-    
+
     private final InterviewPersistenceService interviewPersistenceService;
     private final PdfExportService pdfExportService;
     private final ObjectMapper objectMapper;
-    
+    private final InterviewMapper interviewMapper;
+
     /**
      * 获取面试会话详情
      */
@@ -37,81 +39,24 @@ public class InterviewHistoryService {
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
-        
+
         InterviewSessionEntity session = sessionOpt.get();
-        
+
         // 解析JSON字段
-        List<Object> questions = List.of();
-        List<String> strengths = List.of();
-        List<String> improvements = List.of();
-        List<Object> referenceAnswers = List.of();
-        
-        try {
-            if (session.getQuestionsJson() != null) {
-                questions = objectMapper.readValue(
-                    session.getQuestionsJson(),
-                    new TypeReference<List<Object>>() {}
-                );
-            }
-            if (session.getStrengthsJson() != null) {
-                strengths = objectMapper.readValue(
-                    session.getStrengthsJson(),
-                    new TypeReference<List<String>>() {}
-                );
-            }
-            if (session.getImprovementsJson() != null) {
-                improvements = objectMapper.readValue(
-                    session.getImprovementsJson(),
-                    new TypeReference<List<String>>() {}
-                );
-            }
-            if (session.getReferenceAnswersJson() != null) {
-                referenceAnswers = objectMapper.readValue(
-                    session.getReferenceAnswersJson(),
-                    new TypeReference<List<Object>>() {}
-                );
-            }
-        } catch (JsonProcessingException e) {
-            log.error("解析面试JSON失败", e);
-        }
-        
-        // 添加答案详情
-        List<InterviewAnswerEntity> answers = session.getAnswers();
-        List<InterviewDetailDTO.AnswerDetailDTO> answerList = answers.stream().map(a -> {
-            List<String> keyPoints = List.of();
-            if (a.getKeyPointsJson() != null) {
-                try {
-                    keyPoints = objectMapper.readValue(
-                        a.getKeyPointsJson(),
-                        new TypeReference<List<String>>() {}
-                    );
-                } catch (JsonProcessingException e) {
-                    log.error("解析关键点JSON失败", e);
-                }
-            }
-            
-            return new InterviewDetailDTO.AnswerDetailDTO(
-                a.getQuestionIndex(),
-                a.getQuestion(),
-                a.getCategory(),
-                a.getUserAnswer(),
-                a.getScore(),
-                a.getFeedback(),
-                a.getReferenceAnswer(),
-                keyPoints,
-                a.getAnsweredAt()
-            );
-        }).toList();
-        
-        return new InterviewDetailDTO(
-            session.getId(),
-            session.getSessionId(),
-            session.getTotalQuestions(),
-            session.getStatus().toString(),
-            session.getOverallScore(),
-            session.getOverallFeedback(),
-            session.getCreatedAt(),
-            session.getCompletedAt(),
+        List<Object> questions = parseJson(session.getQuestionsJson(), new TypeReference<>() {});
+        List<String> strengths = parseJson(session.getStrengthsJson(), new TypeReference<>() {});
+        List<String> improvements = parseJson(session.getImprovementsJson(), new TypeReference<>() {});
+        List<Object> referenceAnswers = parseJson(session.getReferenceAnswersJson(), new TypeReference<>() {});
+
+        // 使用 MapStruct 批量转换答案详情
+        List<InterviewDetailDTO.AnswerDetailDTO> answerList = interviewMapper.toAnswerDetailDTOList(
+            session.getAnswers(),
+            this::extractKeyPoints
+        );
+
+        // 使用 MapStruct 组装最终 DTO
+        return interviewMapper.toDetailDTO(
+            session,
             questions,
             strengths,
             improvements,
@@ -119,7 +64,29 @@ public class InterviewHistoryService {
             answerList
         );
     }
-    
+
+    /**
+     * 从 JSON 提取 keyPoints
+     */
+    private List<String> extractKeyPoints(InterviewAnswerEntity answer) {
+        return parseJson(answer.getKeyPointsJson(), new TypeReference<>() {});
+    }
+
+    /**
+     * 通用 JSON 解析方法
+     */
+    private <T> T parseJson(String json, TypeReference<T> typeRef) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, typeRef);
+        } catch (JsonProcessingException e) {
+            log.error("解析 JSON 失败", e);
+            return null;
+        }
+    }
+
     /**
      * 导出面试报告为PDF
      */
@@ -128,7 +95,7 @@ public class InterviewHistoryService {
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
-        
+
         InterviewSessionEntity session = sessionOpt.get();
         try {
             return pdfExportService.exportInterviewReport(session);
