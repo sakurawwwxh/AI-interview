@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 
 /**
  * 面试答案实体
- * Interview Answer Entity
  */
 @Entity
 @Table(name = "interview_answers")

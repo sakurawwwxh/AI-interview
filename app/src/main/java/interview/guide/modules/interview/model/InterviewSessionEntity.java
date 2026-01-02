@@ -9,7 +9,6 @@ import java.util.List;
 
 /**
  * 面试会话实体
- * Interview Session Entity
  */
 @Entity
 @Table(name = "interview_sessions")

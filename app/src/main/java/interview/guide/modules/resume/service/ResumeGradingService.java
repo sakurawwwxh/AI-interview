@@ -23,7 +23,6 @@ import java.util.Map;
 /**
  * 简历评分服务
  * 使用Spring AI调用LLM对简历进行评分和建议
- * Resume Grading Service using Spring AI
  */
 @Service
 public class ResumeGradingService {

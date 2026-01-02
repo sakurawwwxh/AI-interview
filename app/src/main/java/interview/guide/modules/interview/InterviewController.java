@@ -31,7 +31,6 @@ public class InterviewController {
     
     /**
      * 创建面试会话
-     * POST /api/interview/sessions
      */
     @PostMapping("/api/interview/sessions")
     public Result<InterviewSessionDTO> createSession(@RequestBody CreateInterviewRequest request) {
@@ -42,7 +41,6 @@ public class InterviewController {
     
     /**
      * 获取会话信息
-     * GET /api/interview/sessions/{sessionId}
      */
     @GetMapping("/api/interview/sessions/{sessionId}")
     public Result<InterviewSessionDTO> getSession(@PathVariable String sessionId) {
@@ -52,7 +50,6 @@ public class InterviewController {
     
     /**
      * 获取当前问题
-     * GET /api/interview/sessions/{sessionId}/question
      */
     @GetMapping("/api/interview/sessions/{sessionId}/question")
     public Result<Map<String, Object>> getCurrentQuestion(@PathVariable String sessionId) {
@@ -61,7 +58,6 @@ public class InterviewController {
     
     /**
      * 提交答案
-     * POST /api/interview/sessions/{sessionId}/answers
      */
     @PostMapping("/api/interview/sessions/{sessionId}/answers")
     public Result<SubmitAnswerResponse> submitAnswer(
@@ -77,7 +73,6 @@ public class InterviewController {
     
     /**
      * 生成面试报告
-     * GET /api/interview/sessions/{sessionId}/report
      */
     @GetMapping("/api/interview/sessions/{sessionId}/report")
     public Result<InterviewReportDTO> getReport(@PathVariable String sessionId) {
@@ -97,7 +92,6 @@ public class InterviewController {
     
     /**
      * 暂存答案（不进入下一题）
-     * PUT /api/interview/sessions/{sessionId}/answers
      */
     @PutMapping("/api/interview/sessions/{sessionId}/answers")
     public Result<Void> saveAnswer(
@@ -113,7 +107,6 @@ public class InterviewController {
     
     /**
      * 提前交卷
-     * POST /api/interview/sessions/{sessionId}/complete
      */
     @PostMapping("/api/interview/sessions/{sessionId}/complete")
     public Result<Void> completeInterview(@PathVariable String sessionId) {
@@ -134,7 +127,6 @@ public class InterviewController {
     
     /**
      * 导出面试报告为PDF
-     * GET /api/interview/sessions/{sessionId}/export
      */
     @GetMapping("/api/interview/sessions/{sessionId}/export")
     public ResponseEntity<byte[]> exportInterviewPdf(@PathVariable String sessionId) {
@@ -155,7 +147,6 @@ public class InterviewController {
     
     /**
      * 删除面试会话
-     * DELETE /api/interview/sessions/{sessionId}
      */
     @DeleteMapping("/api/interview/sessions/{sessionId}")
     public Result<Void> deleteInterview(@PathVariable String sessionId) {

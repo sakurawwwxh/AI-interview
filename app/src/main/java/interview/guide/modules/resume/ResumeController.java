@@ -34,8 +34,7 @@ public class ResumeController {
     
     /**
      * 上传简历并获取分析结果
-     * POST /api/resumes/upload
-     * 
+     *
      * @param file 简历文件（支持PDF、DOCX、DOC、TXT）
      * @return 简历分析结果，包含评分和建议
      */
@@ -51,7 +50,6 @@ public class ResumeController {
     
     /**
      * 获取所有简历列表
-     * GET /api/resumes
      */
     @GetMapping("/api/resumes")
     public Result<List<ResumeListItemDTO>> getAllResumes() {
@@ -61,7 +59,6 @@ public class ResumeController {
     
     /**
      * 获取简历详情（包含分析历史）
-     * GET /api/resumes/{id}/detail
      */
     @GetMapping("/api/resumes/{id}/detail")
     public Result<ResumeDetailDTO> getResumeDetail(@PathVariable Long id) {
@@ -71,7 +68,6 @@ public class ResumeController {
     
     /**
      * 导出简历分析报告为PDF
-     * GET /api/resumes/{id}/export
      */
     @GetMapping("/api/resumes/{id}/export")
     public ResponseEntity<byte[]> exportAnalysisPdf(@PathVariable Long id) {
@@ -91,7 +87,6 @@ public class ResumeController {
     
     /**
      * 删除简历
-     * DELETE /api/resumes/{id}
      * 
      * @param id 简历ID
      * @return 删除结果
@@ -104,7 +99,6 @@ public class ResumeController {
     
     /**
      * 健康检查接口
-     * GET /api/resumes/health
      */
     @GetMapping("/api/resumes/health")
     public Result<Map<String, String>> health() {

@@ -18,7 +18,7 @@ import java.util.Optional;
 
 /**
  * 面试历史服务
- * Interview History Service
+ * 获取面试会话详情和导出面试报告
  */
 @Slf4j
 @Service

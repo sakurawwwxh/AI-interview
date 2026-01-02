@@ -24,7 +24,6 @@ public class RagChatController {
 
     /**
      * 创建新会话
-     * POST /api/rag-chat/sessions
      */
     @PostMapping("/api/rag-chat/sessions")
     public Result<SessionDTO> createSession(@Valid @RequestBody CreateSessionRequest request) {
@@ -33,7 +32,6 @@ public class RagChatController {
 
     /**
      * 获取会话列表
-     * GET /api/rag-chat/sessions
      */
     @GetMapping("/api/rag-chat/sessions")
     public Result<List<SessionListItemDTO>> listSessions() {
@@ -51,7 +49,6 @@ public class RagChatController {
 
     /**
      * 更新会话标题
-     * PUT /api/rag-chat/sessions/{sessionId}/title
      */
     @PutMapping("/api/rag-chat/sessions/{sessionId}/title")
     public Result<Void> updateSessionTitle(
@@ -73,7 +70,6 @@ public class RagChatController {
 
     /**
      * 更新会话知识库
-     * PUT /api/rag-chat/sessions/{sessionId}/knowledge-bases
      */
     @PutMapping("/api/rag-chat/sessions/{sessionId}/knowledge-bases")
     public Result<Void> updateSessionKnowledgeBases(
@@ -95,8 +91,6 @@ public class RagChatController {
 
     /**
      * 发送消息（流式SSE）
-     * POST /api/rag-chat/sessions/{sessionId}/messages/stream
-     *
      * 流式响应设计：
      * 1. 先同步保存用户消息和创建 AI 消息占位
      * 2. 返回流式响应

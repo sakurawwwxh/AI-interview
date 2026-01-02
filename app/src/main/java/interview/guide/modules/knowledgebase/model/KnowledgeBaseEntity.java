@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 
 /**
  * 知识库实体
- * Knowledge Base Entity for storing uploaded documents
  */
 @Entity
 @Table(name = "knowledge_bases", indexes = {

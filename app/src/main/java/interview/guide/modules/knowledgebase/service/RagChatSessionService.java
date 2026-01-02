@@ -20,6 +20,7 @@ import java.util.List;
 
 /**
  * RAG 聊天会话服务
+ * 提供RAG聊天会话的创建、获取、更新、删除等操作
  */
 @Slf4j
 @Service
