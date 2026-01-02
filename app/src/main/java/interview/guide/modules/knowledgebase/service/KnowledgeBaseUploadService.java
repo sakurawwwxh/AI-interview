@@ -2,6 +2,7 @@ package interview.guide.modules.knowledgebase.service;
 
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.infrastructure.file.FileHashService;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.infrastructure.file.FileValidationService;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
@@ -12,9 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -26,12 +24,13 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeBaseUploadService {
-    
+
     private final KnowledgeBaseParseService parseService;
     private final FileStorageService storageService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseVectorService vectorService;
     private final FileValidationService fileValidationService;
+    private final FileHashService fileHashService;
     
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
@@ -55,7 +54,7 @@ public class KnowledgeBaseUploadService {
         validateContentType(contentType, fileName);
 
         // 3. 检查知识库是否已存在（去重）
-        String fileHash = calculateFileHash(file);
+        String fileHash = fileHashService.calculateHash(file);
         Optional<KnowledgeBaseEntity> existingKb = knowledgeBaseRepository.findByFileHash(fileHash);
         if (existingKb.isPresent()) {
             log.info("检测到重复知识库: hash={}", fileHash);
@@ -181,32 +180,7 @@ public class KnowledgeBaseUploadService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存知识库失败");
         }
     }
-    
-    /**
-     * 计算文件内容的SHA-256哈希值
-     */
-    private String calculateFileHash(MultipartFile file) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(file.getBytes());
-            return bytesToHex(hashBytes);
-        } catch (NoSuchAlgorithmException | IOException e) {
-            log.error("计算文件哈希失败: {}", e.getMessage());
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "计算文件哈希失败");
-        }
-    }
-    
-    /**
-     * 将字节数组转换为十六进制字符串
-     */
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
-    }
-    
+
     /**
      * 从文件名提取知识库名称（去除扩展名）
      */

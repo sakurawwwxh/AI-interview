@@ -1,5 +1,6 @@
 package interview.guide.modules.knowledgebase.service;
 
+import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
@@ -10,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * 知识库查询服务
@@ -22,14 +22,15 @@ import java.util.stream.Collectors;
 public class KnowledgeBaseListService {
 
     private final KnowledgeBaseRepository knowledgeBaseRepository;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
 
     /**
      * 获取所有知识库列表
      */
     public List<KnowledgeBaseListItemDTO> listKnowledgeBases() {
-        return knowledgeBaseRepository.findAllByOrderByUploadedAtDesc().stream()
-            .map(KnowledgeBaseListItemDTO::fromEntity)
-            .collect(Collectors.toList());
+        return knowledgeBaseMapper.toListItemDTOList(
+            knowledgeBaseRepository.findAllByOrderByUploadedAtDesc()
+        );
     }
 
     /**
@@ -37,7 +38,7 @@ public class KnowledgeBaseListService {
      */
     public Optional<KnowledgeBaseListItemDTO> getKnowledgeBase(Long id) {
         return knowledgeBaseRepository.findById(id)
-            .map(KnowledgeBaseListItemDTO::fromEntity);
+            .map(knowledgeBaseMapper::toListItemDTO);
     }
 
     /**
@@ -55,7 +56,7 @@ public class KnowledgeBaseListService {
             .map(id -> knowledgeBaseRepository.findById(id)
                 .map(KnowledgeBaseEntity::getName)
                 .orElse("未知知识库"))
-            .collect(Collectors.toList());
+            .toList();
     }
 
     // ========== 分类管理 ==========
@@ -77,9 +78,7 @@ public class KnowledgeBaseListService {
         } else {
             entities = knowledgeBaseRepository.findByCategoryOrderByUploadedAtDesc(category);
         }
-        return entities.stream()
-            .map(KnowledgeBaseListItemDTO::fromEntity)
-            .collect(Collectors.toList());
+        return knowledgeBaseMapper.toListItemDTOList(entities);
     }
 
     /**
@@ -103,9 +102,9 @@ public class KnowledgeBaseListService {
         if (keyword == null || keyword.isBlank()) {
             return listKnowledgeBases();
         }
-        return knowledgeBaseRepository.searchByKeyword(keyword.trim()).stream()
-            .map(KnowledgeBaseListItemDTO::fromEntity)
-            .collect(Collectors.toList());
+        return knowledgeBaseMapper.toListItemDTOList(
+            knowledgeBaseRepository.searchByKeyword(keyword.trim())
+        );
     }
 
     // ========== 排序功能 ==========
@@ -121,9 +120,7 @@ public class KnowledgeBaseListService {
             case "question" -> entities = knowledgeBaseRepository.findAllByOrderByQuestionCountDesc();
             default -> entities = knowledgeBaseRepository.findAllByOrderByUploadedAtDesc();
         }
-        return entities.stream()
-            .map(KnowledgeBaseListItemDTO::fromEntity)
-            .collect(Collectors.toList());
+        return knowledgeBaseMapper.toListItemDTOList(entities);
     }
 }
 

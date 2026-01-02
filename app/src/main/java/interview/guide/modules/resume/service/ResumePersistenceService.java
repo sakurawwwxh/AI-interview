@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.infrastructure.file.FileHashService;
 import interview.guide.infrastructure.mapper.ResumeMapper;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.model.ResumeAnalysisEntity;
@@ -17,10 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,11 +29,12 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ResumePersistenceService {
-    
+
     private final ResumeRepository resumeRepository;
     private final ResumeAnalysisRepository analysisRepository;
     private final ObjectMapper objectMapper;
     private final ResumeMapper resumeMapper;
+    private final FileHashService fileHashService;
     
     /**
      * 检查简历是否已存在（基于文件内容hash）
@@ -46,7 +44,7 @@ public class ResumePersistenceService {
      */
     public Optional<ResumeEntity> findExistingResume(MultipartFile file) {
         try {
-            String fileHash = calculateFileHash(file);
+            String fileHash = fileHashService.calculateHash(file);
             Optional<ResumeEntity> existing = resumeRepository.findByFileHash(fileHash);
             
             if (existing.isPresent()) {
@@ -67,10 +65,10 @@ public class ResumePersistenceService {
      * 保存新简历
      */
     @Transactional(rollbackFor = Exception.class)
-    public ResumeEntity saveResume(MultipartFile file, String resumeText, 
+    public ResumeEntity saveResume(MultipartFile file, String resumeText,
                                    String storageKey, String storageUrl) {
         try {
-            String fileHash = calculateFileHash(file);
+            String fileHash = fileHashService.calculateHash(file);
             
             ResumeEntity resume = new ResumeEntity();
             resume.setFileHash(fileHash);
@@ -216,14 +214,5 @@ public class ResumePersistenceService {
         // 2. 删除简历实体（面试会话会在服务层删除）
         resumeRepository.delete(resume);
         log.info("简历已删除: id={}, filename={}", id, resume.getOriginalFilename());
-    }
-    
-    /**
-     * 计算文件的SHA-256哈希值
-     */
-    private String calculateFileHash(MultipartFile file) throws IOException, NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hash = digest.digest(file.getBytes());
-        return HexFormat.of().formatHex(hash);
     }
 }
