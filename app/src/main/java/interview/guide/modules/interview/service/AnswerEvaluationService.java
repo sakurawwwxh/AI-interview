@@ -189,23 +189,4 @@ public class AnswerEvaluationService {
             referenceAnswers
         );
     }
-    
-    private InterviewReportDTO createErrorReport(String sessionId, List<InterviewQuestionDTO> questions) {
-        return new InterviewReportDTO(
-            sessionId,
-            questions.size(),
-            0,
-            List.of(),
-            questions.stream()
-                .map(q -> new QuestionEvaluation(
-                    q.questionIndex(), q.question(), q.category(),
-                    q.userAnswer(), 0, "评估服务暂时不可用"
-                ))
-                .collect(Collectors.toList()),
-            "评估过程中出现错误，请稍后重试",
-            List.of(),
-            List.of("请检查AI服务是否正常运行"),
-            List.of()
-        );
-    }
 }

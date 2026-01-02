@@ -95,29 +95,18 @@ public class ResumePersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public ResumeAnalysisEntity saveAnalysis(ResumeEntity resume, ResumeAnalysisResponse analysis) {
         try {
-            ResumeAnalysisEntity entity = new ResumeAnalysisEntity();
+            // 使用 MapStruct 映射基础字段
+            ResumeAnalysisEntity entity = resumeMapper.toAnalysisEntity(analysis);
             entity.setResume(resume);
-            entity.setOverallScore(analysis.overallScore());
-            
-            // 保存各维度评分
-            if (analysis.scoreDetail() != null) {
-                entity.setContentScore(analysis.scoreDetail().contentScore());
-                entity.setStructureScore(analysis.scoreDetail().structureScore());
-                entity.setSkillMatchScore(analysis.scoreDetail().skillMatchScore());
-                entity.setExpressionScore(analysis.scoreDetail().expressionScore());
-                entity.setProjectScore(analysis.scoreDetail().projectScore());
-            }
-            
-            entity.setSummary(analysis.summary());
-            
-            // 将列表序列化为JSON
+
+            // JSON 字段需要手动序列化
             entity.setStrengthsJson(objectMapper.writeValueAsString(analysis.strengths()));
             entity.setSuggestionsJson(objectMapper.writeValueAsString(analysis.suggestions()));
-            
+
             ResumeAnalysisEntity saved = analysisRepository.save(entity);
-            log.info("简历评测结果已保存: analysisId={}, resumeId={}, score={}", 
+            log.info("简历评测结果已保存: analysisId={}, resumeId={}, score={}",
                     saved.getId(), resume.getId(), analysis.overallScore());
-            
+
             return saved;
         } catch (JsonProcessingException e) {
             log.error("序列化评测结果失败: {}", e.getMessage(), e);
