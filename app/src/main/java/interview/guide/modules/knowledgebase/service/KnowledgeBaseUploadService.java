@@ -1,9 +1,9 @@
 package interview.guide.modules.knowledgebase.service;
 
-import interview.guide.common.config.AppConfigProperties;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
-import interview.guide.infrastructure.storage.FileStorageService;
+import interview.guide.infrastructure.file.FileStorageService;
+import interview.guide.infrastructure.file.FileValidationService;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,9 @@ public class KnowledgeBaseUploadService {
     private final FileStorageService storageService;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseVectorService vectorService;
-    private final AppConfigProperties appConfig;
+    private final FileValidationService fileValidationService;
+    
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
     /**
      * 上传知识库文件
@@ -43,7 +45,7 @@ public class KnowledgeBaseUploadService {
      */
     public Map<String, Object> uploadKnowledgeBase(MultipartFile file, String name, String category) {
         // 1. 验证文件
-        validateFile(file);
+        fileValidationService.validateFile(file, MAX_FILE_SIZE, "知识库");
 
         String fileName = file.getOriginalFilename();
         log.info("收到知识库上传请求: {}, 大小: {} bytes, category: {}", fileName, file.getSize(), category);
@@ -115,50 +117,16 @@ public class KnowledgeBaseUploadService {
     }
     
     /**
-     * 验证文件
-     */
-    private void validateFile(MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择要上传的知识库文件");
-        }
-        
-        // 检查文件大小（限制为50MB）
-        long maxSize = 50 * 1024 * 1024; // 50MB
-        if (file.getSize() > maxSize) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "文件大小超过限制");
-        }
-    }
-    
-    /**
      * 验证文件类型
      */
     private void validateContentType(String contentType, String fileName) {
-        // 先检查MIME类型
-        if (isAllowedType(contentType)) {
-            return;
-        }
-        
-        // 如果MIME类型不支持，再检查文件扩展名（用于Markdown等文件）
-        if (fileName != null && isAllowedByExtension(fileName)) {
-            return;
-        }
-        
-        throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持的文件类型: " + contentType + 
-            "，支持的类型：PDF、DOCX、DOC、TXT、MD等");
-    }
-    
-    /**
-     * 根据文件扩展名判断是否允许
-     */
-    private boolean isAllowedByExtension(String fileName) {
-        if (fileName == null) {
-            return false;
-        }
-        
-        String lowerFileName = fileName.toLowerCase();
-        return lowerFileName.endsWith(".md") ||
-               lowerFileName.endsWith(".markdown") ||
-               lowerFileName.endsWith(".mdown");
+        fileValidationService.validateContentType(
+            contentType,
+            fileName,
+            fileValidationService::isKnowledgeBaseMimeType,
+            fileValidationService::isMarkdownExtension,
+            "不支持的文件类型: " + contentType + "，支持的类型：PDF、DOCX、DOC、TXT、MD等"
+        );
     }
     
     /**
@@ -186,26 +154,6 @@ public class KnowledgeBaseUploadService {
             ),
             "duplicate", true
         );
-    }
-    
-    /**
-     * 检查文件类型是否允许
-     */
-    private boolean isAllowedType(String contentType) {
-        if (contentType == null) {
-            return false;
-        }
-        
-        String lowerContentType = contentType.toLowerCase();
-        // 支持常见的文档格式
-        return lowerContentType.contains("pdf") ||
-               lowerContentType.contains("msword") ||
-               lowerContentType.contains("wordprocessingml") ||
-               lowerContentType.contains("text/plain") ||
-               lowerContentType.contains("text/markdown") ||
-               lowerContentType.contains("text/x-markdown") ||
-               lowerContentType.contains("text/x-web-markdown") ||
-               lowerContentType.contains("application/rtf");
     }
     
     /**
