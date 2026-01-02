@@ -23,7 +23,7 @@ import java.util.Optional;
 
 /**
  * 简历持久化服务
- * Resume Persistence Service with deduplication
+ * 简历和评测结果的持久化，简历删除时删除所有关联数据
  */
 @Slf4j
 @Service

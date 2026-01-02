@@ -23,7 +23,7 @@ import java.util.Optional;
 
 /**
  * 简历历史服务
- * Resume History Service
+ * 简历历史和导出简历分析报告
  */
 @Slf4j
 @Service

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * RAG 聊天相关 DTO
+ * RAG聊天相关DTO
  */
 public class RagChatDTO {
 

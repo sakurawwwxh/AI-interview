@@ -19,7 +19,6 @@ import java.util.Map;
 
 /**
  * 知识库控制器
- * Knowledge Base Controller for upload and query
  */
 @Slf4j
 @RestController

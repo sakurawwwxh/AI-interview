@@ -10,6 +10,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/** 
+ * RAG聊天会话Repository
+ */
 @Repository
 public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEntity, Long> {
 

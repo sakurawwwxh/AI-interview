@@ -16,7 +16,6 @@ import java.io.InputStream;
 /**
  * 简历解析服务
  * 使用Apache Tika解析多种文档格式
- * Resume Parse Service using Apache Tika
  */
 @Slf4j
 @Service
