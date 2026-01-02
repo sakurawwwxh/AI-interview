@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 /**
  * 知识库列表项DTO
+ * 使用MapStruct进行转换，见KnowledgeBaseMapper
  */
 public record KnowledgeBaseListItemDTO(
     Long id,
@@ -17,19 +18,5 @@ public record KnowledgeBaseListItemDTO(
     Integer accessCount,
     Integer questionCount
 ) {
-    public static KnowledgeBaseListItemDTO fromEntity(KnowledgeBaseEntity entity) {
-        return new KnowledgeBaseListItemDTO(
-            entity.getId(),
-            entity.getName(),
-            entity.getCategory(),
-            entity.getOriginalFilename(),
-            entity.getFileSize(),
-            entity.getContentType(),
-            entity.getUploadedAt(),
-            entity.getLastAccessedAt(),
-            entity.getAccessCount(),
-            entity.getQuestionCount()
-        );
-    }
 }
 

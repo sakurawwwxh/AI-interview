@@ -2,6 +2,8 @@ package interview.guide.modules.knowledgebase.service;
 
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
+import interview.guide.infrastructure.mapper.RagChatMapper;
 import interview.guide.modules.knowledgebase.model.*;
 import interview.guide.modules.knowledgebase.model.RagChatDTO.*;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
@@ -15,7 +17,6 @@ import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * RAG 聊天会话服务
@@ -29,6 +30,8 @@ public class RagChatSessionService {
     private final RagChatMessageRepository messageRepository;
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseQueryService queryService;
+    private final RagChatMapper ragChatMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
 
     /**
      * 创建新会话
@@ -54,7 +57,7 @@ public class RagChatSessionService {
 
         log.info("创建 RAG 聊天会话: id={}, title={}", session.getId(), session.getTitle());
 
-        return toSessionDTO(session);
+        return ragChatMapper.toSessionDTO(session);
     }
 
     /**
@@ -63,8 +66,8 @@ public class RagChatSessionService {
     public List<SessionListItemDTO> listSessions() {
         return sessionRepository.findAllOrderByPinnedAndUpdatedAtDesc()
             .stream()
-            .map(this::toSessionListItemDTO)
-            .collect(Collectors.toList());
+            .map(ragChatMapper::toSessionListItemDTO)
+            .toList();
     }
 
     /**
@@ -81,7 +84,12 @@ public class RagChatSessionService {
         List<RagChatMessageEntity> messages = messageRepository
             .findBySessionIdOrderByMessageOrderAsc(sessionId);
 
-        return toSessionDetailDTO(session, messages);
+        // 转换知识库列表
+        List<KnowledgeBaseListItemDTO> kbDTOs = knowledgeBaseMapper.toListItemDTOList(
+            new java.util.ArrayList<>(session.getKnowledgeBases())
+        );
+
+        return ragChatMapper.toSessionDetailDTO(session, messages, kbDTOs);
     }
 
     /**
@@ -221,64 +229,5 @@ public class RagChatSessionService {
             return knowledgeBases.get(0).getName();
         }
         return knowledgeBases.size() + " 个知识库对话";
-    }
-
-    private SessionDTO toSessionDTO(RagChatSessionEntity session) {
-        return new SessionDTO(
-            session.getId(),
-            session.getTitle(),
-            session.getKnowledgeBaseIds(),
-            session.getCreatedAt()
-        );
-    }
-
-    private SessionListItemDTO toSessionListItemDTO(RagChatSessionEntity session) {
-        List<String> kbNames = session.getKnowledgeBases().stream()
-            .map(KnowledgeBaseEntity::getName)
-            .toList();
-
-        return new SessionListItemDTO(
-            session.getId(),
-            session.getTitle(),
-            session.getMessageCount(),
-            kbNames,
-            session.getUpdatedAt(),
-            session.getIsPinned() != null ? session.getIsPinned() : false
-        );
-    }
-
-    private SessionDetailDTO toSessionDetailDTO(RagChatSessionEntity session, List<RagChatMessageEntity> messages) {
-        List<KnowledgeBaseListItemDTO> kbDTOs = session.getKnowledgeBases().stream()
-            .map(kb -> new KnowledgeBaseListItemDTO(
-                kb.getId(),
-                kb.getName(),
-                kb.getCategory(),
-                kb.getOriginalFilename(),
-                kb.getFileSize(),
-                kb.getContentType(),
-                kb.getUploadedAt(),
-                kb.getLastAccessedAt(),
-                kb.getAccessCount(),
-                kb.getQuestionCount()
-            ))
-            .toList();
-
-        List<MessageDTO> messageDTOs = messages.stream()
-            .map(m -> new MessageDTO(
-                m.getId(),
-                m.getTypeString(),
-                m.getContent(),
-                m.getCreatedAt()
-            ))
-            .toList();
-
-        return new SessionDetailDTO(
-            session.getId(),
-            session.getTitle(),
-            kbDTOs,
-            messageDTOs,
-            session.getCreatedAt(),
-            session.getUpdatedAt()
-        );
     }
 }
