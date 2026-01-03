@@ -7,6 +7,7 @@ import Interview from './pages/InterviewPage';
 import InterviewHistoryPage from './pages/InterviewHistoryPage';
 import KnowledgeBaseQueryPage from './pages/KnowledgeBaseQueryPage';
 import KnowledgeBaseUploadPage from './pages/KnowledgeBaseUploadPage';
+import KnowledgeBaseManagePage from './pages/KnowledgeBaseManagePage';
 import {historyApi} from './api/history';
 import {useEffect, useState} from 'react';
 import type {ResumeAnalysisResponse, StorageInfo} from './types/resume';
@@ -141,16 +142,16 @@ function App() {
           
           {/* 面试记录列表 */}
           <Route path="interviews" element={<InterviewHistoryWrapper />} />
-          
+
           {/* 模拟面试 */}
           <Route path="interview/:resumeId" element={<InterviewWrapper />} />
-          
+
           {/* 知识库管理 */}
-          <Route path="knowledgebase" element={<KnowledgeBaseQueryPageWrapper />} />
-          
+          <Route path="knowledgebase" element={<KnowledgeBaseManagePageWrapper />} />
+
           {/* 知识库上传 */}
           <Route path="knowledgebase/upload" element={<KnowledgeBaseUploadPageWrapper />} />
-          
+
           {/* 问答助手（知识库聊天） */}
           <Route path="knowledgebase/chat" element={<KnowledgeBaseQueryPageWrapper />} />
         </Route>
@@ -176,7 +177,7 @@ function InterviewHistoryWrapper() {
     } else {
       // 否则尝试从面试详情中获取简历ID
       try {
-        const detail = await historyApi.getInterviewDetail(sessionId);
+        await historyApi.getInterviewDetail(sessionId);
         // 面试详情中没有简历ID，需要从其他地方获取
         // 暂时跳转到历史记录列表
         navigate('/history');
@@ -187,6 +188,21 @@ function InterviewHistoryWrapper() {
   };
   
   return <InterviewHistoryPage onBack={handleBack} onViewInterview={handleViewInterview} />;
+}
+
+// 知识库管理页面包装器
+function KnowledgeBaseManagePageWrapper() {
+  const navigate = useNavigate();
+
+  const handleUpload = () => {
+    navigate('/knowledgebase/upload');
+  };
+
+  const handleChat = () => {
+    navigate('/knowledgebase/chat');
+  };
+
+  return <KnowledgeBaseManagePage onUpload={handleUpload} onChat={handleChat} />;
 }
 
 // 知识库问答页面包装器
@@ -213,12 +229,12 @@ function KnowledgeBaseQueryPageWrapper() {
 // 知识库上传页面包装器
 function KnowledgeBaseUploadPageWrapper() {
   const navigate = useNavigate();
-  
-  const handleUploadComplete = (result: UploadKnowledgeBaseResponse) => {
-    // 上传完成后返回问答页面
+
+  const handleUploadComplete = (_result: UploadKnowledgeBaseResponse) => {
+    // 上传完成后返回管理页面
     navigate('/knowledgebase');
   };
-  
+
   const handleBack = () => {
     navigate('/knowledgebase');
   };

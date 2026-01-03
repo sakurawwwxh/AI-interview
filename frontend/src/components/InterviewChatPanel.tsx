@@ -36,9 +36,9 @@ export default function InterviewChatPanel({
   answer,
   onAnswerChange,
   onSubmit,
-  onCompleteEarly,
+  // onCompleteEarly, // 暂时未使用
   isSubmitting,
-  showCompleteConfirm,
+  // showCompleteConfirm, // 暂时未使用
   onShowCompleteConfirm
 }: InterviewChatPanelProps) {
   const chatContainerRef = useRef<HTMLDivElement>(null);

@@ -60,6 +60,18 @@ public class KnowledgeBaseEntity {
     
     // 问题数量（用户针对此知识库提问的次数）
     private Integer questionCount = 0;
+
+    // 向量化状态
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private VectorStatus vectorStatus = VectorStatus.COMPLETED;
+
+    // 向量化错误信息（失败时记录）
+    @Column(length = 500)
+    private String vectorError;
+
+    // 向量分块数量
+    private Integer chunkCount = 0;
     
     @PrePersist
     protected void onCreate() {
@@ -181,6 +193,30 @@ public class KnowledgeBaseEntity {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public VectorStatus getVectorStatus() {
+        return vectorStatus;
+    }
+
+    public void setVectorStatus(VectorStatus vectorStatus) {
+        this.vectorStatus = vectorStatus;
+    }
+
+    public String getVectorError() {
+        return vectorError;
+    }
+
+    public void setVectorError(String vectorError) {
+        this.vectorError = vectorError;
+    }
+
+    public Integer getChunkCount() {
+        return chunkCount;
+    }
+
+    public void setChunkCount(Integer chunkCount) {
+        this.chunkCount = chunkCount;
     }
 }
 

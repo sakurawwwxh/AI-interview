@@ -133,5 +133,15 @@ public class KnowledgeBaseController {
     public Result<List<KnowledgeBaseListItemDTO>> search(@RequestParam("keyword") String keyword) {
         return Result.success(listService.search(keyword));
     }
+
+    // ========== 统计 API ==========
+
+    /**
+     * 获取知识库统计信息
+     */
+    @GetMapping("/api/knowledgebase/stats")
+    public Result<KnowledgeBaseStatsDTO> getStatistics() {
+        return Result.success(listService.getStatistics());
+    }
 }
 

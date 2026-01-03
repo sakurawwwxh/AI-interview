@@ -72,7 +72,7 @@ export default function InterviewDetailPanel({ interview }: InterviewDetailPanel
 function ScoreCard({
   score,
   feedback,
-  scorePercent,
+  // scorePercent, // 暂时未使用
   circumference,
   strokeDashoffset
 }: {

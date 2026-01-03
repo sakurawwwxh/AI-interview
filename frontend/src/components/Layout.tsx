@@ -7,7 +7,8 @@ import {
   Briefcase,
   Users,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Database
 } from 'lucide-react';
 
 // Layout不再需要children prop，使用Outlet渲染子路由
@@ -48,7 +49,8 @@ export default function Layout({}: LayoutProps) {
       title: '知识增强',
       icon: Layers,
       items: [
-        { id: 'knowledgebase', path: '/knowledgebase/upload', label: '知识库上传', icon: BookOpen },
+        { id: 'kb-manage', path: '/knowledgebase', label: '知识库管理', icon: Database },
+        { id: 'kb-upload', path: '/knowledgebase/upload', label: '知识库上传', icon: BookOpen },
         { id: 'chat', path: '/knowledgebase/chat', label: '问答助手', icon: MessageSquare },
       ],
     },
@@ -58,6 +60,10 @@ export default function Layout({}: LayoutProps) {
   const isActive = (path: string) => {
     if (path === '/upload') {
       return currentPath === '/upload' || currentPath === '/';
+    }
+    // 精确匹配 /knowledgebase（管理页面）
+    if (path === '/knowledgebase') {
+      return currentPath === '/knowledgebase';
     }
     return currentPath.startsWith(path);
   };

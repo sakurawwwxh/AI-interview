@@ -14,7 +14,7 @@ interface InterviewWithResume extends InterviewItem {
   resumeFilename: string;
 }
 
-export default function InterviewHistoryPage({ onBack, onViewInterview }: InterviewHistoryPageProps) {
+export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview }: InterviewHistoryPageProps) {
   const [interviews, setInterviews] = useState<InterviewWithResume[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
