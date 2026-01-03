@@ -38,6 +38,9 @@ dependencies {
     // AWS S3 SDK for RustFS storage
     implementation 'software.amazon.awssdk:s3:2.25.27'
     
+    // Redisson - Redis客户端
+    implementation 'org.redisson:redisson-spring-boot-starter:3.24.3'
+    
     // PDF导出 - iText 7
     implementation 'com.itextpdf:itext7-core:7.2.5'
     implementation 'com.itextpdf:font-asian:7.2.5'
