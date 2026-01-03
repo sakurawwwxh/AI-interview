@@ -6,7 +6,6 @@ import remarkBreaks from 'remark-breaks';
 import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/knowledgebase';
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
-import ConfirmDialog from '../components/ConfirmDialog';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import {
   Plus,
@@ -41,8 +40,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
   const [selectedKbIds, setSelectedKbIds] = useState<Set<number>>(new Set());
   const [loadingList, setLoadingList] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
 
   // 搜索和排序状态
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -51,12 +48,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
 
   // 右侧面板状态
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
-
-  // 分类管理状态
-  const [showAddCategory, setShowAddCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [editingKbCategory, setEditingKbCategory] = useState<{ id: number; name: string } | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
 
   // 会话状态
   const [sessions, setSessions] = useState<RagChatSessionListItem[]>([]);
@@ -84,7 +75,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   useEffect(() => {
     loadKnowledgeBases();
     loadSessions();
-    loadCategories();
   }, []);
 
   useEffect(() => {
@@ -139,15 +129,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       console.error('加载知识库列表失败', err);
     } finally {
       setLoadingList(false);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      const list = await knowledgeBaseApi.getAllCategories();
-      setCategories(list);
-    } catch (err) {
-      console.error('加载分类列表失败', err);
     }
   };
 
@@ -304,27 +285,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
-  const handleAddCategory = () => {
-    if (!newCategoryName.trim()) return;
-    const trimmed = newCategoryName.trim();
-    if (!categories.includes(trimmed)) {
-      setCategories(prev => [...prev, trimmed]);
-    }
-    setNewCategoryName('');
-    setShowAddCategory(false);
-  };
-
-  const handleUpdateKbCategory = async (kbId: number, category: string | null) => {
-    try {
-      await knowledgeBaseApi.updateCategory(kbId, category);
-      await loadKnowledgeBases();
-      await loadCategories();
-      setEditingKbCategory(null);
-    } catch (err) {
-      console.error('更新分类失败', err);
-    }
-  };
-
   const formatMarkdown = (text: string): string => {
     if (!text) return '';
     return text
@@ -426,35 +386,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     }
   };
 
-  const handleDeleteKbClick = (id: number, name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDeleteConfirm({ id, name });
-  };
-
-  const handleDeleteKbConfirm = async () => {
-    if (!deleteConfirm) return;
-
-    const { id } = deleteConfirm;
-    setDeletingId(id);
-    try {
-      await knowledgeBaseApi.deleteKnowledgeBase(id);
-      await loadKnowledgeBases();
-      if (selectedKbIds.has(id)) {
-        setSelectedKbIds(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
-        setMessages([]);
-      }
-      setDeleteConfirm(null);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败，请稀后重试');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -481,7 +412,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       {/* 头部 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">知识库问答</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">问答助手</h1>
           <p className="text-slate-500 text-sm">选择知识库，向 AI 提问</p>
         </div>
         <div className="flex gap-3">
@@ -715,7 +646,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
           </div>
         </div>
 
-        {/* 右侧：知识库管理（可收起） */}
+        {/* 右侧：知识库选择（简化版） */}
         <AnimatePresence>
           {rightPanelOpen && (
             <motion.div
@@ -727,7 +658,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
             >
               <div className="bg-white rounded-2xl p-4 shadow-sm h-full flex flex-col w-[280px]">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold text-slate-800">知识库</h2>
+                  <h2 className="text-base font-semibold text-slate-800">选择知识库</h2>
                   <button
                     onClick={() => setRightPanelOpen(false)}
                     className="p-1 text-slate-400 hover:text-slate-600 rounded"
@@ -754,30 +685,22 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                   </button>
                 </div>
 
-                {/* 排序和添加分类 */}
-                <div className="flex items-center gap-2 mb-3">
+                {/* 排序 */}
+                <div className="mb-3">
                   <select
                     value={sortBy}
                     onChange={(e) => {
                       setSortBy(e.target.value as SortOption);
                       setSearchKeyword('');
                     }}
-                    className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    className="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
                   >
                     <option value="time">时间排序</option>
                     <option value="size">大小排序</option>
                     <option value="access">访问排序</option>
                     <option value="question">提问排序</option>
                   </select>
-                  <button
-                    onClick={() => setShowAddCategory(true)}
-                    className="p-1.5 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
-                    title="添加分类"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
                 </div>
-
 
                 {/* 知识库列表 */}
                 <div className="flex-1 overflow-y-auto">
@@ -828,47 +751,22 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                   {group.items.map((kb) => (
                                     <div
                                       key={kb.id}
-                                      className={`p-2 rounded-lg transition-all ${
+                                      onClick={() => handleToggleKb(kb.id)}
+                                      className={`p-2 rounded-lg cursor-pointer transition-all ${
                                         selectedKbIds.has(kb.id)
                                           ? 'bg-primary-50 border border-primary-500'
                                           : 'bg-white hover:bg-slate-50 border border-transparent'
                                       }`}
                                     >
-                                      <div className="flex items-center justify-between gap-1">
-                                        <div
-                                          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-                                          onClick={() => handleToggleKb(kb.id)}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedKbIds.has(kb.id)}
-                                            onChange={() => handleToggleKb(kb.id)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="w-3.5 h-3.5 text-primary-500 rounded focus:ring-primary-500"
-                                          />
-                                          <span className="font-medium text-slate-800 text-xs truncate">{kb.name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-0.5">
-                                          {/* 修改分类按钮 */}
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setEditingKbCategory({ id: kb.id, name: kb.name });
-                                            }}
-                                            className="p-1 text-slate-400 hover:text-primary-500 rounded transition-colors"
-                                            title="修改分类"
-                                          >
-                                            <Edit className="w-3 h-3" />
-                                          </button>
-                                          {/* 删除按钮 */}
-                                          <button
-                                            onClick={(e) => handleDeleteKbClick(kb.id, kb.name, e)}
-                                            disabled={deletingId === kb.id}
-                                            className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
-                                          >
-                                            <Trash2 className="w-3 h-3" />
-                                          </button>
-                                        </div>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedKbIds.has(kb.id)}
+                                          onChange={() => handleToggleKb(kb.id)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-3.5 h-3.5 text-primary-500 rounded focus:ring-primary-500"
+                                        />
+                                        <span className="font-medium text-slate-800 text-xs truncate flex-1">{kb.name}</span>
                                       </div>
                                       <p className="text-xs text-slate-400 mt-0.5 ml-5">{formatFileSize(kb.fileSize)}</p>
                                     </div>
@@ -899,23 +797,29 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         )}
       </div>
 
-      {/* 添加分类弹窗 */}
+      {/* 删除会话确认弹窗 */}
+      <DeleteConfirmDialog
+        open={!!sessionDeleteConfirm}
+        item={sessionDeleteConfirm ? { id: 0, title: sessionDeleteConfirm.title } : null}
+        itemType="对话"
+        onConfirm={handleDeleteSession}
+        onCancel={() => setSessionDeleteConfirm(null)}
+      />
+
+      {/* 编辑会话标题弹窗 */}
       <AnimatePresence>
-        {showAddCategory && (
+        {editingSessionTitle && (
           <>
-            {/* 背景遮罩 */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => {
-                setShowAddCategory(false);
-                setNewCategoryName('');
+                setEditingSessionTitle(null);
+                setNewSessionTitle('');
               }}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             />
-            
-            {/* 弹窗 */}
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -924,149 +828,39 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 onClick={(e) => e.stopPropagation()}
                 className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
               >
-                {/* 标题 */}
-                <h3 className="text-xl font-bold text-slate-900 mb-4">
-                  新建分类
-                </h3>
-                
-                {/* 输入框 */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    分类名称
-                  </label>
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && newCategoryName.trim()) {
-                        handleAddCategory();
-                      }
-                    }}
-                    placeholder="请输入分类名称"
-                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    autoFocus
-                  />
-                </div>
-
-                {/* 按钮 */}
-                <div className="flex gap-3 justify-end">
-                  <motion.button
+                <h3 className="text-xl font-bold text-slate-900 mb-4">编辑标题</h3>
+                <input
+                  type="text"
+                  value={newSessionTitle}
+                  onChange={(e) => setNewSessionTitle(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSaveSessionTitle()}
+                  placeholder="请输入新标题"
+                  className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-3">
+                  <button
                     onClick={() => {
-                      setShowAddCategory(false);
-                      setNewCategoryName('');
+                      setEditingSessionTitle(null);
+                      setNewSessionTitle('');
                     }}
-                    className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800"
                   >
                     取消
-                  </motion.button>
-                  <motion.button
-                    onClick={handleAddCategory}
-                    disabled={!newCategoryName.trim()}
-                    className="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  </button>
+                  <button
+                    onClick={handleSaveSessionTitle}
+                    disabled={!newSessionTitle.trim()}
+                    className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50"
                   >
-                    创建
-                  </motion.button>
+                    保存
+                  </button>
                 </div>
               </motion.div>
             </div>
           </>
         )}
       </AnimatePresence>
-
-      {/* 知识库删除确认对话框 */}
-      <DeleteConfirmDialog
-        open={deleteConfirm !== null}
-        item={deleteConfirm}
-        itemType="知识库"
-        loading={deletingId !== null}
-        onConfirm={handleDeleteKbConfirm}
-        onCancel={() => setDeleteConfirm(null)}
-      />
-
-      {/* 会话删除确认对话框 */}
-      <DeleteConfirmDialog
-        open={sessionDeleteConfirm !== null}
-        item={sessionDeleteConfirm}
-        itemType="对话"
-        loading={false}
-        onConfirm={handleDeleteSession}
-        onCancel={() => setSessionDeleteConfirm(null)}
-      />
-
-      {/* 修改分类对话框 */}
-      <ConfirmDialog
-        open={editingKbCategory !== null}
-        title="修改分类"
-        message=""
-        confirmText="确定"
-        cancelText="取消"
-        onConfirm={() => {}}
-        onCancel={() => setEditingKbCategory(null)}
-        customContent={
-          editingKbCategory && (
-            <div className="mt-4">
-              <p className="text-sm text-slate-600 mb-3">
-                为 "{editingKbCategory.name}" 选择分类：
-              </p>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                <button
-                  onClick={() => handleUpdateKbCategory(editingKbCategory.id, null)}
-                  className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  未分类
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => handleUpdateKbCategory(editingKbCategory.id, cat)}
-                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 transition-colors"
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )
-        }
-      />
-
-      {/* 编辑会话标题对话框 */}
-      <ConfirmDialog
-        open={editingSessionTitle !== null}
-        title="编辑对话标题"
-        message=""
-        confirmText="保存"
-        cancelText="取消"
-        onConfirm={handleSaveSessionTitle}
-        onCancel={() => {
-          setEditingSessionTitle(null);
-          setNewSessionTitle('');
-        }}
-        customContent={
-          editingSessionTitle && (
-            <div className="mt-4 mb-6">
-              <input
-                type="text"
-                value={newSessionTitle}
-                onChange={(e) => setNewSessionTitle(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && newSessionTitle.trim()) {
-                    handleSaveSessionTitle();
-                  }
-                }}
-                placeholder="输入新标题"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                autoFocus
-              />
-            </div>
-          )
-        }
-      />
     </div>
   );
 }
