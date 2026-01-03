@@ -1,5 +1,6 @@
 package interview.guide.common.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -10,16 +11,13 @@ import software.amazon.awssdk.services.s3.S3Client;
 import java.net.URI;
 
 /**
- * S3客户端配置
+ * S3客户端配置（用于RustFS）
  */
 @Configuration
+@RequiredArgsConstructor
 public class S3Config {
-    
+
     private final StorageConfigProperties storageConfig;
-    
-    public S3Config(StorageConfigProperties storageConfig) {
-        this.storageConfig = storageConfig;
-    }
     
     @Bean
     public S3Client s3Client() {
