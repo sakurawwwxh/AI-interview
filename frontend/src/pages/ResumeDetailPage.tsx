@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useCallback} from 'react';
 import {useLocation} from 'react-router-dom';
 import {AnimatePresence, motion} from 'framer-motion';
 import {historyApi, InterviewDetail, ResumeDetail} from '../api/history';
@@ -34,10 +34,64 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
   const [detailView, setDetailView] = useState<DetailViewType>('list');
   const [selectedInterview, setSelectedInterview] = useState<InterviewDetail | null>(null);
   const [loadingInterview, setLoadingInterview] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+
+  // 静默加载数据（用于轮询）
+  const loadResumeDetailSilent = useCallback(async () => {
+    try {
+      const data = await historyApi.getResumeDetail(resumeId);
+      setResume(data);
+    } catch (err) {
+      console.error('加载简历详情失败', err);
+    }
+  }, [resumeId]);
+
+  const loadResumeDetail = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await historyApi.getResumeDetail(resumeId);
+      setResume(data);
+    } catch (err) {
+      console.error('加载简历详情失败', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [resumeId]);
 
   useEffect(() => {
     loadResumeDetail();
-  }, [resumeId]);
+  }, [loadResumeDetail]);
+
+  // 轮询：当分析状态为待处理时，每5秒刷新一次
+  // 待处理判断：显式的 PENDING/PROCESSING 状态，或状态未定义且无分析结果
+  useEffect(() => {
+    const isProcessing = resume && (
+      resume.analyzeStatus === 'PENDING' ||
+      resume.analyzeStatus === 'PROCESSING' ||
+      (resume.analyzeStatus === undefined && (!resume.analyses || resume.analyses.length === 0))
+    );
+
+    if (isProcessing && !loading) {
+      const timer = setInterval(() => {
+        loadResumeDetailSilent();
+      }, 5000);
+
+      return () => clearInterval(timer);
+    }
+  }, [resume, loading, loadResumeDetailSilent]);
+
+  // 重新分析
+  const handleReanalyze = async () => {
+    try {
+      setReanalyzing(true);
+      await historyApi.reanalyze(resumeId);
+      await loadResumeDetailSilent();
+    } catch (err) {
+      console.error('重新分析失败', err);
+    } finally {
+      setReanalyzing(false);
+    }
+  };
 
   // 检查是否需要自动打开面试详情
   useEffect(() => {
@@ -61,18 +115,6 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
       loadAndViewInterview();
     }
   }, [location.state, resume]);
-
-  const loadResumeDetail = async () => {
-    setLoading(true);
-    try {
-      const data = await historyApi.getResumeDetail(resumeId);
-      setResume(data);
-    } catch (err) {
-      console.error('加载简历详情失败', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleExportAnalysisPdf = async () => {
     setExporting('analysis');
@@ -295,10 +337,14 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             >
               {activeTab === 'analysis' ? (
-                <AnalysisPanel 
-                  analysis={latestAnalysis} 
+                <AnalysisPanel
+                  analysis={latestAnalysis}
+                  analyzeStatus={resume.analyzeStatus}
+                  analyzeError={resume.analyzeError}
                   onExport={handleExportAnalysisPdf}
                   exporting={exporting === 'analysis'}
+                  onReanalyze={handleReanalyze}
+                  reanalyzing={reanalyzing}
                 />
               ) : (
                 <InterviewPanel 

@@ -15,9 +15,9 @@ export interface StorageInfo {
   resumeId?: number;
 }
 
-// 上传API完整响应
+// 上传API完整响应（异步模式：analysis 可能为空）
 export interface UploadResponse {
-  analysis: ResumeAnalysisResponse;
+  analysis?: ResumeAnalysisResponse;
   storage: StorageInfo;
   duplicate?: boolean;
   message?: string;
