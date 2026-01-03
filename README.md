@@ -1,6 +1,6 @@
 <div align="center">
-
 **智能 AI 面试官平台** - 基于大语言模型的简历分析和模拟面试系统
+
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-green?logo=springboot)](https://spring.io/projects/spring-boot)
 [![React](https://img.shields.io/badge/React-18.3-blue?logo=react)](https://react.dev/)
@@ -47,7 +47,23 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 └───────────────┘ └─────────────┘ └───────────────────┘
 ```
 
----
+**异步处理流程**：
+
+简历分析和知识库向量化采用 Redis Stream 异步处理：
+
+```
+上传请求 → 保存文件 → 发送消息到 Stream → 立即返回
+                              ↓
+                      Consumer 消费消息
+                              ↓
+                    执行分析/向量化任务
+                              ↓
+                      更新数据库状态
+                              ↓
+                   前端轮询获取最新状态
+```
+
+状态流转： `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`
 
 ## 技术栈
 
@@ -109,7 +125,10 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### TODO
 
-
+- [ ] 问答助手的 Markdown 展示优化
+- [ ] 异步生成模拟面试评估报告
+- [ ] 模拟面试增加追问功能
+- [ ] 打通模拟面试和知识库
 
 ## 效果展示
 
@@ -137,17 +156,17 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 模拟面试：
 
-![](../../../../../Library/Application Support/typora-user-images/page-mock-interview.png)
+![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-mock-interview.png)
 
 ### 知识库
 
 知识库管理：
 
-![](../../../../../Library/Application Support/typora-user-images/page-knowledge-base-management.png)
+![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-knowledge-base-management.png)
 
 问答助手：
 
-![page-qa-assistant](../../../../../Library/Application Support/typora-user-images/page-qa-assistant.png)
+![page-qa-assistant](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-qa-assistant.png)
 
 ## 项目结构
 
@@ -202,7 +221,7 @@ interview-guide/
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Snailclimb/interview-guide.git
 cd interview-guide
 ```
 
@@ -289,24 +308,6 @@ pnpm dev
 ```
 
 前端服务启动于 `http://localhost:5173`
-
-## 异步处理流程
-
-简历分析和知识库向量化采用 **Redis Stream** 异步处理：
-
-```
-上传请求 → 保存文件 → 发送消息到 Stream → 立即返回
-                              ↓
-                      Consumer 消费消息
-                              ↓
-                    执行分析/向量化任务
-                              ↓
-                      更新数据库状态
-                              ↓
-                   前端轮询获取最新状态
-```
-
-**状态流转：** `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`
 
 ## 使用场景
 
