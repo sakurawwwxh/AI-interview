@@ -16,7 +16,10 @@ public record KnowledgeBaseListItemDTO(
     LocalDateTime uploadedAt,
     LocalDateTime lastAccessedAt,
     Integer accessCount,
-    Integer questionCount
+    Integer questionCount,
+    VectorStatus vectorStatus,
+    String vectorError,
+    Integer chunkCount
 ) {
 }
 

@@ -10,14 +10,6 @@ import {
 } from 'recharts';
 import {normalizeScore} from '../utils/score';
 
-interface RadarDataItem {
-  subject: string;
-  score: number;
-  fullMark: number;
-  originalScore: number;
-  originalFullMark: number;
-}
-
 interface RadarChartProps {
   data: Array<{
     subject: string;
@@ -86,7 +78,7 @@ export default function RadarChart({ data, height = 320, className = '' }: Radar
               borderRadius: '12px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
             }}
-            formatter={(value: number | undefined, _name: string | undefined, props: any) => {
+            formatter={(_value: number | undefined, _name: string | undefined, props: any) => {
               const originalScore = props?.payload?.originalScore ?? 0;
               const originalFullMark = props?.payload?.originalFullMark ?? 40;
               const percentage = originalFullMark > 0 

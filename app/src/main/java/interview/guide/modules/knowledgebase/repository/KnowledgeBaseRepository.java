@@ -1,6 +1,7 @@
 package interview.guide.modules.knowledgebase.repository;
 
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
+import interview.guide.modules.knowledgebase.model.VectorStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -66,5 +67,24 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      * 按提问次数排序
      */
     List<KnowledgeBaseEntity> findAllByOrderByQuestionCountDesc();
+
+    // ==================== 统计查询 ====================
+
+    /**
+     * 统计总提问次数
+     */
+    @Query("SELECT COALESCE(SUM(k.questionCount), 0) FROM KnowledgeBaseEntity k")
+    long sumQuestionCount();
+
+    /**
+     * 统计总访问次数
+     */
+    @Query("SELECT COALESCE(SUM(k.accessCount), 0) FROM KnowledgeBaseEntity k")
+    long sumAccessCount();
+
+    /**
+     * 按向量化状态统计数量
+     */
+    long countByVectorStatus(VectorStatus vectorStatus);
 }
 

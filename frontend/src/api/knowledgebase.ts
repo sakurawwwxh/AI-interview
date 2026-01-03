@@ -2,6 +2,9 @@ import { request, getErrorMessage } from './request';
 
 const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
 
+// 向量化状态
+export type VectorStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
 export interface KnowledgeBaseItem {
   id: number;
   name: string;
@@ -13,6 +16,18 @@ export interface KnowledgeBaseItem {
   lastAccessedAt: string;
   accessCount: number;
   questionCount: number;
+  vectorStatus: VectorStatus;
+  vectorError: string | null;
+  chunkCount: number;
+}
+
+// 统计信息
+export interface KnowledgeBaseStats {
+  totalCount: number;
+  totalQuestionCount: number;
+  totalAccessCount: number;
+  completedCount: number;
+  processingCount: number;
 }
 
 export type SortOption = 'time' | 'size' | 'access' | 'question';
@@ -118,6 +133,15 @@ export const knowledgeBaseApi = {
    */
   async search(keyword: string): Promise<KnowledgeBaseItem[]> {
     return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/search?keyword=${encodeURIComponent(keyword)}`);
+  },
+
+  // ========== 统计 ==========
+
+  /**
+   * 获取知识库统计信息
+   */
+  async getStatistics(): Promise<KnowledgeBaseStats> {
+    return request.get<KnowledgeBaseStats>('/api/knowledgebase/stats');
   },
 
   /**

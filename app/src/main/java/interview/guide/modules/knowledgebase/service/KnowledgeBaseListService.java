@@ -3,6 +3,8 @@ package interview.guide.modules.knowledgebase.service;
 import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseStatsDTO;
+import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -121,6 +123,21 @@ public class KnowledgeBaseListService {
             default -> entities = knowledgeBaseRepository.findAllByOrderByUploadedAtDesc();
         }
         return knowledgeBaseMapper.toListItemDTOList(entities);
+    }
+
+    // ========== 统计功能 ==========
+
+    /**
+     * 获取知识库统计信息
+     */
+    public KnowledgeBaseStatsDTO getStatistics() {
+        return new KnowledgeBaseStatsDTO(
+            knowledgeBaseRepository.count(),
+            knowledgeBaseRepository.sumQuestionCount(),
+            knowledgeBaseRepository.sumAccessCount(),
+            knowledgeBaseRepository.countByVectorStatus(VectorStatus.COMPLETED),
+            knowledgeBaseRepository.countByVectorStatus(VectorStatus.PROCESSING)
+        );
     }
 }
 
