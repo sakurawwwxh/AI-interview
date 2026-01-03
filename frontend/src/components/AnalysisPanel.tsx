@@ -8,19 +8,35 @@ import {
   TrendingUp,
   Download,
   Target,
-  CheckCircle2
+  CheckCircle2,
+  Loader2,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
+import type { AnalyzeStatus } from '../api/history';
 
 interface AnalysisPanelProps {
   analysis: any;
+  analyzeStatus?: AnalyzeStatus;
+  analyzeError?: string;
   onExport: () => void;
   exporting: boolean;
+  onReanalyze?: () => void;
+  reanalyzing?: boolean;
 }
 
 /**
  * 简历分析面板组件
  */
-export default function AnalysisPanel({ analysis, onExport, exporting }: AnalysisPanelProps) {
+export default function AnalysisPanel({
+  analysis,
+  analyzeStatus,
+  analyzeError,
+  onExport,
+  exporting,
+  onReanalyze,
+  reanalyzing,
+}: AnalysisPanelProps) {
   // 准备雷达图数据
   const radarData = useMemo(() => {
     if (!analysis) return [];
@@ -125,12 +141,47 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
     analysis.summary.includes('Remote host terminated') ||
     analysis.summary.includes('handshake')
   );
-  const isAnalysisValid = analysis && 
-    analysis.overallScore >= 10 && 
-    analysis.summary && 
+  const isAnalysisValid = analysis &&
+    analysis.overallScore >= 10 &&
+    analysis.summary &&
     !hasErrorKeywords;
 
-  if (!analysis || !isAnalysisValid) {
+  // 判断是否为"分析中"状态
+  // 1. 显式的 PENDING/PROCESSING 状态
+  // 2. 状态未定义且没有分析结果（说明还在处理中）
+  const isProcessing = analyzeStatus === 'PENDING' ||
+    analyzeStatus === 'PROCESSING' ||
+    (analyzeStatus === undefined && !analysis);
+
+  // 处理分析中状态
+  if (isProcessing) {
+    const isExplicitProcessing = analyzeStatus === 'PROCESSING';
+    return (
+      <div className="bg-white rounded-2xl p-12 text-center">
+        <div className="w-16 h-16 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
+          {isExplicitProcessing ? (
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          ) : (
+            <Clock className="w-8 h-8 text-yellow-500" />
+          )}
+        </div>
+        <h3 className="text-xl font-semibold text-slate-700 mb-2">
+          {isExplicitProcessing ? 'AI 正在分析中...' : '等待分析'}
+        </h3>
+        <p className="text-slate-500 mb-4">
+          {isExplicitProcessing
+            ? '请稍候，AI 正在对您的简历进行深度分析'
+            : '简历已上传成功，即将开始 AI 分析'}
+        </p>
+        <p className="text-sm text-slate-400">页面将自动刷新显示分析结果</p>
+      </div>
+    );
+  }
+
+  // 处理分析失败状态
+  // 1. 显式的 FAILED 状态
+  // 2. 有分析结果但结果无效
+  if (analyzeStatus === 'FAILED' || !isAnalysisValid) {
     return (
       <div className="bg-white rounded-2xl p-12 text-center">
         <div className="w-16 h-16 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
@@ -138,10 +189,22 @@ export default function AnalysisPanel({ analysis, onExport, exporting }: Analysi
         </div>
         <h3 className="text-xl font-semibold text-slate-700 mb-2">分析失败</h3>
         <p className="text-slate-500 mb-4">AI 服务暂时不可用，请稍后重试</p>
-        {analysis?.summary && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
-            <p className="text-sm text-red-600">{analysis.summary}</p>
+        {(analyzeError || analysis?.summary) && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-left mb-4">
+            <p className="text-sm text-red-600">{analyzeError || analysis.summary}</p>
           </div>
+        )}
+        {onReanalyze && (
+          <motion.button
+            onClick={onReanalyze}
+            disabled={reanalyzing}
+            className="px-6 py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <RefreshCw className={`w-4 h-4 ${reanalyzing ? 'animate-spin' : ''}`} />
+            {reanalyzing ? '重新分析中...' : '重新分析'}
+          </motion.button>
         )}
       </div>
     );

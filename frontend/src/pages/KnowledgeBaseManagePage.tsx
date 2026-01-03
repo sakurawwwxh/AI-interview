@@ -18,6 +18,7 @@ import {
   Check,
   X,
   RefreshCw,
+  Download,
 } from 'lucide-react';
 import {
   knowledgeBaseApi,
@@ -26,6 +27,7 @@ import {
   SortOption,
   VectorStatus,
 } from '../api/knowledgebase';
+import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 
 interface KnowledgeBaseManagePageProps {
   onUpload: () => void;
@@ -124,7 +126,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   const [sortBy, setSortBy] = useState<SortOption>('time');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [deleteItem, setDeleteItem] = useState<KnowledgeBaseItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // 分类编辑状态
@@ -212,16 +214,30 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   };
 
   // 删除知识库
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (!deleteItem) return;
     try {
       setDeleting(true);
-      await knowledgeBaseApi.deleteKnowledgeBase(id);
-      setDeleteConfirm(null);
+      await knowledgeBaseApi.deleteKnowledgeBase(deleteItem.id);
+      setDeleteItem(null);
       await loadData();
     } catch (error) {
       console.error('删除失败:', error);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // 下载知识库
+  const handleDownload = (kb: KnowledgeBaseItem) => {
+    // 使用存储URL直接下载
+    if (kb.storageUrl) {
+      const link = document.createElement('a');
+      link.href = kb.storageUrl;
+      link.download = kb.originalFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -536,7 +552,15 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                     {formatDate(kb.uploadedAt)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1">
+                      {/* 下载按钮 */}
+                      <button
+                        onClick={() => handleDownload(kb)}
+                        className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+                        title="下载"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                       {/* 重新向量化按钮（仅 FAILED 状态显示） */}
                       {kb.vectorStatus === 'FAILED' && (
                         <button
@@ -549,31 +573,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                         </button>
                       )}
                       {/* 删除按钮 */}
-                      {deleteConfirm === kb.id ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleDelete(kb.id)}
-                            disabled={deleting}
-                            className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 disabled:opacity-50"
-                          >
-                            {deleting ? '删除中...' : '确认'}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(null)}
-                            className="px-3 py-1 bg-slate-100 text-slate-600 text-sm rounded hover:bg-slate-200"
-                          >
-                            取消
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirm(kb.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="删除"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setDeleteItem(kb)}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="删除"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </motion.tr>
@@ -582,6 +588,16 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
           </table>
         )}
       </div>
+
+      {/* 删除确认对话框 */}
+      <DeleteConfirmDialog
+        open={deleteItem !== null}
+        item={deleteItem}
+        itemType="知识库"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteItem(null)}
+      />
     </div>
   );
 }

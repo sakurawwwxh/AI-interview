@@ -10,21 +10,18 @@ import KnowledgeBaseUploadPage from './pages/KnowledgeBaseUploadPage';
 import KnowledgeBaseManagePage from './pages/KnowledgeBaseManagePage';
 import {historyApi} from './api/history';
 import {useEffect, useState} from 'react';
-import type {ResumeAnalysisResponse, StorageInfo} from './types/resume';
 import type {UploadKnowledgeBaseResponse} from './api/knowledgebase';
 
 // 上传页面包装器
 function UploadPageWrapper() {
   const navigate = useNavigate();
-  
-  const handleAnalysisComplete = (_result: ResumeAnalysisResponse, storage: StorageInfo) => {
-    // 直接跳转到详情页
-    if (storage.resumeId) {
-      navigate(`/history/${storage.resumeId}`);
-    }
+
+  const handleUploadComplete = (resumeId: number) => {
+    // 异步模式：上传成功后跳转到简历库，让用户在列表中查看分析状态
+    navigate('/history', { state: { newResumeId: resumeId } });
   };
-  
-  return <UploadPage onAnalysisComplete={handleAnalysisComplete} />;
+
+  return <UploadPage onUploadComplete={handleUploadComplete} />;
 }
 
 // 历史记录列表包装器

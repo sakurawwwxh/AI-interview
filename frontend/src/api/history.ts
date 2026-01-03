@@ -1,5 +1,7 @@
 import { request } from './request';
 
+export type AnalyzeStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
 export interface ResumeListItem {
   id: number;
   filename: string;
@@ -9,6 +11,15 @@ export interface ResumeListItem {
   latestScore?: number;
   lastAnalyzedAt?: string;
   interviewCount: number;
+  analyzeStatus?: AnalyzeStatus;
+  analyzeError?: string;
+  storageUrl?: string;
+}
+
+export interface ResumeStats {
+  totalCount: number;
+  totalInterviewCount: number;
+  totalAccessCount: number;
 }
 
 export interface AnalysisItem {
@@ -61,6 +72,8 @@ export interface ResumeDetail {
   uploadedAt: string;
   accessCount: number;
   resumeText: string;
+  analyzeStatus?: AnalyzeStatus;
+  analyzeError?: string;
   analyses: AnalysisItem[];
   interviews: InterviewItem[];
 }
@@ -125,5 +138,19 @@ export const historyApi = {
    */
   async deleteInterview(sessionId: string): Promise<void> {
     return request.delete(`/api/interview/sessions/${sessionId}`);
+  },
+
+  /**
+   * 获取简历统计信息
+   */
+  async getStatistics(): Promise<ResumeStats> {
+    return request.get<ResumeStats>('/api/resumes/statistics');
+  },
+
+  /**
+   * 重新分析简历
+   */
+  async reanalyze(id: number): Promise<void> {
+    return request.post(`/api/resumes/${id}/reanalyze`);
   },
 };

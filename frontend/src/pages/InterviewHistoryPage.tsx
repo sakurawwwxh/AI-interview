@@ -1,8 +1,21 @@
-import {useEffect, useState} from 'react';
-import {motion} from 'framer-motion';
-import {historyApi, InterviewItem} from '../api/history';
-import {formatDateOnly} from '../utils/date';
+import { useEffect, useState, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { historyApi, InterviewItem } from '../api/history';
+import { formatDate } from '../utils/date';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
+import {
+  Users,
+  Search,
+  Download,
+  Trash2,
+  ChevronRight,
+  CheckCircle,
+  Clock,
+  PlayCircle,
+  TrendingUp,
+  FileText,
+  Loader2,
+} from 'lucide-react';
 
 interface InterviewHistoryPageProps {
   onBack: () => void;
@@ -14,64 +27,152 @@ interface InterviewWithResume extends InterviewItem {
   resumeFilename: string;
 }
 
+interface InterviewStats {
+  totalCount: number;
+  completedCount: number;
+  averageScore: number;
+}
+
+// 统计卡片组件
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  suffix,
+  color,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number | string;
+  suffix?: string;
+  color: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-xl p-6 shadow-sm border border-slate-100"
+    >
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-lg ${color}`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <p className="text-sm text-slate-500">{label}</p>
+          <p className="text-2xl font-bold text-slate-800">
+            {value}{suffix && <span className="text-base font-normal text-slate-400 ml-1">{suffix}</span>}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// 判断是否为已完成状态（包括 COMPLETED 和 EVALUATED）
+function isCompletedStatus(status: string): boolean {
+  return status === 'COMPLETED' || status === 'EVALUATED';
+}
+
+// 状态图标
+function StatusIcon({ status }: { status: string }) {
+  if (isCompletedStatus(status)) {
+    return <CheckCircle className="w-4 h-4 text-green-500" />;
+  }
+  switch (status) {
+    case 'IN_PROGRESS':
+      return <PlayCircle className="w-4 h-4 text-blue-500" />;
+    default:
+      return <Clock className="w-4 h-4 text-yellow-500" />;
+  }
+}
+
+// 状态文本
+function getStatusText(status: string): string {
+  if (isCompletedStatus(status)) {
+    return '已完成';
+  }
+  switch (status) {
+    case 'IN_PROGRESS':
+      return '进行中';
+    default:
+      return '已创建';
+  }
+}
+
+// 获取分数颜色
+function getScoreColor(score: number): string {
+  if (score >= 80) return 'bg-green-500';
+  if (score >= 60) return 'bg-yellow-500';
+  return 'bg-red-500';
+}
+
 export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview }: InterviewHistoryPageProps) {
   const [interviews, setInterviews] = useState<InterviewWithResume[]>([]);
+  const [stats, setStats] = useState<InterviewStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ sessionId: string } | null>(null);
+  const [deleteItem, setDeleteItem] = useState<InterviewWithResume | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAllInterviews();
-  }, []);
-
-  const loadAllInterviews = async () => {
+  const loadAllInterviews = useCallback(async () => {
     setLoading(true);
     try {
-      // 获取所有简历，然后聚合所有面试记录
       const resumes = await historyApi.getResumes();
       const allInterviews: InterviewWithResume[] = [];
-      
+
       for (const resume of resumes) {
         const detail = await historyApi.getResumeDetail(resume.id);
         if (detail.interviews && detail.interviews.length > 0) {
           detail.interviews.forEach(interview => {
-            allInterviews.push({ 
-              ...interview, 
+            allInterviews.push({
+              ...interview,
               resumeId: resume.id,
-              resumeFilename: resume.filename 
+              resumeFilename: resume.filename
             });
           });
         }
       }
-      
+
       // 按创建时间倒序排序
-      allInterviews.sort((a, b) => 
+      allInterviews.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      
+
       setInterviews(allInterviews);
+
+      // 计算统计信息
+      const completed = allInterviews.filter(i => isCompletedStatus(i.status));
+      const totalScore = completed.reduce((sum, i) => sum + (i.overallScore || 0), 0);
+      setStats({
+        totalCount: allInterviews.length,
+        completedCount: completed.length,
+        averageScore: completed.length > 0 ? Math.round(totalScore / completed.length) : 0,
+      });
     } catch (err) {
       console.error('加载面试记录失败', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleDeleteClick = (sessionId: string, e: React.MouseEvent) => {
+  useEffect(() => {
+    loadAllInterviews();
+  }, [loadAllInterviews]);
+
+  const handleDeleteClick = (interview: InterviewWithResume, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDeleteConfirm({ sessionId });
+    setDeleteItem(interview);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm) return;
-    
-    const { sessionId } = deleteConfirm;
-    setDeletingSessionId(sessionId);
+    if (!deleteItem) return;
+
+    setDeletingSessionId(deleteItem.sessionId);
     try {
-      await historyApi.deleteInterview(sessionId);
+      await historyApi.deleteInterview(deleteItem.sessionId);
       await loadAllInterviews();
-      setDeleteConfirm(null);
+      setDeleteItem(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : '删除失败，请稍后重试');
     } finally {
@@ -79,14 +180,15 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
     }
   };
 
-  const handleExport = async (sessionId: string) => {
+  const handleExport = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setExporting(sessionId);
     try {
       const blob = await historyApi.exportInterviewPdf(sessionId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `面试报告_${sessionId}.pdf`;
+      a.download = `面试报告_${sessionId.slice(-8)}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -98,16 +200,9 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-10 h-10 border-3 border-slate-200 border-t-primary-500 rounded-full mx-auto mb-4 animate-spin" />
-          <p className="text-slate-500">加载中...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredInterviews = interviews.filter(interview =>
+    interview.resumeFilename.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <motion.div
@@ -116,17 +211,18 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
       animate={{ opacity: 1 }}
     >
       {/* 头部 */}
-      <div className="flex justify-between items-start mb-10 flex-wrap gap-6">
+      <div className="flex justify-between items-start mb-8 flex-wrap gap-6">
         <div>
           <motion.h1
-            className="text-4xl font-bold text-slate-900 mb-2"
+            className="text-2xl font-bold text-slate-800 flex items-center gap-3"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
           >
+            <Users className="w-7 h-7 text-primary-500" />
             面试记录
           </motion.h1>
           <motion.p
-            className="text-slate-500"
+            className="text-slate-500 mt-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
@@ -134,140 +230,186 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
             查看和管理所有模拟面试记录
           </motion.p>
         </div>
+
+        <motion.div
+          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+        >
+          <Search className="w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="搜索简历名称..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 outline-none text-slate-700 placeholder:text-slate-400"
+          />
+        </motion.div>
       </div>
 
-      {/* 面试记录列表 */}
-      {interviews.length === 0 ? (
+      {/* 统计卡片 */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCard
+            icon={Users}
+            label="面试总数"
+            value={stats.totalCount}
+            color="bg-primary-500"
+          />
+          <StatCard
+            icon={CheckCircle}
+            label="已完成"
+            value={stats.completedCount}
+            color="bg-emerald-500"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="平均分数"
+            value={stats.averageScore}
+            suffix="分"
+            color="bg-indigo-500"
+          />
+        </div>
+      )}
+
+      {/* 加载状态 */}
+      {loading && (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+        </div>
+      )}
+
+      {/* 空状态 */}
+      {!loading && filteredInterviews.length === 0 && (
         <motion.div
-          className="bg-white rounded-2xl p-12 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
         >
-          <div className="text-slate-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="none">
-              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <p className="text-slate-500 text-lg">暂无面试记录</p>
-          <p className="text-slate-400 text-sm mt-2">开始一次模拟面试后，记录将显示在这里</p>
+          <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-slate-700 mb-2">暂无面试记录</h3>
+          <p className="text-slate-500">开始一次模拟面试后，记录将显示在这里</p>
         </motion.div>
-      ) : (
+      )}
+
+      {/* 表格 */}
+      {!loading && filteredInterviews.length > 0 && (
         <motion.div
-          className="bg-white rounded-2xl p-6"
+          className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
         >
-          <div className="space-y-4">
-            {interviews.map((interview) => (
-              <motion.div
-                key={interview.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="border border-slate-200 rounded-xl p-5 hover:border-primary-300 hover:shadow-md transition-all cursor-pointer group"
-                onClick={() => onViewInterview(interview.sessionId, interview.resumeId)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-slate-800">
-                        面试 #{interview.id}
+          <table className="w-full">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">关联简历</th>
+                <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">题目数</th>
+                <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">状态</th>
+                <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">得分</th>
+                <th className="text-left px-6 py-4 text-sm font-medium text-slate-600">创建时间</th>
+                <th className="text-right px-6 py-4 text-sm font-medium text-slate-600">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <AnimatePresence>
+                {filteredInterviews.map((interview, index) => (
+                  <motion.tr
+                    key={interview.sessionId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => onViewInterview(interview.sessionId, interview.resumeId)}
+                    className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-slate-400" />
+                        <div>
+                          <p className="font-medium text-slate-800">{interview.resumeFilename}</p>
+                          <p className="text-xs text-slate-400">#{interview.sessionId.slice(-8)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        {interview.totalQuestions} 题
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        interview.status === 'COMPLETED' 
-                          ? 'bg-green-100 text-green-700'
-                          : interview.status === 'IN_PROGRESS'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {interview.status === 'COMPLETED' ? '已完成' : 
-                         interview.status === 'IN_PROGRESS' ? '进行中' : '已创建'}
-                      </span>
-                      {interview.overallScore !== null && (
-                        <span className="text-lg font-bold text-primary-600">
-                          {interview.overallScore} 分
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <StatusIcon status={interview.status} />
+                        <span className="text-sm text-slate-600">
+                          {getStatusText(interview.status)}
                         </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-slate-500 space-y-1">
-                      <p className="flex items-center gap-2">
-                        <span className="font-medium text-slate-700">关联简历:</span>
-                        <span className="text-primary-600">{interview.resumeFilename}</span>
-                      </p>
-                      <p>题目数量: {interview.totalQuestions}</p>
-                      <p>创建时间: {formatDateOnly(interview.createdAt)}</p>
-                      {interview.completedAt && (
-                        <p>完成时间: {formatDateOnly(interview.completedAt)}</p>
-                      )}
-                    </div>
-                  </div>
-                  {/* 操作按钮 - 使用图标按钮，悬停时显示 */}
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                    {/* 导出按钮 */}
-                    <motion.button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleExport(interview.sessionId);
-                      }}
-                      disabled={exporting === interview.sessionId}
-                      className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      title="导出PDF"
-                    >
-                      {exporting === interview.sessionId ? (
-                        <motion.div
-                          className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {isCompletedStatus(interview.status) && interview.overallScore !== null ? (
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <motion.div
+                              className={`h-full ${getScoreColor(interview.overallScore)} rounded-full`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${interview.overallScore}%` }}
+                              transition={{ duration: 0.8, delay: index * 0.05 }}
+                            />
+                          </div>
+                          <span className="font-bold text-slate-800">{interview.overallScore}</span>
+                        </div>
                       ) : (
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="7,10 12,15 17,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                        <span className="text-slate-400">-</span>
                       )}
-                    </motion.button>
-                    
-                    {/* 删除按钮 */}
-                    <button
-                      onClick={(e) => handleDeleteClick(interview.sessionId, e)}
-                      disabled={deletingSessionId === interview.sessionId}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="删除面试记录"
-                    >
-                      {deletingSessionId === interview.sessionId ? (
-                        <motion.div
-                          className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        />
-                      ) : (
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                          <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M10 11V17M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {formatDate(interview.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* 导出按钮 */}
+                        {isCompletedStatus(interview.status) && (
+                          <button
+                            onClick={(e) => handleExport(interview.sessionId, e)}
+                            disabled={exporting === interview.sessionId}
+                            className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="导出PDF"
+                          >
+                            {exporting === interview.sessionId ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        {/* 删除按钮 */}
+                        <button
+                          onClick={(e) => handleDeleteClick(interview, e)}
+                          disabled={deletingSessionId === interview.sessionId}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="删除"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
         </motion.div>
       )}
 
       {/* 删除确认对话框 */}
       <DeleteConfirmDialog
-        open={deleteConfirm !== null}
-        item={deleteConfirm ? { id: 0, sessionId: deleteConfirm.sessionId } : null}
+        open={deleteItem !== null}
+        item={deleteItem ? { id: deleteItem.id, sessionId: deleteItem.sessionId } : null}
         itemType="面试记录"
         loading={deletingSessionId !== null}
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteConfirm(null)}
+        onCancel={() => setDeleteItem(null)}
       />
     </motion.div>
   );
 }
-
