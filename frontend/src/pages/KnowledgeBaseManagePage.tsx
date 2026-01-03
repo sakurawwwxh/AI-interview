@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database,
   Search,
@@ -14,6 +14,9 @@ import {
   Loader2,
   ChevronDown,
   Eye,
+  Edit3,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   knowledgeBaseApi,
@@ -123,6 +126,12 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // 分类编辑状态
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryValue, setEditingCategoryValue] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const categoryInputRef = useRef<HTMLInputElement>(null);
+
   // 加载数据
   const loadData = useCallback(async () => {
     try {
@@ -161,6 +170,47 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
       console.error('删除失败:', error);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // 开始编辑分类
+  const handleStartEditCategory = (kb: KnowledgeBaseItem) => {
+    setEditingCategoryId(kb.id);
+    setEditingCategoryValue(kb.category || '');
+    setTimeout(() => {
+      categoryInputRef.current?.focus();
+    }, 50);
+  };
+
+  // 取消编辑分类
+  const handleCancelEditCategory = () => {
+    setEditingCategoryId(null);
+    setEditingCategoryValue('');
+  };
+
+  // 保存分类
+  const handleSaveCategory = async (id: number) => {
+    try {
+      setSavingCategory(true);
+      const categoryToSave = editingCategoryValue.trim() || null;
+      await knowledgeBaseApi.updateCategory(id, categoryToSave);
+      setEditingCategoryId(null);
+      setEditingCategoryValue('');
+      await loadData();
+    } catch (error) {
+      console.error('更新分类失败:', error);
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  // 处理分类输入框按键
+  const handleCategoryKeyDown = (e: React.KeyboardEvent, id: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveCategory(id);
+    } else if (e.key === 'Escape') {
+      handleCancelEditCategory();
     }
   };
 
@@ -344,13 +394,77 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {kb.category ? (
-                      <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-sm">
-                        {kb.category}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-sm">未分类</span>
-                    )}
+                    <AnimatePresence mode="wait">
+                      {editingCategoryId === kb.id ? (
+                        <motion.div
+                          key="editing"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center gap-2"
+                        >
+                          <input
+                            ref={categoryInputRef}
+                            type="text"
+                            value={editingCategoryValue}
+                            onChange={(e) => setEditingCategoryValue(e.target.value)}
+                            onKeyDown={(e) => handleCategoryKeyDown(e, kb.id)}
+                            placeholder="输入分类名称"
+                            list="category-suggestions"
+                            className="w-24 px-2 py-1 text-sm border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            disabled={savingCategory}
+                          />
+                          <datalist id="category-suggestions">
+                            {categories.map((cat) => (
+                              <option key={cat} value={cat} />
+                            ))}
+                          </datalist>
+                          <button
+                            onClick={() => handleSaveCategory(kb.id)}
+                            disabled={savingCategory}
+                            className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+                            title="保存"
+                          >
+                            {savingCategory ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={handleCancelEditCategory}
+                            disabled={savingCategory}
+                            className="p-1 text-slate-400 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
+                            title="取消"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="display"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center gap-2 group/category"
+                        >
+                          {kb.category ? (
+                            <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-sm">
+                              {kb.category}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-sm">未分类</span>
+                          )}
+                          <button
+                            onClick={() => handleStartEditCategory(kb)}
+                            className="p-1 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded opacity-0 group-hover/category:opacity-100 transition-all"
+                            title="编辑分类"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">
                     {formatFileSize(kb.fileSize)}
