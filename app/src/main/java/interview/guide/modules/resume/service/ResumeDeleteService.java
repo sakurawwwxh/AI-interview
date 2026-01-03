@@ -1,5 +1,7 @@
 package interview.guide.modules.resume.service;
 
+import interview.guide.common.exception.BusinessException;
+import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.resume.model.ResumeEntity;
@@ -31,17 +33,14 @@ public class ResumeDeleteService {
         
         // 获取简历信息（用于删除存储文件）
         ResumeEntity resume = persistenceService.findById(id)
-            .orElseThrow(() -> new interview.guide.common.exception.BusinessException(
-                interview.guide.common.exception.ErrorCode.RESUME_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(
+                ErrorCode.RESUME_NOT_FOUND));
         
-        // 1. 删除存储的文件（如果存在）
-        if (resume.getStorageKey() != null && !resume.getStorageKey().isEmpty()) {
-            try {
-                storageService.deleteResume(resume.getStorageKey());
-                log.info("已删除存储文件: {}", resume.getStorageKey());
-            } catch (Exception e) {
-                log.warn("删除存储文件失败，继续删除数据库记录: {}", e.getMessage());
-            }
+        // 1. 删除存储的文件（FileStorageService 已内置存在性检查）
+        try {
+            storageService.deleteResume(resume.getStorageKey());
+        } catch (Exception e) {
+            log.warn("删除存储文件失败，继续删除数据库记录: {}", e.getMessage());
         }
         
         // 2. 删除面试会话（会自动删除面试答案）

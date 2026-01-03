@@ -68,7 +68,7 @@ public class KnowledgeBaseUploadService {
         }
 
         // 5. 保存文件到RustFS
-        String fileKey = uploadToStorage(file);
+        String fileKey = storageService.uploadKnowledgeBase(file);
         String fileUrl = storageService.getFileUrl(fileKey);
         log.info("知识库已存储到RustFS: {}", fileKey);
 
@@ -100,19 +100,6 @@ public class KnowledgeBaseUploadService {
             ),
             "duplicate", false
         );
-    }
-    
-    /**
-     * 上传文件到RustFS存储
-     */
-    private String uploadToStorage(MultipartFile file) {
-        try {
-            // 使用知识库专用的上传方法
-            return storageService.uploadKnowledgeBase(file);
-        } catch (Exception e) {
-            log.error("上传文件到RustFS失败: {}", e.getMessage(), e);
-            throw new BusinessException(ErrorCode.STORAGE_UPLOAD_FAILED, "文件存储失败");
-        }
     }
     
     /**
