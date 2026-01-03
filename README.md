@@ -1,4 +1,5 @@
 <div align="center">
+
 **智能 AI 面试官平台** - 基于大语言模型的简历分析和模拟面试系统
 
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
@@ -126,6 +127,7 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 ### TODO
 
 - [ ] 问答助手的 Markdown 展示优化
+- [ ] 知识库管理页面的下载
 - [ ] 异步生成模拟面试评估报告
 - [ ] 模拟面试增加追问功能
 - [ ] 打通模拟面试和知识库
