@@ -51,10 +51,18 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 | Spring AI | 1.1.2 | AI 集成框架 |
 | PostgreSQL + pgvector | 14+ | 关系数据库 + 向量存储 |
 | Redis | 6+ | 缓存 + 消息队列（Stream） |
-| Apache Tika | - | 文档解析 |
-| iText 7 | - | PDF 导出 |
-| MapStruct | - | 对象映射 |
-| Gradle | - | 构建工具 |
+| Apache Tika | 2.9.2 | 文档解析 |
+| iText 7 | 7.2.5 | PDF 导出 |
+| MapStruct | 1.5.5.Final | 对象映射 |
+| Gradle | 8.8 | 构建工具 |
+
+技术选型常见问题解答：
+
+1. 数据存储为什么选择 PostgreSQL + pgvector？PG 的向量数据存储功能够用了，精简架构，不想引入太多组件。
+2. 为什么引入 Redis？
+   - Redis 替代 `ConcurrentHashMap` 实现面试会话的缓存。
+   - 基于 Redis Stream 实现简历分析、知识库向量化等场景的异步（还能解耦，分析和向量化可以使用其他编程语言来做）。不使用 [Kafka](https://javaguide.cn/high-performance/message-queue/kafka-questions-01.html) 这类成熟的消息队列，也是不想引入太多组件。
+3. 构建工具为什么选择 Gradle？个人更喜欢用 Gradle，也写过相关的文章：[Gradle核心概念总结](https://javaguide.cn/tools/gradle/gradle-core-concepts.html)。
 
 ### 前端技术
 
@@ -91,6 +99,7 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 知识库管理模块
 
+- 多格式支持：PDF、DOCX、DOC、TXT、Markdown
 - 文档上传和自动分块
 - 异步向量化处理
 - RAG 检索增强生成
@@ -103,7 +112,6 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 - [ ] 问答助手的 Markdown 展示优化
 - [ ] 知识库管理页面的下载
 - [ ] 异步生成模拟面试评估报告
-- [ ] 容器化一键部署
 - [ ] 模拟面试增加追问功能
 - [ ] 打通模拟面试和知识库
 
@@ -294,8 +302,6 @@ pnpm dev
 | **HR/招聘人员** | 批量分析简历，评估候选人能力 |
 | **培训机构** | 提供面试培训服务，管理知识库资源 |
 
----
-
 ## 常见问题
 
 ### Q: 简历分析失败
@@ -328,4 +334,3 @@ pnpm dev
 ## 许可证
 
 AGPL-3.0 License（只要通过网络提供服务，就必须向用户公开修改后的源码）
-
