@@ -1,6 +1,6 @@
 /*
  * AI Interview Platform - Backend Application
- * Spring Boot 3.3 + Spring AI + Apache Tika
+ * Spring Boot 3.3 + Java 21 + Spring AI + PostgreSQL + pgvector + RustFS + Redis
  */
 
 plugins {
