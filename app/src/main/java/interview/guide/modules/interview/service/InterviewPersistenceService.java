@@ -1,7 +1,7 @@
 package interview.guide.modules.interview.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
@@ -60,7 +60,7 @@ public class InterviewPersistenceService {
             log.info("面试会话已保存: sessionId={}, resumeId={}", sessionId, resumeId);
             
             return saved;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("序列化问题列表失败: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存会话失败");
         }
@@ -187,7 +187,7 @@ public class InterviewPersistenceService {
             
             log.info("面试报告已保存: sessionId={}, score={}", sessionId, report.overallScore());
             
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("序列化报告失败: {}", e.getMessage(), e);
         }
     }

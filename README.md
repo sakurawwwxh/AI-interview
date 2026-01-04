@@ -3,7 +3,7 @@
 **智能 AI 面试官平台** - 基于大语言模型的简历分析和模拟面试系统
 
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-green?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-green?logo=springboot)](https://spring.io/projects/spring-boot)
 [![React](https://img.shields.io/badge/React-18.3-blue?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791?logo=postgresql)](https://www.postgresql.org/)
@@ -19,6 +19,8 @@
 InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理的智能面试辅助平台。系统利用大语言模型（LLM）和向量数据库技术，为求职者和 HR 提供智能化的简历评估和面试练习服务。
 
 ## 系统架构
+
+**提示**：架构图采用 draw.io 绘制，导出为 svg 格式，在 Github Dark 模式下的显示效果会有问题。
 
 ![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/interview-guide-architecture-diagram.svg)
 
@@ -46,15 +48,15 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Spring Boot | 3.3 | 应用框架 |
+| Spring Boot | 4.0 | 应用框架 |
 | Java | 21 | 开发语言 |
-| Spring AI | 1.1.2 | AI 集成框架 |
+| Spring AI | 2.0 | AI 集成框架 |
 | PostgreSQL + pgvector | 14+ | 关系数据库 + 向量存储 |
 | Redis | 6+ | 缓存 + 消息队列（Stream） |
 | Apache Tika | 2.9.2 | 文档解析 |
-| iText 7 | 7.2.5 | PDF 导出 |
-| MapStruct | 1.5.5.Final | 对象映射 |
-| Gradle | 8.8 | 构建工具 |
+| iText 8 | 8.0.5 | PDF 导出 |
+| MapStruct | 1.6.3 | 对象映射 |
+| Gradle | 8.14 | 构建工具 |
 
 技术选型常见问题解答：
 

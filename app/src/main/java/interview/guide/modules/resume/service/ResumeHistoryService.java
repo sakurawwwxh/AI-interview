@@ -1,8 +1,8 @@
 package interview.guide.modules.resume.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.export.PdfExportService;
@@ -120,7 +120,7 @@ public class ResumeHistoryService {
                     new TypeReference<List<String>>() {}
                 );
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("解析 strengths JSON 失败", e);
         }
         return List.of();
@@ -137,7 +137,7 @@ public class ResumeHistoryService {
                     new TypeReference<List<Object>>() {}
                 );
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("解析 suggestions JSON 失败", e);
         }
         return List.of();
