@@ -1,8 +1,8 @@
 package interview.guide.infrastructure.redis;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
 import lombok.Data;
@@ -68,7 +68,7 @@ public class InterviewSessionCache {
             this.status = status;
             try {
                 this.questionsJson = objectMapper.writeValueAsString(questions);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 throw new RuntimeException("序列化问题列表失败", e);
             }
         }
@@ -76,7 +76,7 @@ public class InterviewSessionCache {
         public List<InterviewQuestionDTO> getQuestions(ObjectMapper objectMapper) {
             try {
                 return objectMapper.readValue(questionsJson, new TypeReference<>() {});
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 throw new RuntimeException("反序列化问题列表失败", e);
             }
         }
@@ -156,7 +156,7 @@ public class InterviewSessionCache {
                 String key = buildSessionKey(sessionId);
                 redisService.set(key, session, SESSION_TTL);
                 log.debug("更新会话问题: sessionId={}", sessionId);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.error("序列化问题列表失败", e);
             }
         });

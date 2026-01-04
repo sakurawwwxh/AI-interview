@@ -1,8 +1,8 @@
 package interview.guide.modules.resume.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileHashService;
@@ -108,7 +108,7 @@ public class ResumePersistenceService {
                     saved.getId(), resume.getId(), analysis.overallScore());
 
             return saved;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("序列化评测结果失败: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.RESUME_ANALYSIS_FAILED, "保存评测结果失败");
         }
@@ -167,7 +167,7 @@ public class ResumePersistenceService {
                 suggestions,
                 entity.getResume().getResumeText()
             );
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("反序列化评测结果失败: {}", e.getMessage());
             throw new BusinessException(ErrorCode.RESUME_ANALYSIS_FAILED, "获取评测结果失败");
         }
