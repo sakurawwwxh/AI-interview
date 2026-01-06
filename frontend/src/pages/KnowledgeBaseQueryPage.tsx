@@ -2,7 +2,6 @@ import {useEffect, useState, useRef, useTransition, useMemo} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
 import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/knowledgebase';
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
@@ -287,17 +286,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
 
   const formatMarkdown = (text: string): string => {
     if (!text) return '';
+    // 只做必要的转换，避免在流式输出时破坏 Markdown 结构
     return text
-      .replace(/\\n/g, '\n')
-      .replace(/^(#{1,6})([^\s#\n])/gm, '$1 $2')
-      .replace(/(^|\n)(\s*\d+)\.(?=\S)/g, '$1$2. ')
-      .replace(/(^|\n)(\s*[-*])(?=\S)/g, '$1$2 ')
-      .replace(/([^\n])\s*(\d+\.\s+)/g, '$1\n\n$2')
-      .replace(/([。！？）:：])\s*([-*])\s*/g, '$1\n\n$2 ')
-      .replace(/([^\n])\s+([-*])\s+/g, '$1\n\n$2 ')
-      .replace(/\*\*：/g, '**： ')
-      .replace(/([^\n])\s*(#{1,6}\s+[^\n]+)/g, '$1\n\n$2')
-      .replace(/\n{3,}/g, '\n\n');
+      .replace(/\\n/g, '\n')           // 转义换行符
+      .replace(/\n{3,}/g, '\n\n');     // 压缩多余空行
   };
 
   const handleSubmitQuestion = async () => {
@@ -591,9 +583,37 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                 prose-strong:text-slate-900 prose-strong:font-bold
                                 prose-ul:my-3 prose-ol:my-3
                                 prose-li:my-1 prose-li:leading-7
-                                prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
+                                prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-code:font-normal
+                                prose-pre:bg-slate-800 prose-pre:text-slate-100 prose-pre:rounded-xl prose-pre:p-4 prose-pre:my-3 prose-pre:overflow-x-auto
+                                [&_pre_code]:bg-transparent [&_pre_code]:text-slate-100 [&_pre_code]:p-0 [&_pre_code]:text-sm [&_pre_code]:leading-6
                                 marker:text-primary-500 marker:font-bold">
-                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  components={{
+                                    // 自定义代码块渲染
+                                    code: ({ className, children, ...props }) => {
+                                      const isInline = !className;
+                                      if (isInline) {
+                                        return (
+                                          <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded-md text-sm" {...props}>
+                                            {children}
+                                          </code>
+                                        );
+                                      }
+                                      return (
+                                        <code className="block text-slate-100 text-sm leading-6" {...props}>
+                                          {children}
+                                        </code>
+                                      );
+                                    },
+                                    // 自定义 pre 渲染
+                                    pre: ({ children, ...props }) => (
+                                      <pre className="bg-slate-800 text-slate-100 rounded-xl p-4 my-3 overflow-x-auto" {...props}>
+                                        {children}
+                                      </pre>
+                                    ),
+                                  }}
+                                >
                                   {formatMarkdown(msg.content)}
                                 </ReactMarkdown>
                                 {loading && index === messages.length - 1 && (

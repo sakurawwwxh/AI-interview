@@ -11,7 +11,14 @@ interface InterviewDetailPanelProps {
  * 面试详情面板组件
  */
 export default function InterviewDetailPanel({ interview }: InterviewDetailPanelProps) {
-  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([0]));
+  // 默认展开所有题目
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(() => {
+    const allIndices = new Set<number>();
+    if (interview.answers) {
+      interview.answers.forEach((_, idx) => allIndices.add(idx));
+    }
+    return allIndices;
+  });
 
   const toggleQuestion = (index: number) => {
     setExpandedQuestions(prev => {
