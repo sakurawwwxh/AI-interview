@@ -19,7 +19,6 @@ export interface KnowledgeBaseItem {
   vectorStatus: VectorStatus;
   vectorError: string | null;
   chunkCount: number;
-  storageUrl?: string;
 }
 
 // 统计信息

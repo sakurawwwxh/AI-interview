@@ -1,5 +1,8 @@
 package interview.guide.modules.knowledgebase.service;
 
+import interview.guide.common.exception.BusinessException;
+import interview.guide.common.exception.ErrorCode;
+import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
@@ -25,6 +28,7 @@ public class KnowledgeBaseListService {
 
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final FileStorageService fileStorageService;
 
     /**
      * 获取所有知识库列表
@@ -138,6 +142,32 @@ public class KnowledgeBaseListService {
             knowledgeBaseRepository.countByVectorStatus(VectorStatus.COMPLETED),
             knowledgeBaseRepository.countByVectorStatus(VectorStatus.PROCESSING)
         );
+    }
+
+    // ========== 下载功能 ==========
+
+    /**
+     * 下载知识库文件
+     */
+    public byte[] downloadFile(Long id) {
+        KnowledgeBaseEntity entity = knowledgeBaseRepository.findById(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.KNOWLEDGE_BASE_NOT_FOUND, "知识库不存在"));
+
+        String storageKey = entity.getStorageKey();
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件存储信息不存在");
+        }
+
+        log.info("下载知识库文件: id={}, filename={}", id, entity.getOriginalFilename());
+        return fileStorageService.downloadFile(storageKey);
+    }
+
+    /**
+     * 获取知识库文件信息（用于下载）
+     */
+    public KnowledgeBaseEntity getEntityForDownload(Long id) {
+        return knowledgeBaseRepository.findById(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.KNOWLEDGE_BASE_NOT_FOUND, "知识库不存在"));
     }
 }
 

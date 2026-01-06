@@ -9,11 +9,15 @@ import interview.guide.modules.knowledgebase.service.KnowledgeBaseUploadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -29,17 +33,6 @@ public class KnowledgeBaseController {
     private final KnowledgeBaseQueryService queryService;
     private final KnowledgeBaseListService listService;
     private final KnowledgeBaseDeleteService deleteService;
-
-    /**
-     * 上传知识库文件
-     */
-    @PostMapping(value = "/api/knowledgebase/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Result<Map<String, Object>> uploadKnowledgeBase(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "name", required = false) String name,
-            @RequestParam(value = "category", required = false) String category) {
-        return Result.success(uploadService.uploadKnowledgeBase(file, name, category));
-    }
 
     /**
      * 获取所有知识库列表
@@ -59,8 +52,8 @@ public class KnowledgeBaseController {
     @GetMapping("/api/knowledgebase/{id}")
     public Result<KnowledgeBaseListItemDTO> getKnowledgeBase(@PathVariable Long id) {
         return listService.getKnowledgeBase(id)
-            .map(Result::success)
-            .orElse(Result.error("知识库不存在"));
+                .map(Result::success)
+                .orElse(Result.error("知识库不存在"));
     }
 
     /**
@@ -124,6 +117,40 @@ public class KnowledgeBaseController {
         return Result.success(null);
     }
 
+    // ========== 上传下载 API ==========
+
+    /**
+     * 上传知识库文件
+     */
+    @PostMapping(value = "/api/knowledgebase/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Map<String, Object>> uploadKnowledgeBase(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "category", required = false) String category) {
+        return Result.success(uploadService.uploadKnowledgeBase(file, name, category));
+    }
+
+    /**
+     * 下载知识库文件
+     */
+    @GetMapping("/api/knowledgebase/{id}/download")
+    public ResponseEntity<byte[]> downloadKnowledgeBase(@PathVariable Long id) {
+        var entity = listService.getEntityForDownload(id);
+        byte[] fileContent = listService.downloadFile(id);
+
+        String filename = entity.getOriginalFilename();
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + encodedFilename + "\"; filename*=UTF-8''" + encodedFilename)
+                .header(HttpHeaders.CONTENT_TYPE,
+                        entity.getContentType() != null ? entity.getContentType()
+                                : MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                .body(fileContent);
+    }
+
     // ========== 搜索 API ==========
 
     /**
@@ -155,5 +182,5 @@ public class KnowledgeBaseController {
         uploadService.revectorize(id);
         return Result.success(null);
     }
-}
 
+}
