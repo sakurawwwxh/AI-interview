@@ -4,6 +4,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO;
@@ -75,11 +76,30 @@ public class InterviewPersistenceService {
         if (sessionOpt.isPresent()) {
             InterviewSessionEntity session = sessionOpt.get();
             session.setStatus(status);
-            if (status == InterviewSessionEntity.SessionStatus.COMPLETED || 
+            if (status == InterviewSessionEntity.SessionStatus.COMPLETED ||
                 status == InterviewSessionEntity.SessionStatus.EVALUATED) {
                 session.setCompletedAt(LocalDateTime.now());
             }
             sessionRepository.save(session);
+        }
+    }
+
+    /**
+     * 更新评估状态
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEvaluateStatus(String sessionId, AsyncTaskStatus status, String error) {
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
+        if (sessionOpt.isPresent()) {
+            InterviewSessionEntity session = sessionOpt.get();
+            session.setEvaluateStatus(status);
+            if (error != null) {
+                session.setEvaluateError(error.length() > 500 ? error.substring(0, 500) : error);
+            } else {
+                session.setEvaluateError(null);
+            }
+            sessionRepository.save(session);
+            log.debug("评估状态已更新: sessionId={}, status={}", sessionId, status);
         }
     }
     
@@ -136,7 +156,7 @@ public class InterviewPersistenceService {
                 log.warn("会话不存在: {}", sessionId);
                 return;
             }
-            
+
             InterviewSessionEntity session = sessionOpt.get();
             session.setOverallScore(report.overallScore());
             session.setOverallFeedback(report.overallFeedback());
@@ -145,48 +165,63 @@ public class InterviewPersistenceService {
             session.setReferenceAnswersJson(objectMapper.writeValueAsString(report.referenceAnswers()));
             session.setStatus(InterviewSessionEntity.SessionStatus.EVALUATED);
             session.setCompletedAt(LocalDateTime.now());
-            
+
             sessionRepository.save(session);
-            
-            // 直接从数据库查询答案并更新
-            List<InterviewAnswerEntity> answers = answerRepository.findBySessionSessionIdOrderByQuestionIndex(sessionId);
-            log.info("查询到 {} 个答案需要更新", answers.size());
-            
-            if (!answers.isEmpty()) {
-                // 更新每个答案的得分和评价
-                for (InterviewReportDTO.QuestionEvaluation eval : report.questionDetails()) {
-                    for (InterviewAnswerEntity answer : answers) {
-                        if (answer.getQuestionIndex() != null && 
-                            answer.getQuestionIndex() == eval.questionIndex()) {
-                            answer.setScore(eval.score());
-                            answer.setFeedback(eval.feedback());
-                            log.debug("更新答案 {} 的评价: score={}", eval.questionIndex(), eval.score());
-                            break;
-                        }
-                    }
+
+            // 查询已存在的答案，建立索引
+            List<InterviewAnswerEntity> existingAnswers = answerRepository.findBySessionSessionIdOrderByQuestionIndex(sessionId);
+            java.util.Map<Integer, InterviewAnswerEntity> answerMap = existingAnswers.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                    InterviewAnswerEntity::getQuestionIndex,
+                    a -> a,
+                    (a1, a2) -> a1
+                ));
+
+            // 建立参考答案索引
+            java.util.Map<Integer, InterviewReportDTO.ReferenceAnswer> refAnswerMap = report.referenceAnswers().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                    InterviewReportDTO.ReferenceAnswer::questionIndex,
+                    r -> r,
+                    (r1, r2) -> r1
+                ));
+
+            List<InterviewAnswerEntity> answersToSave = new java.util.ArrayList<>();
+
+            // 遍历所有评估结果，更新或创建答案记录
+            for (InterviewReportDTO.QuestionEvaluation eval : report.questionDetails()) {
+                InterviewAnswerEntity answer = answerMap.get(eval.questionIndex());
+
+                if (answer == null) {
+                    // 未回答的题目，创建新记录
+                    answer = new InterviewAnswerEntity();
+                    answer.setSession(session);
+                    answer.setQuestionIndex(eval.questionIndex());
+                    answer.setQuestion(eval.question());
+                    answer.setCategory(eval.category());
+                    answer.setUserAnswer(null);  // 未回答
+                    log.debug("为未回答的题目 {} 创建答案记录", eval.questionIndex());
                 }
-                
+
+                // 更新评分和反馈
+                answer.setScore(eval.score());
+                answer.setFeedback(eval.feedback());
+
                 // 设置参考答案和关键点
-                for (InterviewReportDTO.ReferenceAnswer refAns : report.referenceAnswers()) {
-                    for (InterviewAnswerEntity answer : answers) {
-                        if (answer.getQuestionIndex() != null && 
-                            answer.getQuestionIndex() == refAns.questionIndex()) {
-                            answer.setReferenceAnswer(refAns.referenceAnswer());
-                            if (refAns.keyPoints() != null && !refAns.keyPoints().isEmpty()) {
-                                answer.setKeyPointsJson(objectMapper.writeValueAsString(refAns.keyPoints()));
-                            }
-                            log.debug("更新答案 {} 的参考答案", refAns.questionIndex());
-                            break;
-                        }
+                InterviewReportDTO.ReferenceAnswer refAns = refAnswerMap.get(eval.questionIndex());
+                if (refAns != null) {
+                    answer.setReferenceAnswer(refAns.referenceAnswer());
+                    if (refAns.keyPoints() != null && !refAns.keyPoints().isEmpty()) {
+                        answer.setKeyPointsJson(objectMapper.writeValueAsString(refAns.keyPoints()));
                     }
                 }
-                
-                answerRepository.saveAll(answers);
-                log.info("已更新 {} 个答案的评价和参考答案", answers.size());
+
+                answersToSave.add(answer);
             }
-            
-            log.info("面试报告已保存: sessionId={}, score={}", sessionId, report.overallScore());
-            
+
+            answerRepository.saveAll(answersToSave);
+            log.info("面试报告已保存: sessionId={}, score={}, 答案数={}",
+                sessionId, report.overallScore(), answersToSave.size());
+
         } catch (JacksonException e) {
             log.error("序列化报告失败: {}", e.getMessage(), e);
         }

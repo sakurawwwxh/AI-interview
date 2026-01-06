@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { historyApi, InterviewItem } from '../api/history';
+import { historyApi, InterviewItem, EvaluateStatus } from '../api/history';
 import { formatDate } from '../utils/date';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import {
@@ -15,6 +15,8 @@ import {
   TrendingUp,
   FileText,
   Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface InterviewHistoryPageProps {
@@ -25,6 +27,8 @@ interface InterviewHistoryPageProps {
 interface InterviewWithResume extends InterviewItem {
   resumeId: number;
   resumeFilename: string;
+  evaluateStatus?: EvaluateStatus;
+  evaluateError?: string;
 }
 
 interface InterviewStats {
@@ -73,30 +77,74 @@ function isCompletedStatus(status: string): boolean {
   return status === 'COMPLETED' || status === 'EVALUATED';
 }
 
+// 判断评估是否完成
+function isEvaluateCompleted(interview: InterviewWithResume): boolean {
+  // 如果 evaluateStatus 存在且为 COMPLETED，则评估已完成
+  if (interview.evaluateStatus === 'COMPLETED') return true;
+  // 向后兼容：如果 status 为 EVALUATED，也认为评估已完成
+  if (interview.status === 'EVALUATED') return true;
+  return false;
+}
+
+// 判断是否正在评估中
+function isEvaluating(interview: InterviewWithResume): boolean {
+  return interview.evaluateStatus === 'PENDING' || interview.evaluateStatus === 'PROCESSING';
+}
+
+// 判断评估是否失败
+function isEvaluateFailed(interview: InterviewWithResume): boolean {
+  return interview.evaluateStatus === 'FAILED';
+}
+
 // 状态图标
-function StatusIcon({ status }: { status: string }) {
-  if (isCompletedStatus(status)) {
+function StatusIcon({ interview }: { interview: InterviewWithResume }) {
+  // 评估失败
+  if (isEvaluateFailed(interview)) {
+    return <AlertCircle className="w-4 h-4 text-red-500" />;
+  }
+  // 正在评估
+  if (isEvaluating(interview)) {
+    return <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />;
+  }
+  // 评估完成
+  if (isEvaluateCompleted(interview)) {
     return <CheckCircle className="w-4 h-4 text-green-500" />;
   }
-  switch (status) {
-    case 'IN_PROGRESS':
-      return <PlayCircle className="w-4 h-4 text-blue-500" />;
-    default:
-      return <Clock className="w-4 h-4 text-yellow-500" />;
+  // 面试进行中
+  if (interview.status === 'IN_PROGRESS') {
+    return <PlayCircle className="w-4 h-4 text-blue-500" />;
   }
+  // 面试已完成但评估未开始
+  if (isCompletedStatus(interview.status)) {
+    return <Clock className="w-4 h-4 text-yellow-500" />;
+  }
+  // 已创建
+  return <Clock className="w-4 h-4 text-yellow-500" />;
 }
 
 // 状态文本
-function getStatusText(status: string): string {
-  if (isCompletedStatus(status)) {
+function getStatusText(interview: InterviewWithResume): string {
+  // 评估失败
+  if (isEvaluateFailed(interview)) {
+    return '评估失败';
+  }
+  // 正在评估
+  if (isEvaluating(interview)) {
+    return interview.evaluateStatus === 'PROCESSING' ? '评估中' : '等待评估';
+  }
+  // 评估完成
+  if (isEvaluateCompleted(interview)) {
     return '已完成';
   }
-  switch (status) {
-    case 'IN_PROGRESS':
-      return '进行中';
-    default:
-      return '已创建';
+  // 面试进行中
+  if (interview.status === 'IN_PROGRESS') {
+    return '进行中';
   }
+  // 面试已完成但评估未开始
+  if (isCompletedStatus(interview.status)) {
+    return '已提交';
+  }
+  return '已创建';
 }
 
 // 获取分数颜色
@@ -114,9 +162,12 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [deleteItem, setDeleteItem] = useState<InterviewWithResume | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const pollingRef = useRef<number | null>(null);
 
-  const loadAllInterviews = useCallback(async () => {
-    setLoading(true);
+  const loadAllInterviews = useCallback(async (isPolling = false) => {
+    if (!isPolling) {
+      setLoading(true);
+    }
     try {
       const resumes = await historyApi.getResumes();
       const allInterviews: InterviewWithResume[] = [];
@@ -141,24 +192,53 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
 
       setInterviews(allInterviews);
 
-      // 计算统计信息
-      const completed = allInterviews.filter(i => isCompletedStatus(i.status));
-      const totalScore = completed.reduce((sum, i) => sum + (i.overallScore || 0), 0);
+      // 计算统计信息（只统计评估已完成的面试）
+      const evaluated = allInterviews.filter(i => isEvaluateCompleted(i));
+      const totalScore = evaluated.reduce((sum, i) => sum + (i.overallScore || 0), 0);
       setStats({
         totalCount: allInterviews.length,
-        completedCount: completed.length,
-        averageScore: completed.length > 0 ? Math.round(totalScore / completed.length) : 0,
+        completedCount: evaluated.length,
+        averageScore: evaluated.length > 0 ? Math.round(totalScore / evaluated.length) : 0,
       });
     } catch (err) {
       console.error('加载面试记录失败', err);
     } finally {
-      setLoading(false);
+      if (!isPolling) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  // 初始加载
   useEffect(() => {
     loadAllInterviews();
   }, [loadAllInterviews]);
+
+  // 轮询检查评估状态
+  useEffect(() => {
+    // 检查是否有正在评估的面试
+    const hasEvaluating = interviews.some(i => isEvaluating(i));
+
+    if (hasEvaluating) {
+      // 启动轮询
+      pollingRef.current = window.setInterval(() => {
+        loadAllInterviews(true);
+      }, 3000); // 每3秒轮询一次
+    } else {
+      // 停止轮询
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [interviews, loadAllInterviews]);
 
   const handleDeleteClick = (interview: InterviewWithResume, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -338,14 +418,14 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <StatusIcon status={interview.status} />
+                        <StatusIcon interview={interview} />
                         <span className="text-sm text-slate-600">
-                          {getStatusText(interview.status)}
+                          {getStatusText(interview)}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {isCompletedStatus(interview.status) && interview.overallScore !== null ? (
+                      {isEvaluateCompleted(interview) && interview.overallScore !== null ? (
                         <div className="flex items-center gap-3">
                           <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
                             <motion.div
@@ -357,6 +437,10 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
                           </div>
                           <span className="font-bold text-slate-800">{interview.overallScore}</span>
                         </div>
+                      ) : isEvaluating(interview) ? (
+                        <span className="text-blue-500 text-sm">生成中...</span>
+                      ) : isEvaluateFailed(interview) ? (
+                        <span className="text-red-500 text-sm" title={interview.evaluateError}>失败</span>
                       ) : (
                         <span className="text-slate-400">-</span>
                       )}
@@ -367,7 +451,7 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {/* 导出按钮 */}
-                        {isCompletedStatus(interview.status) && (
+                        {isEvaluateCompleted(interview) && (
                           <button
                             onClick={(e) => handleExport(interview.sessionId, e)}
                             disabled={exporting === interview.sessionId}

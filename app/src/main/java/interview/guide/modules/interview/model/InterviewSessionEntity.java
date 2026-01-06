@@ -1,5 +1,6 @@
 package interview.guide.modules.interview.model;
 
+import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.modules.resume.model.ResumeEntity;
 import jakarta.persistence.*;
 
@@ -71,6 +72,15 @@ public class InterviewSessionEntity {
     
     // 完成时间
     private LocalDateTime completedAt;
+
+    // 评估状态（异步评估）
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AsyncTaskStatus evaluateStatus;
+
+    // 评估错误信息
+    @Column(length = 500)
+    private String evaluateError;
     
     public enum SessionStatus {
         CREATED,      // 会话已创建
@@ -204,7 +214,23 @@ public class InterviewSessionEntity {
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
     }
-    
+
+    public AsyncTaskStatus getEvaluateStatus() {
+        return evaluateStatus;
+    }
+
+    public void setEvaluateStatus(AsyncTaskStatus evaluateStatus) {
+        this.evaluateStatus = evaluateStatus;
+    }
+
+    public String getEvaluateError() {
+        return evaluateError;
+    }
+
+    public void setEvaluateError(String evaluateError) {
+        this.evaluateError = evaluateError;
+    }
+
     public void addAnswer(InterviewAnswerEntity answer) {
         answers.add(answer);
         answer.setSession(this);
