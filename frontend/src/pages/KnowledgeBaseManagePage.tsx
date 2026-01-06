@@ -230,15 +230,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
 
   // 下载知识库
   const handleDownload = (kb: KnowledgeBaseItem) => {
-    // 使用存储URL直接下载
-    if (kb.storageUrl) {
-      const link = document.createElement('a');
-      link.href = kb.storageUrl;
-      link.download = kb.originalFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+    // 通过后端 API 下载文件
+    const link = document.createElement('a');
+    link.href = `/api/knowledgebase/${kb.id}/download`;
+    link.download = kb.originalFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 开始编辑分类
