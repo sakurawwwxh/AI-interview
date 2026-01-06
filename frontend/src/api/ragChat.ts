@@ -150,24 +150,23 @@ export const ragChatApi = {
       const extractEventContent = (event: string): string | null => {
         if (!event.trim()) return null;
 
-        // 处理多行 SSE 格式，每行可能以 "data:" 开头
         const lines = event.split('\n');
-        const contentLines: string[] = [];
+        const contentParts: string[] = [];
 
         for (const line of lines) {
-          let content = line.trim();
-          // 移除 "data:" 前缀
-          if (content.startsWith('data:')) {
-            content = content.substring(5).trim();
-          }
-          // 跳过空行和事件类型行（如 "event: message"）
-          if (content && !content.startsWith('event:') && !content.startsWith('id:')) {
-            contentLines.push(content);
+          if (line.startsWith('data:')) {
+            // 提取 data: 后面的内容，保留原始格式（包括缩进空格）
+            // ServerSentEvent 不会在 data: 后添加额外空格
+            contentParts.push(line.substring(5));
           }
         }
 
-        const result = contentLines.join('\n');
-        return result || null;
+        if (contentParts.length === 0) return null;
+
+        // 合并内容并还原转义的换行符
+        return contentParts.join('')
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r');
       };
 
       while (true) {
