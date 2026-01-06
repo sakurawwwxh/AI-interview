@@ -11,6 +11,8 @@ public record InterviewDetailDTO(
     String sessionId,
     Integer totalQuestions,
     String status,
+    String evaluateStatus,
+    String evaluateError,
     Integer overallScore,
     String overallFeedback,
     LocalDateTime createdAt,

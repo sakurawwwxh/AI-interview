@@ -1,6 +1,7 @@
 import { request } from './request';
 
 export type AnalyzeStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type EvaluateStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export interface ResumeListItem {
   id: number;
@@ -41,6 +42,8 @@ export interface InterviewItem {
   sessionId: string;
   totalQuestions: number;
   status: string;
+  evaluateStatus?: EvaluateStatus;
+  evaluateError?: string;
   overallScore: number | null;
   overallFeedback: string | null;
   createdAt: string;
@@ -79,6 +82,8 @@ export interface ResumeDetail {
 }
 
 export interface InterviewDetail extends InterviewItem {
+  evaluateStatus?: EvaluateStatus;
+  evaluateError?: string;
   answers: AnswerItem[];
 }
 

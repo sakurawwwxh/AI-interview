@@ -68,7 +68,7 @@ function InterviewWrapper() {
   const location = useLocation();
   const [resumeText, setResumeText] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     // 优先从location state获取resumeText
     const stateText = (location.state as { resumeText?: string })?.resumeText;
@@ -90,16 +90,21 @@ function InterviewWrapper() {
       setLoading(false);
     }
   }, [resumeId, location.state]);
-  
+
   if (!resumeId) {
     return <Navigate to="/history" replace />;
   }
-  
+
   const handleBack = () => {
     // 尝试返回详情页，如果失败则返回历史列表
     navigate(`/history/${resumeId}`, { replace: false });
   };
-  
+
+  const handleInterviewComplete = () => {
+    // 面试完成后跳转到面试记录页
+    navigate('/interviews');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -110,12 +115,13 @@ function InterviewWrapper() {
       </div>
     );
   }
-  
+
   return (
     <Interview
       resumeText={resumeText}
       resumeId={parseInt(resumeId, 10)}
       onBack={handleBack}
+      onInterviewComplete={handleInterviewComplete}
     />
   );
 }

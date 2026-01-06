@@ -4,8 +4,10 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.redis.InterviewSessionCache;
 import interview.guide.infrastructure.redis.InterviewSessionCache.CachedSession;
+import interview.guide.modules.interview.listener.EvaluateStreamProducer;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class InterviewSessionService {
     private final InterviewPersistenceService persistenceService;
     private final InterviewSessionCache sessionCache;
     private final ObjectMapper objectMapper;
+    private final EvaluateStreamProducer evaluateStreamProducer;
 
     /**
      * 创建新的面试会话
@@ -259,6 +262,7 @@ public class InterviewSessionService {
 
     /**
      * 提交答案（并进入下一题）
+     * 如果是最后一题，自动触发异步评估
      */
     public SubmitAnswerResponse submitAnswer(SubmitAnswerRequest request) {
         CachedSession session = getOrRestoreSession(request.sessionId());
@@ -302,6 +306,13 @@ public class InterviewSessionService {
                 newStatus == SessionStatus.COMPLETED
                     ? InterviewSessionEntity.SessionStatus.COMPLETED
                     : InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+
+            // 如果是最后一题，设置评估状态为 PENDING 并触发异步评估
+            if (!hasNextQuestion) {
+                persistenceService.updateEvaluateStatus(request.sessionId(), AsyncTaskStatus.PENDING, null);
+                evaluateStreamProducer.sendEvaluateTask(request.sessionId());
+                log.info("会话 {} 已完成所有问题，评估任务已入队", request.sessionId());
+            }
         } catch (Exception e) {
             log.warn("保存答案到数据库失败: {}", e.getMessage());
         }
@@ -359,7 +370,7 @@ public class InterviewSessionService {
     }
 
     /**
-     * 提前交卷
+     * 提前交卷（触发异步评估）
      */
     public void completeInterview(String sessionId) {
         CachedSession session = getOrRestoreSession(sessionId);
@@ -375,11 +386,16 @@ public class InterviewSessionService {
         try {
             persistenceService.updateSessionStatus(sessionId,
                 InterviewSessionEntity.SessionStatus.COMPLETED);
+            // 设置评估状态为 PENDING
+            persistenceService.updateEvaluateStatus(sessionId, AsyncTaskStatus.PENDING, null);
         } catch (Exception e) {
             log.warn("更新会话状态失败: {}", e.getMessage());
         }
 
-        log.info("会话 {} 提前交卷", sessionId);
+        // 发送评估任务到 Redis Stream
+        evaluateStreamProducer.sendEvaluateTask(sessionId);
+
+        log.info("会话 {} 提前交卷，评估任务已入队", sessionId);
     }
 
     /**

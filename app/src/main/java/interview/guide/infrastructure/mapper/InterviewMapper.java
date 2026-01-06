@@ -66,6 +66,8 @@ public interface InterviewMapper {
      * 注意：questions, strengths, improvements, referenceAnswers, answers 需要在 Service 层处理
      */
     @Mapping(target = "status", expression = "java(session.getStatus().toString())")
+    @Mapping(target = "evaluateStatus", expression = "java(session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null)")
+    @Mapping(target = "evaluateError", source = "session.evaluateError")
     @Mapping(target = "questions", source = "questions")
     @Mapping(target = "strengths", source = "strengths")
     @Mapping(target = "improvements", source = "improvements")
@@ -113,6 +115,8 @@ public interface InterviewMapper {
         map.put("sessionId", session.getSessionId());
         map.put("totalQuestions", session.getTotalQuestions());
         map.put("status", session.getStatus().toString());
+        map.put("evaluateStatus", session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null);
+        map.put("evaluateError", session.getEvaluateError());
         map.put("overallScore", session.getOverallScore());
         map.put("createdAt", session.getCreatedAt());
         map.put("completedAt", session.getCompletedAt());

@@ -4,10 +4,9 @@ import {interviewApi} from '../api/interview';
 import ConfirmDialog from '../components/ConfirmDialog';
 import InterviewConfigPanel from '../components/InterviewConfigPanel';
 import InterviewChatPanel from '../components/InterviewChatPanel';
-import InterviewReportPanel from '../components/InterviewReportPanel';
-import type {InterviewQuestion, InterviewReport, InterviewSession} from '../types/interview';
+import type {InterviewQuestion, InterviewSession} from '../types/interview';
 
-type InterviewStage = 'config' | 'interview' | 'loading-report' | 'report';
+type InterviewStage = 'config' | 'interview';
 
 interface Message {
   type: 'interviewer' | 'user';
@@ -20,9 +19,10 @@ interface InterviewProps {
   resumeText: string;
   resumeId?: number;
   onBack: () => void;
+  onInterviewComplete: () => void;
 }
 
-export default function Interview({ resumeText, resumeId, onBack }: InterviewProps) {
+export default function Interview({ resumeText, resumeId, onBack, onInterviewComplete }: InterviewProps) {
   const [stage, setStage] = useState<InterviewStage>('config');
   const [questionCount, setQuestionCount] = useState(8);
   const [session, setSession] = useState<InterviewSession | null>(null);
@@ -30,7 +30,6 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   const [messages, setMessages] = useState<Message[]>([]);
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [report, setReport] = useState<InterviewReport | null>(null);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [checkingUnfinished, setCheckingUnfinished] = useState(false);
@@ -162,24 +161,24 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   
   const handleSubmitAnswer = async () => {
     if (!answer.trim() || !session || !currentQuestion) return;
-    
+
     setIsSubmitting(true);
-    
+
     const userMessage: Message = {
       type: 'user',
       content: answer
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     try {
       const response = await interviewApi.submitAnswer({
         sessionId: session.sessionId,
         questionIndex: currentQuestion.questionIndex,
         answer: answer.trim()
       });
-      
+
       setAnswer('');
-      
+
       if (response.hasNextQuestion && response.nextQuestion) {
         setCurrentQuestion(response.nextQuestion);
         setMessages(prev => [...prev, {
@@ -189,8 +188,8 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
           questionIndex: response.nextQuestion!.questionIndex
         }]);
       } else {
-        setStage('loading-report');
-        await generateReport();
+        // 面试已完成，评估将在后台进行，跳转到面试记录页
+        onInterviewComplete();
       }
     } catch (err) {
       setError('提交答案失败，请重试');
@@ -199,35 +198,21 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
       setIsSubmitting(false);
     }
   };
-  
+
   const handleCompleteEarly = async () => {
     if (!session) return;
-    
+
     setIsSubmitting(true);
     try {
       await interviewApi.completeInterview(session.sessionId);
       setShowCompleteConfirm(false);
-      setStage('loading-report');
-      await generateReport();
+      // 面试已完成，评估将在后台进行，跳转到面试记录页
+      onInterviewComplete();
     } catch (err) {
       setError('提前交卷失败，请重试');
       console.error(err);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-  
-  const generateReport = async () => {
-    if (!session) return;
-    
-    try {
-      const reportData = await interviewApi.getReport(session.sessionId);
-      setReport(reportData);
-      setStage('report');
-    } catch (err) {
-      setError('生成报告失败，请重试');
-      setStage('interview');
-      console.error(err);
     }
   };
   
@@ -253,7 +238,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
   // 面试对话界面
   const renderInterview = () => {
     if (!session || !currentQuestion) return null;
-    
+
     return (
       <InterviewChatPanel
         session={session}
@@ -269,36 +254,10 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
       />
     );
   };
-  
-  // 加载报告
-  const renderLoadingReport = () => (
-    <motion.div 
-      className="max-w-md mx-auto text-center py-20"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <motion.div 
-        className="w-16 h-16 border-4 border-slate-200 border-t-primary-500 rounded-full mx-auto mb-6"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-      />
-      <h3 className="text-xl font-semibold text-slate-800 mb-2">AI正在分析您的面试表现...</h3>
-      <p className="text-slate-500">这可能需要30秒左右</p>
-    </motion.div>
-  );
-  
-  // 报告界面
-  const renderReport = () => {
-    if (!report || !session) return null;
-    
-    return <InterviewReportPanel report={report} session={session} onBack={onBack} />;
-  };
 
   const stageSubtitles = {
     config: '配置您的面试参数',
-    interview: '认真回答每个问题，展示您的实力',
-    'loading-report': '正在生成评估报告...',
-    report: '面试结束，查看您的表现'
+    interview: '认真回答每个问题，展示您的实力'
   };
   
   return (
@@ -325,7 +284,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
       
       <AnimatePresence mode="wait" initial={false}>
         {stage === 'config' && (
-          <motion.div 
+          <motion.div
             key="config"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -336,7 +295,7 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
           </motion.div>
         )}
         {stage === 'interview' && (
-          <motion.div 
+          <motion.div
             key="interview"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -344,28 +303,6 @@ export default function Interview({ resumeText, resumeId, onBack }: InterviewPro
             transition={{ duration: 0.3 }}
           >
             {renderInterview()}
-          </motion.div>
-        )}
-        {stage === 'loading-report' && (
-          <motion.div 
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {renderLoadingReport()}
-          </motion.div>
-        )}
-        {stage === 'report' && (
-          <motion.div 
-            key="report"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {renderReport()}
           </motion.div>
         )}
       </AnimatePresence>
