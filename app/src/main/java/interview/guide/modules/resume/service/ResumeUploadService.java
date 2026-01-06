@@ -1,14 +1,13 @@
 package interview.guide.modules.resume.service;
 
 import interview.guide.common.config.AppConfigProperties;
-import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.infrastructure.file.FileValidationService;
-import interview.guide.infrastructure.redis.RedisService;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
+import interview.guide.modules.resume.listener.AnalyzeStreamProducer;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +33,7 @@ public class ResumeUploadService {
     private final ResumePersistenceService persistenceService;
     private final AppConfigProperties appConfig;
     private final FileValidationService fileValidationService;
-    private final RedisService redisService;
+    private final AnalyzeStreamProducer analyzeStreamProducer;
     private final ResumeRepository resumeRepository;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -77,7 +76,7 @@ public class ResumeUploadService {
         ResumeEntity savedResume = persistenceService.saveResume(file, resumeText, fileKey, fileUrl);
 
         // 7. 发送分析任务到 Redis Stream（异步处理）
-        sendAnalyzeTask(savedResume.getId(), resumeText);
+        analyzeStreamProducer.sendAnalyzeTask(savedResume.getId(), resumeText);
 
         log.info("简历上传完成，分析任务已入队: {}, resumeId={}", fileName, savedResume.getId());
 
@@ -95,46 +94,6 @@ public class ResumeUploadService {
             ),
             "duplicate", false
         );
-    }
-
-    /**
-     * 发送分析任务到 Redis Stream
-     *
-     * @param resumeId 简历ID
-     * @param content  简历文本内容
-     */
-    private void sendAnalyzeTask(Long resumeId, String content) {
-        try {
-            Map<String, String> message = Map.of(
-                AsyncTaskStreamConstants.FIELD_RESUME_ID, resumeId.toString(),
-                AsyncTaskStreamConstants.FIELD_CONTENT, content,
-                AsyncTaskStreamConstants.FIELD_RETRY_COUNT, "0"
-            );
-
-            String messageId = redisService.streamAdd(
-                AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY,
-                message
-            );
-
-            log.info("分析任务已发送到Stream: resumeId={}, messageId={}", resumeId, messageId);
-        } catch (Exception e) {
-            log.error("发送分析任务失败: resumeId={}, error={}", resumeId, e.getMessage(), e);
-            // 发送失败时更新状态为 FAILED
-            updateAnalyzeStatus(resumeId, AsyncTaskStatus.FAILED, "任务入队失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 更新分析状态
-     */
-    private void updateAnalyzeStatus(Long resumeId, AsyncTaskStatus status, String error) {
-        resumeRepository.findById(resumeId).ifPresent(resume -> {
-            resume.setAnalyzeStatus(status);
-            if (error != null) {
-                resume.setAnalyzeError(error.length() > 500 ? error.substring(0, 500) : error);
-            }
-            resumeRepository.save(resume);
-        });
     }
 
     /**
@@ -216,7 +175,7 @@ public class ResumeUploadService {
         resumeRepository.save(resume);
 
         // 发送分析任务到 Stream
-        sendAnalyzeTask(resumeId, resumeText);
+        analyzeStreamProducer.sendAnalyzeTask(resumeId, resumeText);
 
         log.info("重新分析任务已发送: resumeId={}", resumeId);
     }

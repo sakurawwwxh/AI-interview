@@ -1,12 +1,11 @@
 package interview.guide.modules.knowledgebase.service;
 
-import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileHashService;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.infrastructure.file.FileValidationService;
-import interview.guide.infrastructure.redis.RedisService;
+import interview.guide.modules.knowledgebase.listener.VectorizeStreamProducer;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
@@ -34,7 +33,7 @@ public class KnowledgeBaseUploadService {
     private final KnowledgeBaseRepository knowledgeBaseRepository;
     private final FileValidationService fileValidationService;
     private final FileHashService fileHashService;
-    private final RedisService redisService;
+    private final VectorizeStreamProducer vectorizeStreamProducer;
 
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
@@ -80,7 +79,7 @@ public class KnowledgeBaseUploadService {
         KnowledgeBaseEntity savedKb = saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
 
         // 7. 发送向量化任务到 Redis Stream（异步处理）
-        sendVectorizeTask(savedKb.getId(), content);
+        vectorizeStreamProducer.sendVectorizeTask(savedKb.getId(), content);
 
         log.info("知识库上传完成，向量化任务已入队: {}, kbId={}", fileName, savedKb.getId());
 
@@ -102,46 +101,6 @@ public class KnowledgeBaseUploadService {
         );
     }
 
-    /**
-     * 发送向量化任务到 Redis Stream
-     *
-     * @param kbId    知识库ID
-     * @param content 文档内容
-     */
-    private void sendVectorizeTask(Long kbId, String content) {
-        try {
-            Map<String, String> message = Map.of(
-                AsyncTaskStreamConstants.FIELD_KB_ID, kbId.toString(),
-                AsyncTaskStreamConstants.FIELD_CONTENT, content,
-                AsyncTaskStreamConstants.FIELD_RETRY_COUNT, "0"
-            );
-
-            String messageId = redisService.streamAdd(
-                AsyncTaskStreamConstants.KB_VECTORIZE_STREAM_KEY,
-                message
-            );
-
-            log.info("向量化任务已发送到Stream: kbId={}, messageId={}", kbId, messageId);
-        } catch (Exception e) {
-            log.error("发送向量化任务失败: kbId={}, error={}", kbId, e.getMessage(), e);
-            // 发送失败时更新状态为 FAILED
-            updateVectorStatus(kbId, VectorStatus.FAILED, "任务入队失败: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 更新向量化状态
-     */
-    private void updateVectorStatus(Long kbId, VectorStatus status, String error) {
-        knowledgeBaseRepository.findById(kbId).ifPresent(kb -> {
-            kb.setVectorStatus(status);
-            if (error != null) {
-                kb.setVectorError(error.length() > 500 ? error.substring(0, 500) : error);
-            }
-            knowledgeBaseRepository.save(kb);
-        });
-    }
-    
     /**
      * 验证文件类型
      */
@@ -247,7 +206,7 @@ public class KnowledgeBaseUploadService {
         knowledgeBaseRepository.save(kb);
 
         // 3. 发送向量化任务到 Stream
-        sendVectorizeTask(kbId, content);
+        vectorizeStreamProducer.sendVectorizeTask(kbId, content);
 
         log.info("重新向量化任务已发送: kbId={}", kbId);
     }
