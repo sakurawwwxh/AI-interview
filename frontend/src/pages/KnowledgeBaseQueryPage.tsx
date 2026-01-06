@@ -286,10 +286,17 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
 
   const formatMarkdown = (text: string): string => {
     if (!text) return '';
-    // 只做必要的转换，避免在流式输出时破坏 Markdown 结构
     return text
-      .replace(/\\n/g, '\n')           // 转义换行符
-      .replace(/\n{3,}/g, '\n\n');     // 压缩多余空行
+      // 处理转义换行符
+      .replace(/\\n/g, '\n')
+      // 确保标题 # 后有空格
+      .replace(/^(#{1,6})([^\s#\n])/gm, '$1 $2')
+      // 确保有序列表数字后有空格（如 1.xxx -> 1. xxx）
+      .replace(/^(\s*)(\d+)\.([^\s\n])/gm, '$1$2. $3')
+      // 确保无序列表 - 或 * 后有空格
+      .replace(/^(\s*[-*])([^\s\n-])/gm, '$1 $2')
+      // 压缩多余空行
+      .replace(/\n{3,}/g, '\n\n');
   };
 
   const handleSubmitQuestion = async () => {

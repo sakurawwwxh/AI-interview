@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -98,7 +99,7 @@ public class RagChatController {
      */
     @PostMapping(value = "/api/rag-chat/sessions/{sessionId}/messages/stream",
                  produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> sendMessageStream(
+    public Flux<ServerSentEvent<String>> sendMessageStream(
             @PathVariable Long sessionId,
             @Valid @RequestBody SendMessageRequest request) {
 
@@ -112,6 +113,10 @@ public class RagChatController {
 
         return sessionService.getStreamAnswer(sessionId, request.question())
             .doOnNext(chunk -> fullContent.append(chunk))
+            // 使用 ServerSentEvent 包装，转义换行符避免破坏 SSE 格式
+            .map(chunk -> ServerSentEvent.<String>builder()
+                .data(chunk.replace("\n", "\\n").replace("\r", "\\r"))
+                .build())
             .doOnComplete(() -> {
                 // 3. 流式完成后更新消息内容
                 sessionService.completeStreamMessage(messageId, fullContent.toString());
