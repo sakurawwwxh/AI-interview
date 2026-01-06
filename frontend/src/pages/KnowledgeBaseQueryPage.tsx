@@ -6,6 +6,7 @@ import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
+import CodeBlock from '../components/CodeBlock';
 import {
   Plus,
   Trash2,
@@ -591,34 +592,32 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                 prose-ul:my-3 prose-ol:my-3
                                 prose-li:my-1 prose-li:leading-7
                                 prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-code:font-normal
-                                prose-pre:bg-slate-800 prose-pre:text-slate-100 prose-pre:rounded-xl prose-pre:p-4 prose-pre:my-3 prose-pre:overflow-x-auto
-                                [&_pre_code]:bg-transparent [&_pre_code]:text-slate-100 [&_pre_code]:p-0 [&_pre_code]:text-sm [&_pre_code]:leading-6
                                 marker:text-primary-500 marker:font-bold">
                                 <ReactMarkdown
                                   remarkPlugins={[remarkGfm]}
                                   components={{
                                     // 自定义代码块渲染
-                                    code: ({ className, children, ...props }) => {
-                                      const isInline = !className;
+                                    code: ({ className, children }) => {
+                                      const match = /language-(\w+)/.exec(className || '');
+                                      const isInline = !match;
+
                                       if (isInline) {
                                         return (
-                                          <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded-md text-sm" {...props}>
+                                          <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded-md text-sm font-normal">
                                             {children}
                                           </code>
                                         );
                                       }
+
+                                      // 代码块使用 CodeBlock 组件
                                       return (
-                                        <code className="block text-slate-100 text-sm leading-6" {...props}>
-                                          {children}
-                                        </code>
+                                        <CodeBlock language={match[1]}>
+                                          {String(children).replace(/\n$/, '')}
+                                        </CodeBlock>
                                       );
                                     },
-                                    // 自定义 pre 渲染
-                                    pre: ({ children, ...props }) => (
-                                      <pre className="bg-slate-800 text-slate-100 rounded-xl p-4 my-3 overflow-x-auto" {...props}>
-                                        {children}
-                                      </pre>
-                                    ),
+                                    // 禁用默认 pre 渲染，由 CodeBlock 处理
+                                    pre: ({ children }) => <>{children}</>,
                                   }}
                                 >
                                   {formatMarkdown(msg.content)}
