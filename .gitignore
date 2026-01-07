@@ -6,4 +6,8 @@ build
 /.claude
 /.idea
 /app/bin
+# Environment variables
+.env
+# IDEA code analysis
 qodana.yaml
+
