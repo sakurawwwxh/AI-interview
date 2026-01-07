@@ -137,7 +137,7 @@ public class KnowledgeBaseQueryService {
         String kbNamesStr = String.join("、", kbNames);
 
         // 使用第一个知识库ID作为主要标识（兼容前端）
-        Long primaryKbId = request.knowledgeBaseIds().get(0);
+        Long primaryKbId = request.knowledgeBaseIds().getFirst();
 
         return new QueryResponse(answer, primaryKbId, kbNamesStr);
     }

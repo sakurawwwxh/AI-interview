@@ -20,7 +20,7 @@ public class VectorRepository {
     /**
      * 删除指定知识库的所有向量数据
      * 使用 SQL 直接删除，利用数据库索引和删除能力
-     * 
+     * <p>
      * Spring AI PgVectorStore 默认表名为 vector_store，元数据存储在 metadata 字段（JSONB类型）
      * 
      * @param knowledgeBaseId 知识库ID
@@ -37,8 +37,8 @@ public class VectorRepository {
          * 3. 这种写法完全避开了 PostgreSQL 的 '?' 操作符，不会引起 JDBC 占位符冲突。
          */
         String sql = """
-            DELETE FROM vector_store 
-            WHERE metadata->>'kb_id' = ? 
+            DELETE FROM vector_store
+            WHERE metadata->>'kb_id' = ?
                OR (metadata->>'kb_id_long' IS NOT NULL AND (metadata->>'kb_id_long')::bigint = ?)
             """;
         

@@ -11,7 +11,7 @@ import java.util.List;
 /**
  * 面试相关的对象映射器
  * 使用MapStruct自动生成转换代码
- *
+ * <p>
  * 注意：JSON字段需要在Service层手动处理
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)

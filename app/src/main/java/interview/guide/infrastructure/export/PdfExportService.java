@@ -1,7 +1,5 @@
 package interview.guide.infrastructure.export;
 
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import com.itextpdf.io.font.PdfEncodings;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
@@ -24,6 +22,8 @@ import interview.guide.modules.resume.model.ResumeEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -96,7 +96,7 @@ public class PdfExportService {
     /**
      * 导出简历分析报告为PDF
      */
-    public byte[] exportResumeAnalysis(ResumeEntity resume, ResumeAnalysisResponse analysis) throws Exception {
+    public byte[] exportResumeAnalysis(ResumeEntity resume, ResumeAnalysisResponse analysis) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdfDoc = new PdfDocument(writer);
@@ -181,7 +181,7 @@ public class PdfExportService {
     /**
      * 导出面试报告为PDF
      */
-    public byte[] exportInterviewReport(InterviewSessionEntity session) throws Exception {
+    public byte[] exportInterviewReport(InterviewSessionEntity session) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdfDoc = new PdfDocument(writer);
