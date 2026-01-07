@@ -323,13 +323,6 @@ pnpm dev
 
 检查 iText 依赖是否正确，确认字体文件存在。
 
-## 分支说明
-
-| 分支 | 说明 |
-|------|------|
-| `master` | 主分支，包含完整功能（Redis Stream 异步处理） |
-| `v1.0-without-redis` | 基础版本，同步处理，无 Redis 依赖 |
-
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！

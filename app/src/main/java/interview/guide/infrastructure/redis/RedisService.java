@@ -3,6 +3,7 @@ package interview.guide.infrastructure.redis;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.*;
+import org.redisson.api.options.KeysScanOptions;
 import org.redisson.api.stream.StreamAddArgs;
 import org.redisson.api.stream.StreamCreateGroupArgs;
 import org.redisson.api.stream.StreamMessageId;
@@ -11,10 +12,13 @@ import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Redis 服务封装
@@ -313,6 +317,6 @@ public class RedisService {
      */
     public Iterable<String> findKeysByPattern(String pattern) {
         RKeys keys = redissonClient.getKeys();
-        return keys.getKeysByPattern(pattern);
+        return keys.getKeys(KeysScanOptions.defaults().pattern(pattern));
     }
 }
