@@ -1,6 +1,7 @@
 package interview.guide.modules.knowledgebase.repository;
 
 import interview.guide.modules.knowledgebase.model.RagChatMessageEntity;
+import interview.guide.modules.knowledgebase.model.RagChatMessageEntity.MessageType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +41,9 @@ public interface RagChatMessageRepository extends JpaRepository<RagChatMessageEn
      * 删除会话的所有消息
      */
     void deleteBySessionId(Long sessionId);
+
+    /**
+     * 统计所有用户消息数（即总提问次数）
+     */
+    long countByType(MessageType type);
 }

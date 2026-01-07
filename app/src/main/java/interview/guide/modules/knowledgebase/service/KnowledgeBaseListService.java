@@ -7,8 +7,10 @@ import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseStatsDTO;
+import interview.guide.modules.knowledgebase.model.RagChatMessageEntity.MessageType;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import interview.guide.modules.knowledgebase.repository.RagChatMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ import java.util.Optional;
 public class KnowledgeBaseListService {
 
     private final KnowledgeBaseRepository knowledgeBaseRepository;
+    private final RagChatMessageRepository ragChatMessageRepository;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final FileStorageService fileStorageService;
 
@@ -133,11 +136,12 @@ public class KnowledgeBaseListService {
 
     /**
      * 获取知识库统计信息
+     * 总提问次数从用户消息数统计，确保多知识库提问只算一次
      */
     public KnowledgeBaseStatsDTO getStatistics() {
         return new KnowledgeBaseStatsDTO(
             knowledgeBaseRepository.count(),
-            knowledgeBaseRepository.sumQuestionCount(),
+            ragChatMessageRepository.countByType(MessageType.USER),  // 真正的提问次数
             knowledgeBaseRepository.sumAccessCount(),
             knowledgeBaseRepository.countByVectorStatus(VectorStatus.COMPLETED),
             knowledgeBaseRepository.countByVectorStatus(VectorStatus.PROCESSING)
