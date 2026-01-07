@@ -3,6 +3,7 @@ package interview.guide.modules.knowledgebase.repository;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -67,6 +68,17 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      * 按提问次数排序
      */
     List<KnowledgeBaseEntity> findAllByOrderByQuestionCountDesc();
+
+    // ==================== 批量更新 ====================
+
+    /**
+     * 批量增加知识库提问计数
+     * @param ids 知识库ID列表
+     * @return 更新的行数
+     */
+    @Modifying
+    @Query("UPDATE KnowledgeBaseEntity k SET k.questionCount = k.questionCount + 1 WHERE k.id IN :ids")
+    int incrementQuestionCountBatch(@Param("ids") List<Long> ids);
 
     // ==================== 统计查询 ====================
 
