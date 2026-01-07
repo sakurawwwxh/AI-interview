@@ -6,3 +6,6 @@ build
 /.claude
 /.idea
 /app/bin
+
+# Environment variables
+.env
