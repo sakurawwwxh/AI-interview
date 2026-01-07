@@ -1,8 +1,5 @@
 package interview.guide.modules.resume.service;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.export.PdfExportService;
@@ -17,6 +14,9 @@ import interview.guide.modules.resume.model.ResumeListItemDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Optional;
@@ -117,7 +117,8 @@ public class ResumeHistoryService {
             if (entity.getStrengthsJson() != null) {
                 return objectMapper.readValue(
                     entity.getStrengthsJson(),
-                    new TypeReference<List<String>>() {}
+                        new TypeReference<>() {
+                        }
                 );
             }
         } catch (JacksonException e) {
@@ -134,7 +135,8 @@ public class ResumeHistoryService {
             if (entity.getSuggestionsJson() != null) {
                 return objectMapper.readValue(
                     entity.getSuggestionsJson(),
-                    new TypeReference<List<Object>>() {}
+                        new TypeReference<>() {
+                        }
                 );
             }
         } catch (JacksonException e) {

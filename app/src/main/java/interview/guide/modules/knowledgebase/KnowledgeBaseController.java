@@ -1,7 +1,10 @@
 package interview.guide.modules.knowledgebase;
 
 import interview.guide.common.result.Result;
-import interview.guide.modules.knowledgebase.model.*;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseStatsDTO;
+import interview.guide.modules.knowledgebase.model.QueryRequest;
+import interview.guide.modules.knowledgebase.model.QueryResponse;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseDeleteService;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseListService;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseQueryService;

@@ -52,7 +52,8 @@ public class InterviewHistoryService {
         // 解析所有题目（用于构建完整的答案列表）
         List<InterviewQuestionDTO> allQuestions = parseJson(
             session.getQuestionsJson(),
-            new TypeReference<List<InterviewQuestionDTO>>() {}
+                new TypeReference<>() {
+                }
         );
 
         // 构建答案详情列表（包含所有题目，未回答的也要显示）
