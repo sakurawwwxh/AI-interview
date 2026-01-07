@@ -54,9 +54,7 @@ public class KnowledgeBaseVectorService {
             
             // 3. 为每个chunk添加metadata（知识库ID）
             // 统一使用 String 类型存储，确保查询一致性
-            chunks.forEach(chunk -> {
-                chunk.getMetadata().put("kb_id", knowledgeBaseId.toString());
-            });
+            chunks.forEach(chunk -> chunk.getMetadata().put("kb_id", knowledgeBaseId.toString()));
             
             // 4. 向量化并存储
             vectorStore.add(chunks);

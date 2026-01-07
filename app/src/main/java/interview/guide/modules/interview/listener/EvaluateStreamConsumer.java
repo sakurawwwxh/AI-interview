@@ -89,40 +89,20 @@ public class EvaluateStreamConsumer {
     private void consumeLoop() {
         while (running.get()) {
             try {
-                // 从 Stream 读取消息
-                Map<StreamMessageId, Map<String, String>> messages = redisService.streamReadGroup(
+                redisService.streamConsumeMessages(
                     AsyncTaskStreamConstants.INTERVIEW_EVALUATE_STREAM_KEY,
                     AsyncTaskStreamConstants.INTERVIEW_EVALUATE_GROUP_NAME,
                     consumerName,
-                    AsyncTaskStreamConstants.BATCH_SIZE
+                    AsyncTaskStreamConstants.BATCH_SIZE,
+                    AsyncTaskStreamConstants.POLL_INTERVAL_MS,
+                    this::processMessage
                 );
-
-                if (messages == null || messages.isEmpty()) {
-                    // 没有消息，等待一段时间
-                    Thread.sleep(AsyncTaskStreamConstants.POLL_INTERVAL_MS);
-                    continue;
-                }
-
-                // 处理每条消息
-                for (Map.Entry<StreamMessageId, Map<String, String>> entry : messages.entrySet()) {
-                    StreamMessageId messageId = entry.getKey();
-                    Map<String, String> data = entry.getValue();
-
-                    processMessage(messageId, data);
-                }
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.info("消费者线程被中断");
-                break;
             } catch (Exception e) {
-                log.error("消费消息时发生错误: {}", e.getMessage(), e);
-                try {
-                    Thread.sleep(AsyncTaskStreamConstants.POLL_INTERVAL_MS);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
+                if (Thread.currentThread().isInterrupted()) {
+                    log.info("消费者线程被中断");
                     break;
                 }
+                log.error("消费消息时发生错误: {}", e.getMessage(), e);
             }
         }
     }

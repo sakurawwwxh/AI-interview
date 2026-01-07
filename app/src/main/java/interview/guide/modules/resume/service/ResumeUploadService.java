@@ -116,33 +116,29 @@ public class ResumeUploadService {
         // 获取历史分析结果
         Optional<ResumeAnalysisResponse> analysisOpt = persistenceService.getLatestAnalysisAsDTO(resume.getId());
 
-        if (analysisOpt.isPresent()) {
-            // 已有分析结果，直接返回
-            return Map.of(
-                "analysis", analysisOpt.get(),
+        // 已有分析结果，直接返回
+        // 没有分析结果（可能之前分析失败），返回当前状态
+        return analysisOpt.map(resumeAnalysisResponse -> Map.of(
+                "analysis", resumeAnalysisResponse,
                 "storage", Map.of(
-                    "fileKey", resume.getStorageKey() != null ? resume.getStorageKey() : "",
-                    "fileUrl", resume.getStorageUrl() != null ? resume.getStorageUrl() : "",
-                    "resumeId", resume.getId()
+                        "fileKey", resume.getStorageKey() != null ? resume.getStorageKey() : "",
+                        "fileUrl", resume.getStorageUrl() != null ? resume.getStorageUrl() : "",
+                        "resumeId", resume.getId()
                 ),
                 "duplicate", true
-            );
-        } else {
-            // 没有分析结果（可能之前分析失败），返回当前状态
-            return Map.of(
+        )).orElseGet(() -> Map.of(
                 "resume", Map.of(
-                    "id", resume.getId(),
-                    "filename", resume.getOriginalFilename(),
-                    "analyzeStatus", resume.getAnalyzeStatus() != null ? resume.getAnalyzeStatus().name() : AsyncTaskStatus.PENDING.name()
+                        "id", resume.getId(),
+                        "filename", resume.getOriginalFilename(),
+                        "analyzeStatus", resume.getAnalyzeStatus() != null ? resume.getAnalyzeStatus().name() : AsyncTaskStatus.PENDING.name()
                 ),
                 "storage", Map.of(
-                    "fileKey", resume.getStorageKey() != null ? resume.getStorageKey() : "",
-                    "fileUrl", resume.getStorageUrl() != null ? resume.getStorageUrl() : "",
-                    "resumeId", resume.getId()
+                        "fileKey", resume.getStorageKey() != null ? resume.getStorageKey() : "",
+                        "fileUrl", resume.getStorageUrl() != null ? resume.getStorageUrl() : "",
+                        "resumeId", resume.getId()
                 ),
                 "duplicate", true
-            );
-        }
+        ));
     }
 
     /**
