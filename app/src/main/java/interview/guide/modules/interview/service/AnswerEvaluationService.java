@@ -143,31 +143,40 @@ public class AnswerEvaluationService {
         List<QuestionEvaluation> questionDetails = new ArrayList<>();
         List<ReferenceAnswer> referenceAnswers = new ArrayList<>();
         Map<String, List<Integer>> categoryScoresMap = new HashMap<>();
-        
+
+        // 统计实际回答的问题数量
+        long answeredCount = questions.stream()
+            .filter(q -> q.userAnswer() != null && !q.userAnswer().isBlank())
+            .count();
+
         // 处理问题评估
         List<QuestionEvaluationDTO> evaluations = dto.questionEvaluations();
         for (int i = 0; i < Math.min(evaluations.size(), questions.size()); i++) {
             QuestionEvaluationDTO eval = evaluations.get(i);
             InterviewQuestionDTO q = questions.get(i);
             int qIndex = q.questionIndex();
-            
+
+            // 如果用户未回答该题，分数强制为 0
+            boolean hasAnswer = q.userAnswer() != null && !q.userAnswer().isBlank();
+            int score = hasAnswer ? eval.score() : 0;
+
             questionDetails.add(new QuestionEvaluation(
                 qIndex, q.question(), q.category(),
-                q.userAnswer(), eval.score(), eval.feedback()
+                q.userAnswer(), score, eval.feedback()
             ));
-            
+
             referenceAnswers.add(new ReferenceAnswer(
-                qIndex, q.question(), 
+                qIndex, q.question(),
                 eval.referenceAnswer() != null ? eval.referenceAnswer() : "",
                 eval.keyPoints() != null ? eval.keyPoints() : List.of()
             ));
-            
+
             // 收集类别分数
             categoryScoresMap
                 .computeIfAbsent(q.category(), k -> new ArrayList<>())
-                .add(eval.score());
+                .add(score);
         }
-        
+
         // 计算各类别平均分
         List<CategoryScore> categoryScores = categoryScoresMap.entrySet().stream()
             .map(e -> new CategoryScore(
@@ -176,11 +185,24 @@ public class AnswerEvaluationService {
                 e.getValue().size()
             ))
             .collect(Collectors.toList());
-        
+
+        // 计算总分：基于实际得分，而非 AI 返回值
+        // 如果所有问题都未回答，总分为 0
+        int overallScore;
+        if (answeredCount == 0) {
+            overallScore = 0;
+        } else {
+            // 使用问题详情中的分数计算平均值
+            overallScore = (int) questionDetails.stream()
+                .mapToInt(QuestionEvaluation::score)
+                .average()
+                .orElse(0);
+        }
+
         return new InterviewReportDTO(
             sessionId,
             questions.size(),
-            dto.overallScore(),
+            overallScore,
             categoryScores,
             questionDetails,
             dto.overallFeedback(),

@@ -7,14 +7,14 @@ server:
 spring:
   application:
     name: ai-interview-platform
-  
+
   # PostgreSQL数据库配置
   datasource:
     url: jdbc:postgresql://localhost:5432/interview_guide
     username: postgres
     password: <REDACTED>
     driver-class-name: org.postgresql.Driver
-  
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,13 +23,25 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-  
+
   servlet:
     multipart:
       enabled: true
       max-file-size: 50MB  # 支持知识库上传（简历限制在业务层检查）
       max-request-size: 50MB
-  
+
+  # Redisson配置 (使用 spring.redis.redisson，参考官方文档)
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          address: "redis://localhost:6379"
+          database: 0
+          connectionMinimumIdleSize: 10
+          connectionPoolSize: 64
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
+
   # Spring AI - 阿里云DashScope (OpenAI兼容模式)
   ai:
     openai:
@@ -65,35 +77,15 @@ app:
       - application/msword
       - application/vnd.openxmlformats-officedocument.wordprocessingml.document
       - text/plain
-  
+
   # RustFS (S3兼容) 存储配置
   storage:
     endpoint: http://localhost:9000
-    access-key: Bdxbc3IoYFj7GEq4HAWi
-    secret-key: 1vcANwb2FZh356Y8pGRUgunskJjfoLzqSxOMCHdi
+    access-key: wr45VXJZhCxc6FAWz0YR
+    secret-key: GtKxV57WJkpw4CvASPBzTy2DYElLnRqh8dIXQa0m
     bucket: interview-guide
     region: us-east-1
-  
+
   # CORS配置 - React前端
   cors:
     allowed-origins: http://localhost:5173,http://localhost:5174
-
-# Redisson配置
-redisson:
-  config: |
-    singleServerConfig:
-      address: "redis://localhost:6379"
-      database: 0
-      idleConnectionTimeout: 10000
-      connectTimeout: 10000
-      timeout: 3000
-      retryAttempts: 3
-      retryInterval: 1500
-      password: null
-      subscriptionsPerConnection: 5
-      clientName: null
-      subscriptionConnectionMinimumIdleSize: 1
-      subscriptionConnectionPoolSize: 50
-      connectionMinimumIdleSize: 10
-      connectionPoolSize: 64
-      dnsMonitoringInterval: 5000
