@@ -46,17 +46,17 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 后端技术
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Spring Boot | 4.0 | 应用框架 |
-| Java | 21 | 开发语言 |
-| Spring AI | 2.0 | AI 集成框架 |
-| PostgreSQL + pgvector | 14+ | 关系数据库 + 向量存储 |
-| Redis | 6+ | 缓存 + 消息队列（Stream） |
-| Apache Tika | 2.9.2 | 文档解析 |
-| iText 8 | 8.0.5 | PDF 导出 |
-| MapStruct | 1.6.3 | 对象映射 |
-| Gradle | 8.14 | 构建工具 |
+| 技术                  | 版本  | 说明                      |
+| --------------------- | ----- | ------------------------- |
+| Spring Boot           | 4.0   | 应用框架                  |
+| Java                  | 21    | 开发语言                  |
+| Spring AI             | 2.0   | AI 集成框架               |
+| PostgreSQL + pgvector | 14+   | 关系数据库 + 向量存储     |
+| Redis                 | 6+    | 缓存 + 消息队列（Stream） |
+| Apache Tika           | 2.9.2 | 文档解析                  |
+| iText 8               | 8.0.5 | PDF 导出                  |
+| MapStruct             | 1.6.3 | 对象映射                  |
+| Gradle                | 8.14  | 构建工具                  |
 
 技术选型常见问题解答：
 
@@ -68,16 +68,16 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 前端技术
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| React | 18.3 | UI 框架 |
-| TypeScript | 5.6 | 开发语言 |
-| Vite | 5.4 | 构建工具 |
-| Tailwind CSS | 4.1 | 样式框架 |
-| React Router | 7.11 | 路由管理 |
-| Framer Motion | 12.23 | 动画库 |
-| Recharts | 3.6 | 图表库 |
-| Lucide React | 0.468 | 图标库 |
+| 技术          | 版本  | 说明     |
+| ------------- | ----- | -------- |
+| React         | 18.3  | UI 框架  |
+| TypeScript    | 5.6   | 开发语言 |
+| Vite          | 5.4   | 构建工具 |
+| Tailwind CSS  | 4.1   | 样式框架 |
+| React Router  | 7.11  | 路由管理 |
+| Framer Motion | 12.23 | 动画库   |
+| Recharts      | 3.6   | 图表库   |
+| Lucide React  | 0.468 | 图标库   |
 
 ## 功能特性
 
@@ -297,13 +297,67 @@ pnpm dev
 
 前端服务启动于 `http://localhost:5173`
 
+
+## 🐳 Docker 快速部署
+
+本项目提供了完整的 Docker 支持，可以一键启动所有服务（前后端、数据库、中间件）。
+
+### 1. 前置准备
+- 安装 [Docker](https://www.docker.com/products/docker-desktop/) 和 Docker Compose
+- 申请阿里云百炼 API Key（用于 AI 对话功能）
+
+### 2. 快速启动
+在项目根目录下执行：
+
+```bash
+# 1. 复制环境变量配置文件
+cp .env.example .env
+
+# 2. 编辑 .env 文件，填入 AI 配置
+# vim .env
+# 必填：AI_BAILIAN_API_KEY=your_key_here
+# 可选：AI_MODEL=qwen-plus        # 默认值为 qwen-plus
+#        # 也可以改为 qwen-max、qwen-long 等其他可用模型
+
+# 3. 构建并启动所有服务
+docker-compose up -d --build
+```
+
+### 3. 服务访问
+启动完成后，您可以通过以下地址访问各个服务：
+
+| 服务             | 地址                                           | 默认账号     | 默认密码     | 说明                   |
+| ---------------- | ---------------------------------------------- | ------------ | ------------ | ---------------------- |
+| **前端应用**     | [http://localhost](http://localhost)           | -            | -            | 用户访问入口           |
+| **后端 API**     | [http://localhost:8080](http://localhost:8080) | -            | -            | Swagger/接口文档       |
+| **MinIO 控制台** | [http://localhost:9001](http://localhost:9001) | `minioadmin` | `minioadmin` | 对象存储管理           |
+| **MinIO API**    | `localhost:9000`                               | -            | -            | S3 兼容接口            |
+| **PostgreSQL**   | `localhost:5432`                               | `postgres`   | `password`   | 数据库 (包含 pgvector) |
+| **Redis**        | `localhost:6379`                               | -            | -            | 缓存与消息队列         |
+
+### 4. 常用运维命令
+
+```bash
+# 查看服务状态
+docker-compose ps
+
+# 查看后端日志
+docker-compose logs -f app
+
+# 停止并移除所有服务
+docker-compose down
+
+# 清理无用镜像（构建产生的中间层）
+docker image prune -f
+```
+
 ## 使用场景
 
-| 用户角色 | 使用场景 |
-|----------|----------|
-| **求职者** | 上传简历获取分析建议，进行模拟面试练习 |
-| **HR/招聘人员** | 批量分析简历，评估候选人能力 |
-| **培训机构** | 提供面试培训服务，管理知识库资源 |
+| 用户角色        | 使用场景                               |
+| --------------- | -------------------------------------- |
+| **求职者**      | 上传简历获取分析建议，进行模拟面试练习 |
+| **HR/招聘人员** | 批量分析简历，评估候选人能力           |
+| **培训机构**    | 提供面试培训服务，管理知识库资源       |
 
 ## 常见问题
 
