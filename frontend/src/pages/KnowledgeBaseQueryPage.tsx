@@ -68,7 +68,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
   const rafRef = useRef<number>();
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const [isPending, startTransition] = useTransition();
 

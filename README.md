@@ -46,17 +46,17 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 后端技术
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Spring Boot | 4.0 | 应用框架 |
-| Java | 21 | 开发语言 |
-| Spring AI | 2.0 | AI 集成框架 |
-| PostgreSQL + pgvector | 14+ | 关系数据库 + 向量存储 |
-| Redis | 6+ | 缓存 + 消息队列（Stream） |
-| Apache Tika | 2.9.2 | 文档解析 |
-| iText 8 | 8.0.5 | PDF 导出 |
-| MapStruct | 1.6.3 | 对象映射 |
-| Gradle | 8.14 | 构建工具 |
+| 技术                  | 版本  | 说明                      |
+| --------------------- | ----- | ------------------------- |
+| Spring Boot           | 4.0   | 应用框架                  |
+| Java                  | 21    | 开发语言                  |
+| Spring AI             | 2.0   | AI 集成框架               |
+| PostgreSQL + pgvector | 14+   | 关系数据库 + 向量存储     |
+| Redis                 | 6+    | 缓存 + 消息队列（Stream） |
+| Apache Tika           | 2.9.2 | 文档解析                  |
+| iText 8               | 8.0.5 | PDF 导出                  |
+| MapStruct             | 1.6.3 | 对象映射                  |
+| Gradle                | 8.14  | 构建工具                  |
 
 技术选型常见问题解答：
 
@@ -68,16 +68,16 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 前端技术
 
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| React | 18.3 | UI 框架 |
-| TypeScript | 5.6 | 开发语言 |
-| Vite | 5.4 | 构建工具 |
-| Tailwind CSS | 4.1 | 样式框架 |
-| React Router | 7.11 | 路由管理 |
-| Framer Motion | 12.23 | 动画库 |
-| Recharts | 3.6 | 图表库 |
-| Lucide React | 0.468 | 图标库 |
+| 技术          | 版本  | 说明     |
+| ------------- | ----- | -------- |
+| React         | 18.3  | UI 框架  |
+| TypeScript    | 5.6   | 开发语言 |
+| Vite          | 5.4   | 构建工具 |
+| Tailwind CSS  | 4.1   | 样式框架 |
+| React Router  | 7.11  | 路由管理 |
+| Framer Motion | 12.23 | 动画库   |
+| Recharts      | 3.6   | 图表库   |
+| Lucide React  | 0.468 | 图标库   |
 
 ## 功能特性
 
@@ -99,240 +99,52 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 - 雷达图可视化展示
 - 面试历史统计
 
-### 知识库管理模块
+## 🐳 Docker 快速部署
 
-- 多格式支持：PDF、DOCX、DOC、TXT、Markdown
-- 文档上传和自动分块
-- 异步向量化处理
-- RAG 检索增强生成
-- 流式响应（SSE）
-- 智能问答对话
-- 知识库统计信息
+本项目提供了完整的 Docker 支持，可以一键启动所有服务（前后端、数据库、中间件）。
 
-### TODO
+### 1. 前置准备
+- 安装 [Docker](https://www.docker.com/products/docker-desktop/) 和 Docker Compose
+- 申请阿里云百炼 API Key（用于 AI 对话功能）
 
-- [ ] 问答助手的 Markdown 展示优化
-- [x] 知识库管理页面的知识库下载
-- [x] 异步生成模拟面试评估报告
-- [ ] 模拟面试增加追问功能
-- [ ] 打通模拟面试和知识库
-
-## 效果展示
-
-### 简历与面试
-
-简历库：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-resume-history.png)
-
-简历上传分析：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-resume-upload-analysis.png)
-
-简历分析详情：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-resume-analysis-detail.png)
-
-面试记录：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-interview-history.png)
-
-面试详情：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-interview-detail.png)
-
-模拟面试：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-mock-interview.png)
-
-### 知识库
-
-知识库管理：
-
-![](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-knowledge-base-management.png)
-
-问答助手：
-
-![page-qa-assistant](https://oss.javaguide.cn/xingqiu/pratical-project/interview-guide/page-qa-assistant.png)
-
-## 项目结构
-
-```
-interview-guide/
-├── app/                              # 后端应用
-│   ├── src/main/java/interview/guide/
-│   │   ├── App.java                  # 主启动类
-│   │   ├── common/                   # 通用模块
-│   │   │   ├── config/               # 配置类
-│   │   │   ├── exception/            # 异常处理
-│   │   │   └── result/               # 统一响应
-│   │   ├── infrastructure/           # 基础设施
-│   │   │   ├── export/               # PDF 导出
-│   │   │   ├── file/                 # 文件处理
-│   │   │   ├── redis/                # Redis 服务
-│   │   │   └── storage/              # 对象存储
-│   │   └── modules/                  # 业务模块
-│   │       ├── interview/            # 面试模块
-│   │       ├── knowledgebase/        # 知识库模块
-│   │       └── resume/               # 简历模块
-│   └── src/main/resources/
-│       ├── application.yml           # 应用配置
-│       └── prompts/                  # AI 提示词模板
-│
-├── frontend/                         # 前端应用
-│   ├── src/
-│   │   ├── api/                      # API 接口
-│   │   ├── components/               # 公共组件
-│   │   ├── pages/                    # 页面组件
-│   │   ├── types/                    # 类型定义
-│   │   └── utils/                    # 工具函数
-│   ├── package.json
-│   └── vite.config.ts
-│
-└── README.md
-```
-
-## 快速开始
-
-环境要求：
-
-| 依赖          | 版本 | 必需 |
-| ------------- | ---- | ---- |
-| JDK           | 21+  | 是   |
-| Node.js       | 18+  | 是   |
-| PostgreSQL    | 14+  | 是   |
-| pgvector 扩展 | -    | 是   |
-| Redis         | 6+   | 是   |
-| S3 兼容存储   | -    | 是   |
-
-### 1. 克隆项目
+### 2. 快速启动
+在项目根目录下执行：
 
 ```bash
-git clone https://github.com/Snailclimb/interview-guide.git
-cd interview-guide
+# 1. 复制环境变量配置文件
+cp .env.example .env
+
+# 2. 编辑 .env 文件，填入您的 API Key
+# vim .env -> 修改 AI_BAILIAN_API_KEY=your_key_here
+
+# 3. 构建并启动所有服务
+docker-compose up -d --build
 ```
 
-### 2. 配置数据库
+### 3. 服务访问
+启动完成后，您可以通过以下地址访问各个服务：
 
-```sql
--- 创建数据库
-CREATE DATABASE interview_guide;
+| 服务             | 地址                                           | 默认账号     | 默认密码     | 说明                   |
+| ---------------- | ---------------------------------------------- | ------------ | ------------ | ---------------------- |
+| **前端应用**     | [http://localhost](http://localhost)           | -            | -            | 用户访问入口           |
+| **后端 API**     | [http://localhost:8080](http://localhost:8080) | -            | -            | Swagger/接口文档       |
+| **MinIO 控制台** | [http://localhost:9001](http://localhost:9001) | `minioadmin` | `minioadmin` | 对象存储管理           |
+| **MinIO API**    | `localhost:9000`                               | -            | -            | S3 兼容接口            |
+| **PostgreSQL**   | `localhost:5432`                               | `postgres`   | `password`   | 数据库 (包含 pgvector) |
+| **Redis**        | `localhost:6379`                               | -            | -            | 缓存与消息队列         |
 
--- 连接数据库并启用 pgvector 扩展（可选，启动后端SpringAI框架底层会自动创建）
-CREATE EXTENSION vector;
-```
-
-### 3. 配置环境变量
+### 4. 常用运维命令
 
 ```bash
-# AI API 密钥（阿里云 DashScope）
-export AI_BAILIAN_API_KEY=your_api_key
+# 查看服务状态
+docker-compose ps
+
+# 查看后端日志
+docker-compose logs -f app
+
+# 停止并移除所有服务
+docker-compose down
+
+# 清理无用镜像（构建产生的中间层）
+docker image prune -f
 ```
-
-### 4. 修改应用配置
-
-编辑 `app/src/main/resources/application.yml`：
-
-```yaml
-spring:
-  # PostgreSQL数据库配置
-  datasource:
-    url: jdbc:postgresql://localhost:5432/interview_guide
-    username: your_username
-    password: your_password
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
-
-# RustFS (S3兼容) 存储配置
-app:
-  storage:
-    endpoint: http://localhost:9000
-    access-key: your_access_key
-    secret-key: your_secret_key
-    bucket: interview-guide
-    
- # Redisson配置
-redisson:
-  config: |
-    singleServerConfig:
-      address: "redis://localhost:6379"
-      database: 0
-      idleConnectionTimeout: 10000
-      connectTimeout: 10000
-      timeout: 3000
-      retryAttempts: 3
-      retryInterval: 1500
-      password: null
-      subscriptionsPerConnection: 5
-      clientName: null
-      subscriptionConnectionMinimumIdleSize: 1
-      subscriptionConnectionPoolSize: 50
-      connectionMinimumIdleSize: 10
-      connectionPoolSize: 64
-      dnsMonitoringInterval: 5000
-
-```
-
-### 5. 启动服务
-
-**后端：**
-
-```bash
-./gradlew bootRun
-```
-
-后端服务启动于 `http://localhost:8080`
-
-**前端：**
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-前端服务启动于 `http://localhost:5173`
-
-## 使用场景
-
-| 用户角色 | 使用场景 |
-|----------|----------|
-| **求职者** | 上传简历获取分析建议，进行模拟面试练习 |
-| **HR/招聘人员** | 批量分析简历，评估候选人能力 |
-| **培训机构** | 提供面试培训服务，管理知识库资源 |
-
-## 常见问题
-
-### Q: 简历分析失败
-
-检查一下阿里云 DashScope API KEY 是否配置正确（申请地址：<https://bailian.console.aliyun.com/>）。
-
-### Q: 简历分析一直显示"分析中"？
-
-检查 Redis 连接和 Stream Consumer 是否正常运行。查看后端日志确认是否有错误。
-
-### Q: 知识库问答没有响应？
-
-确认知识库已完成向量化（状态为 COMPLETED），检查 pgvector 扩展是否正确安装。
-
-### Q: PDF 导出失败？
-
-检查 iText 依赖是否正确，确认字体文件存在。
-
-## 分支说明
-
-| 分支 | 说明 |
-|------|------|
-| `master` | 主分支，包含完整功能（Redis Stream 异步处理） |
-| `v1.0-without-redis` | 基础版本，同步处理，无 Redis 依赖 |
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
-
-AGPL-3.0 License（只要通过网络提供服务，就必须向用户公开修改后的源码）
