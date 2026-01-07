@@ -6,3 +6,4 @@ build
 /.claude
 /.idea
 /app/bin
+qodana.yaml

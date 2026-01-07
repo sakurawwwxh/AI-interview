@@ -4,8 +4,14 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.mapper.KnowledgeBaseMapper;
 import interview.guide.infrastructure.mapper.RagChatMapper;
-import interview.guide.modules.knowledgebase.model.*;
-import interview.guide.modules.knowledgebase.model.RagChatDTO.*;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
+import interview.guide.modules.knowledgebase.model.RagChatDTO.CreateSessionRequest;
+import interview.guide.modules.knowledgebase.model.RagChatDTO.SessionDTO;
+import interview.guide.modules.knowledgebase.model.RagChatDTO.SessionDetailDTO;
+import interview.guide.modules.knowledgebase.model.RagChatDTO.SessionListItemDTO;
+import interview.guide.modules.knowledgebase.model.RagChatMessageEntity;
+import interview.guide.modules.knowledgebase.model.RagChatSessionEntity;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import interview.guide.modules.knowledgebase.repository.RagChatMessageRepository;
 import interview.guide.modules.knowledgebase.repository.RagChatSessionRepository;
@@ -227,7 +233,7 @@ public class RagChatSessionService {
             return "新对话";
         }
         if (knowledgeBases.size() == 1) {
-            return knowledgeBases.get(0).getName();
+            return knowledgeBases.getFirst().getName();
         }
         return knowledgeBases.size() + " 个知识库对话";
     }
