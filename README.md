@@ -238,44 +238,44 @@ export AI_BAILIAN_API_KEY=your_api_key
 spring:
   # PostgreSQL数据库配置
   datasource:
-    url: jdbc:postgresql://localhost:5432/interview_guide
-    username: your_username
-    password: your_password
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide2}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:123456}
+    driver-class-name: org.postgresql.Driver
 
-  data:
-    redis:
-      host: localhost
-      port: 6379
+  jpa:
+    hibernate:
+      ddl-auto: create #首次启动用 create，表创建成功后，改回 update
+
+  # Redisson配置 (使用 spring.redis.redisson，参考官方文档)
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          address: "redis://${REDIS_HOST:localhost}:${REDIS_PORT:6379}"
+          database: 0
+          connectionMinimumIdleSize: 10
+          connectionPoolSize: 64
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
 
 # RustFS (S3兼容) 存储配置
 app:
   storage:
-    endpoint: http://localhost:9000
-    access-key: your_access_key
-    secret-key: your_secret_key
-    bucket: interview-guide
+    endpoint: ${APP_STORAGE_ENDPOINT:http://localhost:9000}
+    access-key: ${APP_STORAGE_ACCESS_KEY:wr45VXJZhCxc6FAWz0YR}
+    secret-key: ${APP_STORAGE_SECRET_KEY:GtKxV57WJkpw4CvASPBzTy2DYElLnRqh8dIXQa0m}
+    bucket: ${APP_STORAGE_BUCKET:interview-guide}
+    region: ${APP_STORAGE_REGION:us-east-1}
     
- # Redisson配置
-redisson:
-  config: |
-    singleServerConfig:
-      address: "redis://localhost:6379"
-      database: 0
-      idleConnectionTimeout: 10000
-      connectTimeout: 10000
-      timeout: 3000
-      retryAttempts: 3
-      retryInterval: 1500
-      password: null
-      subscriptionsPerConnection: 5
-      clientName: null
-      subscriptionConnectionMinimumIdleSize: 1
-      subscriptionConnectionPoolSize: 50
-      connectionMinimumIdleSize: 10
-      connectionPoolSize: 64
-      dnsMonitoringInterval: 5000
+
 
 ```
+
+⚠️**注意**：
+
+1.  JPA 的 `ddl-auto` 首次启动用 `create`，表创建成功后，改回 `update`。
+2. 如果本地已经 Minio 的话，可以用其替换 RusfFS。
 
 ### 5. 启动服务
 
@@ -361,6 +361,48 @@ docker image prune -f
 
 ## 常见问题
 
+### Q: 数据库表创建失败/数据丢失
+
+这大概率是 JPA 的 `ddl-auto` 配置不对的原因。`ddl-auto` 模式对比：
+
+| 模式     | 行为                            | 适用场景      |
+| -------- | ------------------------------- | ------------- |
+| create   | 无条件删除并重建所有表          | 开发/测试环境 |
+| update   | 对比现有 schema，只执行增量更新 | 开发环境      |
+| validate | 只验证，不修改                  | 生产环境      |
+| none     | 什么都不做                      | 生产环境      |
+
+对于新数据库，推荐：
+
+```yaml
+# 首次启动用 create
+jpa:
+  hibernate:
+    ddl-auto: create
+
+# 表创建成功后，改回 update
+jpa:
+  hibernate:
+    ddl-auto: update
+```
+
+记得改回 **update**，否则每次重启都会删除所有数据！
+
+### Q: 知识库向量化失败
+
+当 `initialize-schema: false` 时，Spring AI **不会自动创建** `vector_store` 表。
+
+```java
+spring:
+  ai:
+    vectorstore:
+      pgvector:
+        initialize-schema: true 
+
+```
+
+建议开发环境设置为 true，方便快速启动。生产环境设置为 false，手动管理数据库 schema，避免意外变更。
+
 ### Q: 简历分析失败
 
 检查一下阿里云 DashScope API KEY 是否配置正确（申请地址：<https://bailian.console.aliyun.com/>）。
@@ -368,10 +410,6 @@ docker image prune -f
 ### Q: 简历分析一直显示"分析中"？
 
 检查 Redis 连接和 Stream Consumer 是否正常运行。查看后端日志确认是否有错误。
-
-### Q: 知识库问答没有响应？
-
-确认知识库已完成向量化（状态为 COMPLETED），检查 pgvector 扩展是否正确安装。
 
 ### Q: PDF 导出失败？
 
