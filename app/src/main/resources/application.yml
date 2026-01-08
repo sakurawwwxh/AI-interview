@@ -10,7 +10,7 @@ spring:
 
   # PostgreSQL数据库配置
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide2}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:<DB_PASSWORD>}
     driver-class-name: org.postgresql.Driver

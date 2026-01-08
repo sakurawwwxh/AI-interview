@@ -115,6 +115,9 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 - [x] 问答助手的 Markdown 展示优化
 - [x] 知识库管理页面的知识库下载
 - [x] 异步生成模拟面试评估报告
+- [x] Docker 快速部署
+- [ ] 添加 API 限流保护
+- [ ] 前端性能优化（虚拟列表等）
 - [ ] 模拟面试增加追问功能
 - [ ] 打通模拟面试和知识库
 
@@ -238,7 +241,7 @@ export AI_BAILIAN_API_KEY=your_api_key
 spring:
   # PostgreSQL数据库配置
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide2}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:123456}
     driver-class-name: org.postgresql.Driver
@@ -298,7 +301,7 @@ pnpm dev
 前端服务启动于 `http://localhost:5173`
 
 
-## 🐳 Docker 快速部署
+## Docker 快速部署
 
 本项目提供了完整的 Docker 支持，可以一键启动所有服务（前后端、数据库、中间件）。
 
