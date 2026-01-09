@@ -26,7 +26,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -50,37 +49,24 @@ public class PdfExportService {
      */
     private PdfFont createChineseFont() {
         try {
-            // 尝试使用 macOS 系统字体
-            String[] fontPaths = {
-                "/System/Library/Fonts/PingFang.ttc,0",
-                "/System/Library/Fonts/STHeiti Light.ttc,0",
-                "/System/Library/Fonts/Hiragino Sans GB.ttc,0",
-                // Windows 字体
-                "C:/Windows/Fonts/simsun.ttc,0",
-                "C:/Windows/Fonts/msyh.ttc,0",
-                // Linux 字体
-                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc,0"
-            };
-            
-            for (String fontPath : fontPaths) {
-                String path = fontPath.contains(",") ? fontPath.split(",")[0] : fontPath;
-                if (new File(path).exists()) {
-                    log.info("使用系统字体: {}", fontPath);
-                    return PdfFontFactory.createFont(fontPath, PdfEncodings.IDENTITY_H, EmbeddingStrategy.PREFER_EMBEDDED);
-                }
+            // 使用项目内嵌字体（保证跨平台一致性）
+            var fontStream = getClass().getClassLoader().getResourceAsStream("fonts/ZhuqueFangsong-Regular.ttf");
+            if (fontStream != null) {
+                byte[] fontBytes = fontStream.readAllBytes();
+                fontStream.close();
+                log.debug("使用项目内嵌字体: fonts/ZhuqueFangsong-Regular.ttf");
+                return PdfFontFactory.createFont(fontBytes, PdfEncodings.IDENTITY_H, EmbeddingStrategy.FORCE_EMBEDDED);
             }
             
-            // 如果没有找到系统字体，尝试使用 iText 内置的中文字体
-            log.info("使用 iText 内置中文字体");
-            return PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
+            // 如果字体文件不存在，抛出异常
+            log.error("未找到字体文件: fonts/ZhuqueFangsong-Regular.ttf");
+            throw new BusinessException(ErrorCode.EXPORT_PDF_FAILED, "字体文件缺失，请联系管理员");
             
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("创建中文字体失败，使用默认字体: {}", e.getMessage());
-            try {
-                return PdfFontFactory.createFont();
-            } catch (Exception ex) {
-                throw new BusinessException(ErrorCode.EXPORT_PDF_FAILED, "无法创建字体");
-            }
+            log.error("创建中文字体失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.EXPORT_PDF_FAILED, "创建字体失败: " + e.getMessage());
         }
     }
     
