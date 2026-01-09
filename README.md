@@ -414,9 +414,12 @@ spring:
 
 检查 Redis 连接和 Stream Consumer 是否正常运行。查看后端日志确认是否有错误。
 
-### Q: PDF 导出失败？
+### Q: PDF 导出失败或中文显示异常？
 
-检查 iText 依赖是否正确，确认字体文件存在。
+项目已内置中文字体（珠圆玉润仿宋），支持跨平台导出。如遇到问题，请检查：
+- 字体文件是否存在：`app/src/main/resources/fonts/ZhuqueFangsong-Regular.ttf`
+- 检查日志中的字体加载信息
+- 确认 iText 依赖是否正确
 
 ## 贡献
 
