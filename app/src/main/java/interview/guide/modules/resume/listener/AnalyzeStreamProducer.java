@@ -38,7 +38,8 @@ public class AnalyzeStreamProducer {
 
             String messageId = redisService.streamAdd(
                 AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY,
-                message
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
             );
 
             log.info("分析任务已发送到Stream: resumeId={}, messageId={}", resumeId, messageId);

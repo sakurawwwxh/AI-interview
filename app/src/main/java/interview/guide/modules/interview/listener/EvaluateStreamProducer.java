@@ -36,7 +36,8 @@ public class EvaluateStreamProducer {
 
             String messageId = redisService.streamAdd(
                 AsyncTaskStreamConstants.INTERVIEW_EVALUATE_STREAM_KEY,
-                message
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
             );
 
             log.info("评估任务已发送到Stream: sessionId={}, messageId={}", sessionId, messageId);

@@ -121,15 +121,26 @@ public class AnalyzeStreamConsumer {
         log.info("开始处理简历分析任务: resumeId={}, messageId={}, retryCount={}", resumeId, messageId, retryCount);
 
         try {
-            // 1. 更新状态为 PROCESSING
+            // 1. 检查简历是否仍然存在（可能在分析过程中被删除）
+            if (!resumeRepository.existsById(resumeId)) {
+                log.warn("简历已被删除，跳过分析任务: resumeId={}", resumeId);
+                ackMessage(messageId);
+                return;
+            }
+
+            // 2. 更新状态为 PROCESSING
             updateAnalyzeStatus(resumeId, AsyncTaskStatus.PROCESSING, null);
 
-            // 2. 执行 AI 分析
+            // 3. 执行 AI 分析
             ResumeAnalysisResponse analysis = gradingService.analyzeResume(content);
 
-            // 3. 保存分析结果
-            ResumeEntity resume = resumeRepository.findById(resumeId)
-                .orElseThrow(() -> new RuntimeException("简历不存在: " + resumeId));
+            // 4. 再次检查简历是否存在（分析期间可能被删除）
+            ResumeEntity resume = resumeRepository.findById(resumeId).orElse(null);
+            if (resume == null) {
+                log.warn("简历在分析期间被删除，跳过保存结果: resumeId={}", resumeId);
+                ackMessage(messageId);
+                return;
+            }
             persistenceService.saveAnalysis(resume, analysis);
 
             // 4. 更新状态为 COMPLETED
@@ -169,7 +180,11 @@ public class AnalyzeStreamConsumer {
                 AsyncTaskStreamConstants.FIELD_RETRY_COUNT, String.valueOf(retryCount)
             );
 
-            redisService.streamAdd(AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY, message);
+            redisService.streamAdd(
+                AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY,
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
+            );
             log.info("简历分析任务已重新入队: resumeId={}, retryCount={}", resumeId, retryCount);
 
         } catch (Exception e) {
