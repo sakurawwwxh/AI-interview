@@ -149,9 +149,13 @@ public class AnswerEvaluationService {
             .filter(q -> q.userAnswer() != null && !q.userAnswer().isBlank())
             .count();
 
-        // 处理问题评估
+        // 处理问题评估（防御性编程：AI 响应解析后可能为 null）
         List<QuestionEvaluationDTO> evaluations = dto.questionEvaluations();
-        for (int i = 0; i < Math.min(evaluations.size(), questions.size()); i++) {
+        int evaluationsSize = evaluations != null ? evaluations.size() : 0;
+        if (evaluations == null || evaluations.isEmpty()) {
+            log.warn("面试评估结果解析异常：问题评估列表为空，sessionId={}", sessionId);
+        }
+        for (int i = 0; i < Math.min(evaluationsSize, questions.size()); i++) {
             QuestionEvaluationDTO eval = evaluations.get(i);
             InterviewQuestionDTO q = questions.get(i);
             int qIndex = q.questionIndex();
