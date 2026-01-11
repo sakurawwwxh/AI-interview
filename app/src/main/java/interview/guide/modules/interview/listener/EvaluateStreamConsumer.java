@@ -131,7 +131,7 @@ public class EvaluateStreamConsumer {
             // 2. 从数据库获取会话（使用 JOIN FETCH 加载简历）
             Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdWithResume(sessionId);
             if (sessionOpt.isEmpty()) {
-                log.error("会话不存在: sessionId={}", sessionId);
+                log.warn("会话已被删除，跳过评估任务: sessionId={}", sessionId);
                 ackMessage(messageId);
                 return;
             }
@@ -204,7 +204,11 @@ public class EvaluateStreamConsumer {
                 AsyncTaskStreamConstants.FIELD_RETRY_COUNT, String.valueOf(retryCount)
             );
 
-            redisService.streamAdd(AsyncTaskStreamConstants.INTERVIEW_EVALUATE_STREAM_KEY, message);
+            redisService.streamAdd(
+                AsyncTaskStreamConstants.INTERVIEW_EVALUATE_STREAM_KEY,
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
+            );
             log.info("评估任务已重新入队: sessionId={}, retryCount={}", sessionId, retryCount);
 
         } catch (Exception e) {

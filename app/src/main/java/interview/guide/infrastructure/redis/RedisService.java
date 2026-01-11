@@ -269,9 +269,25 @@ public class RedisService {
      * 发送消息到 Stream
      */
     public String streamAdd(String streamKey, Map<String, String> message) {
+        return streamAdd(streamKey, message, 0);
+    }
+
+    /**
+     * 发送消息到 Stream（带长度限制）
+     *
+     * @param streamKey Stream 键
+     * @param message   消息内容
+     * @param maxLen    最大长度，超过时自动裁剪旧消息，0 表示不限制
+     * @return 消息ID
+     */
+    public String streamAdd(String streamKey, Map<String, String> message, int maxLen) {
         RStream<String, String> stream = redissonClient.getStream(streamKey, StringCodec.INSTANCE);
-        StreamMessageId messageId = stream.add(StreamAddArgs.entries(message));
-        log.debug("发送 Stream 消息: stream={}, messageId={}", streamKey, messageId);
+        StreamAddArgs<String, String> args = StreamAddArgs.entries(message);
+        if (maxLen > 0) {
+            args.trimNonStrict().maxLen(maxLen);
+        }
+        StreamMessageId messageId = stream.add(args);
+        log.debug("发送 Stream 消息: stream={}, messageId={}, maxLen={}", streamKey, messageId, maxLen);
         return messageId.toString();
     }
 

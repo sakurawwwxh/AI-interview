@@ -38,7 +38,8 @@ public class VectorizeStreamProducer {
 
             String messageId = redisService.streamAdd(
                 AsyncTaskStreamConstants.KB_VECTORIZE_STREAM_KEY,
-                message
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
             );
 
             log.info("向量化任务已发送到Stream: kbId={}, messageId={}", kbId, messageId);

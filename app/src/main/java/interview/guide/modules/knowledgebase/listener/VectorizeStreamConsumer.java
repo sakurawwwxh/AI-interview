@@ -160,7 +160,11 @@ public class VectorizeStreamConsumer {
                 AsyncTaskStreamConstants.FIELD_RETRY_COUNT, String.valueOf(retryCount)
             );
 
-            redisService.streamAdd(AsyncTaskStreamConstants.KB_VECTORIZE_STREAM_KEY, message);
+            redisService.streamAdd(
+                AsyncTaskStreamConstants.KB_VECTORIZE_STREAM_KEY,
+                message,
+                AsyncTaskStreamConstants.STREAM_MAX_LEN
+            );
             log.info("向量化任务已重新入队: kbId={}, retryCount={}", kbId, retryCount);
 
         } catch (Exception e) {

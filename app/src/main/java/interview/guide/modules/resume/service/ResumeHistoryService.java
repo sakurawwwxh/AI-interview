@@ -104,6 +104,8 @@ public class ResumeHistoryService {
             resume.getUploadedAt(),
             resume.getAccessCount(),
             resume.getResumeText(),
+            resume.getAnalyzeStatus(),
+            resume.getAnalyzeError(),
             analysisHistory,
             interviewHistory
         );
