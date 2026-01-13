@@ -2,6 +2,8 @@ package interview.guide.infrastructure.file;
 
 import org.springframework.stereotype.Service;
 
+import java.util.stream.Collectors;
+
 /**
  * 文本清理服务
  * 提供统一的文本内容清理和规范化功能
@@ -11,9 +13,19 @@ public class TextCleaningService {
 
     /**
      * 清理和规范化文本内容
+     * 
+     * 格式级清理：
      * - 规范化换行符
      * - 去除连续多个空行
      * - 去除行首行尾多余空格
+     * 
+     * 语义级过滤（简历场景化）：
+     * - 去除图片文件名（整行匹配，防止误杀）
+     * - 去除 Tika PDF 临时文件路径
+     * - 去除 HTTP 图片链接
+     * - 去除只有符号的分隔线
+     * 
+     * 作为 RAG/AI 分析前的"保险层"，确保文本质量
      *
      * @param text 原始文本
      * @return 清理后的文本
@@ -24,16 +36,32 @@ public class TextCleaningService {
         }
 
         return text
-            // 规范化换行符
+            // ========== 语义过滤层（简历场景化）==========
+            // 1. 去除图片文件名（整行匹配，防止误删正文中的字符串）
+            .replaceAll("(?m)^image\\d+\\.(png|jpg|jpeg|gif)$", "")
+            
+            // 2. 去除 Tika PDF 临时文件路径
+            .replaceAll("file:///.*?\\.html\\?query=\\d+", "")
+            
+            // 3. 去除 HTTP 图片链接（明显 URI）
+            .replaceAll("http://.*?image\\d+\\.(png|jpg|jpeg|gif)", "")
+            
+            // 4. 去除只有符号的分隔线（整行匹配）
+            .replaceAll("(?m)^[-_*=]{3,}$", "")
+            
+            // ========== 格式清理层 ==========
+            // 5. 规范化换行符
             .replaceAll("\\r\\n", "\n")
             .replaceAll("\\r", "\n")
-            // 去除连续多个空行，保留最多两个
+            
+            // 6. 去除连续多个空行，保留最多两个
             .replaceAll("\\n{3,}", "\n\n")
-            // 去除行首行尾多余空格
+            
+            // 7. 去除行首行尾多余空格
             .lines()
             .map(String::strip)
-            .reduce((a, b) -> a + "\n" + b)
-            .orElse("")
+            .filter(line -> !line.isEmpty()) // 过滤空行（由语义过滤产生的）
+            .collect(Collectors.joining("\n"))
             .strip();
     }
 
