@@ -43,8 +43,8 @@ public class TextCleaningService {
             // 2. 去除 Tika PDF 临时文件路径
             .replaceAll("file:///.*?\\.html\\?query=\\d+", "")
             
-            // 3. 去除 HTTP 图片链接（明显 URI）
-            .replaceAll("http://.*?image\\d+\\.(png|jpg|jpeg|gif)", "")
+            // 3. 去除 HTTP/HTTPS 图片链接
+            .replaceAll("https?://[^\\s]*?\\.(png|jpe?g|gif|bmp|webp)", "")
             
             // 4. 去除只有符号的分隔线（整行匹配）
             .replaceAll("(?m)^[-_*=]{3,}$", "")
