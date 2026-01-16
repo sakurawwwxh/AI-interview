@@ -98,5 +98,10 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      * 按向量化状态统计数量
      */
     long countByVectorStatus(VectorStatus vectorStatus);
+
+    /**
+     * 按向量化状态查找知识库（按上传时间倒序）
+     */
+    List<KnowledgeBaseEntity> findByVectorStatusOrderByUploadedAtDesc(VectorStatus vectorStatus);
 }
 

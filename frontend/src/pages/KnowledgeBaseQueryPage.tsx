@@ -123,7 +123,8 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const loadKnowledgeBases = async () => {
     setLoadingList(true);
     try {
-      const list = await knowledgeBaseApi.getAllKnowledgeBases(sortBy);
+      // 问答助手只显示向量化完成的知识库
+      const list = await knowledgeBaseApi.getAllKnowledgeBases(sortBy, 'COMPLETED');
       setKnowledgeBases(list);
     } catch (err) {
       console.error('加载知识库列表失败', err);
