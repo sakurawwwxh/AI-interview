@@ -34,12 +34,43 @@ public class KnowledgeBaseListService {
     private final FileStorageService fileStorageService;
 
     /**
-     * 获取所有知识库列表
+     * 获取知识库列表（支持状态过滤和排序）
+     * 
+     * @param vectorStatus 向量化状态，null 表示不过滤
+     * @param sortBy 排序字段，null 或 "time" 表示按时间排序
+     * @return 知识库列表
+     */
+    public List<KnowledgeBaseListItemDTO> listKnowledgeBases(VectorStatus vectorStatus, String sortBy) {
+        List<KnowledgeBaseEntity> entities;
+        
+        // 如果指定了状态，按状态过滤
+        if (vectorStatus != null) {
+            entities = knowledgeBaseRepository.findByVectorStatusOrderByUploadedAtDesc(vectorStatus);
+        } else {
+            // 否则获取所有知识库
+            entities = knowledgeBaseRepository.findAllByOrderByUploadedAtDesc();
+        }
+        
+        // 如果指定了排序字段，在内存中排序
+        if (sortBy != null && !sortBy.isBlank() && !sortBy.equalsIgnoreCase("time")) {
+            entities = sortEntities(entities, sortBy);
+        }
+        
+        return knowledgeBaseMapper.toListItemDTOList(entities);
+    }
+
+    /**
+     * 获取所有知识库列表（保持向后兼容）
      */
     public List<KnowledgeBaseListItemDTO> listKnowledgeBases() {
-        return knowledgeBaseMapper.toListItemDTOList(
-            knowledgeBaseRepository.findAllByOrderByUploadedAtDesc()
-        );
+        return listKnowledgeBases(null, null);
+    }
+
+    /**
+     * 按向量化状态获取知识库列表（保持向后兼容）
+     */
+    public List<KnowledgeBaseListItemDTO> listKnowledgeBasesByStatus(VectorStatus vectorStatus) {
+        return listKnowledgeBases(vectorStatus, null);
     }
 
     /**
@@ -119,17 +150,28 @@ public class KnowledgeBaseListService {
     // ========== 排序功能 ==========
 
     /**
-     * 按指定字段排序获取知识库列表
+     * 按指定字段排序获取知识库列表（保持向后兼容）
      */
     public List<KnowledgeBaseListItemDTO> listSorted(String sortBy) {
-        List<KnowledgeBaseEntity> entities;
-        switch (sortBy != null ? sortBy.toLowerCase() : "time") {
-            case "size" -> entities = knowledgeBaseRepository.findAllByOrderByFileSizeDesc();
-            case "access" -> entities = knowledgeBaseRepository.findAllByOrderByAccessCountDesc();
-            case "question" -> entities = knowledgeBaseRepository.findAllByOrderByQuestionCountDesc();
-            default -> entities = knowledgeBaseRepository.findAllByOrderByUploadedAtDesc();
-        }
-        return knowledgeBaseMapper.toListItemDTOList(entities);
+        return listKnowledgeBases(null, sortBy);
+    }
+
+    /**
+     * 在内存中对实体列表排序
+     */
+    private List<KnowledgeBaseEntity> sortEntities(List<KnowledgeBaseEntity> entities, String sortBy) {
+        return switch (sortBy.toLowerCase()) {
+            case "size" -> entities.stream()
+                .sorted((a, b) -> Long.compare(b.getFileSize(), a.getFileSize()))
+                .toList();
+            case "access" -> entities.stream()
+                .sorted((a, b) -> Integer.compare(b.getAccessCount(), a.getAccessCount()))
+                .toList();
+            case "question" -> entities.stream()
+                .sorted((a, b) -> Integer.compare(b.getQuestionCount(), a.getQuestionCount()))
+                .toList();
+            default -> entities; // time 已经在数据库层面排序了
+        };
     }
 
     // ========== 统计功能 ==========
