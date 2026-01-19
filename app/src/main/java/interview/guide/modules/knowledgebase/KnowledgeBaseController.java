@@ -5,6 +5,7 @@ import interview.guide.modules.knowledgebase.model.KnowledgeBaseListItemDTO;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseStatsDTO;
 import interview.guide.modules.knowledgebase.model.QueryRequest;
 import interview.guide.modules.knowledgebase.model.QueryResponse;
+import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseDeleteService;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseListService;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseQueryService;
@@ -42,11 +43,19 @@ public class KnowledgeBaseController {
      */
     @GetMapping("/api/knowledgebase/list")
     public Result<List<KnowledgeBaseListItemDTO>> getAllKnowledgeBases(
-            @RequestParam(value = "sortBy", required = false) String sortBy) {
-        if (sortBy != null && !sortBy.isBlank()) {
-            return Result.success(listService.listSorted(sortBy));
+            @RequestParam(value = "sortBy", required = false) String sortBy,
+            @RequestParam(value = "vectorStatus", required = false) String vectorStatus) {
+        
+        VectorStatus status = null;
+        if (vectorStatus != null && !vectorStatus.isBlank()) {
+            try {
+                status = VectorStatus.valueOf(vectorStatus.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return Result.error("无效的向量化状态: " + vectorStatus);
+            }
         }
-        return Result.success(listService.listKnowledgeBases());
+        
+        return Result.success(listService.listKnowledgeBases(status, sortBy));
     }
 
     /**

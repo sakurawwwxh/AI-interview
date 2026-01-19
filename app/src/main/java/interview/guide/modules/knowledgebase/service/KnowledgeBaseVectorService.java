@@ -20,27 +20,27 @@ import java.util.stream.Collectors;
 @Service
 public class KnowledgeBaseVectorService {
     
+    /**
+     * 阿里云 DashScope Embedding API 批量大小限制
+     */
+    private static final int MAX_BATCH_SIZE = 10;
     private final VectorStore vectorStore;
     private final TextSplitter textSplitter;
     private final VectorRepository vectorRepository;
-    
     public KnowledgeBaseVectorService(VectorStore vectorStore, VectorRepository vectorRepository) {
         this.vectorStore = vectorStore;
         this.vectorRepository = vectorRepository;
         // 使用TokenTextSplitter，每个chunk约500 tokens，重叠50 tokens
         this.textSplitter = new TokenTextSplitter();
     }
-    
     /**
      * 将知识库内容向量化并存储
-     * 
      * @param knowledgeBaseId 知识库ID
      * @param content 知识库文本内容
      */
     @Transactional
     public void vectorizeAndStore(Long knowledgeBaseId, String content) {
         log.info("开始向量化知识库: kbId={}, contentLength={}", knowledgeBaseId, content.length());
-        
         try {
             // 1. 先删除该知识库的旧向量数据
             deleteByKnowledgeBaseId(knowledgeBaseId);
@@ -55,12 +55,20 @@ public class KnowledgeBaseVectorService {
             // 3. 为每个chunk添加metadata（知识库ID）
             // 统一使用 String 类型存储，确保查询一致性
             chunks.forEach(chunk -> chunk.getMetadata().put("kb_id", knowledgeBaseId.toString()));
-            
-            // 4. 向量化并存储
-            vectorStore.add(chunks);
-            
-            log.info("知识库向量化完成: kbId={}, chunks={}", knowledgeBaseId, chunks.size());
-            
+            // 4. 分批向量化并存储（阿里云 DashScope API 限制 batch size <= 10）
+            int totalChunks = chunks.size();
+            int batchCount = (totalChunks + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE; // 向上取整
+            log.info("开始分批向量化: 总共 {} 个chunks，分 {} 批处理，每批最多 {} 个",
+                    totalChunks, batchCount, MAX_BATCH_SIZE);
+            for (int i = 0; i < batchCount; i++) {
+                int start = i * MAX_BATCH_SIZE;
+                int end = Math.min(start + MAX_BATCH_SIZE, totalChunks);
+                List<Document> batch = chunks.subList(start, end);
+                log.debug("处理第 {}/{} 批: chunks {}-{}", i + 1, batchCount, start + 1, end);
+                vectorStore.add(batch);
+            }
+            log.info("知识库向量化完成: kbId={}, chunks={}, batches={}",
+                    knowledgeBaseId, totalChunks, batchCount);
         } catch (Exception e) {
             log.error("向量化知识库失败: kbId={}, error={}", knowledgeBaseId, e.getMessage(), e);
             throw new RuntimeException("向量化知识库失败: " + e.getMessage(), e);

@@ -77,9 +77,16 @@ export const knowledgeBaseApi = {
   /**
    * 获取所有知识库列表
    */
-  async getAllKnowledgeBases(sortBy?: SortOption): Promise<KnowledgeBaseItem[]> {
-    const params = sortBy ? `?sortBy=${sortBy}` : '';
-    return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/list${params}`);
+  async getAllKnowledgeBases(sortBy?: SortOption, vectorStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'): Promise<KnowledgeBaseItem[]> {
+    const params = new URLSearchParams();
+    if (sortBy) {
+      params.append('sortBy', sortBy);
+    }
+    if (vectorStatus) {
+      params.append('vectorStatus', vectorStatus);
+    }
+    const queryString = params.toString();
+    return request.get<KnowledgeBaseItem[]>(`/api/knowledgebase/list${queryString ? `?${queryString}` : ''}`);
   },
 
   /**
