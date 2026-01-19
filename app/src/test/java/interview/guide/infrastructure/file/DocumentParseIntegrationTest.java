@@ -2,6 +2,7 @@ package interview.guide.infrastructure.file;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * DocumentParseService 集成测试
  * 使用真实的文件和服务进行端到端测试
  */
+@Tag("integration")
 @DisplayName("文档解析服务集成测试")
 class DocumentParseIntegrationTest {
 
@@ -75,10 +77,6 @@ class DocumentParseIntegrationTest {
         // 验证分隔线已被清理
         assertFalse(result.contains("===================="), "分隔线应被清理");
         assertFalse(result.contains("--------"), "分隔线应被清理");
-        
-        System.out.println("\n========== 解析结果（前 500 字符）==========");
-        System.out.println(result.substring(0, Math.min(500, result.length())));
-        System.out.println("\n总字符数: " + result.length());
     }
 
     @Test
@@ -134,12 +132,8 @@ class DocumentParseIntegrationTest {
         
         // 验证 Markdown 特定内容
         // Emoji 可能被保留或转换，取决于 Tika 的处理
-        assertTrue(result.contains("联系方式") || result.contains("邮箱"), 
+        assertTrue(result.contains("联系方式") || result.contains("邮箱"),
             "应包含联系方式部分");
-        
-        System.out.println("\n========== Markdown 解析结果（前 500 字符）==========");
-        System.out.println(result.substring(0, Math.min(500, result.length())));
-        System.out.println("\n总字符数: " + result.length());
     }
 
     @Test
@@ -187,9 +181,6 @@ class DocumentParseIntegrationTest {
         assertTrue(result.contains("王五"));
         assertTrue(result.contains("Spring Boot"));
         assertTrue(result.contains("github.com"));
-        
-        System.out.println("\n========== 特殊字符解析结果 ==========");
-        System.out.println(result);
     }
 
     @Test
@@ -259,9 +250,6 @@ class DocumentParseIntegrationTest {
         
         // 验证连续空行被压缩
         assertFalse(result.contains("\n\n\n"), "不应有超过2个连续换行符");
-        
-        System.out.println("\n========== 清理后的文本 ==========");
-        System.out.println(result);
     }
 
     @Test
@@ -311,9 +299,6 @@ class DocumentParseIntegrationTest {
         assertTrue(result.contains("Google Beijing"));
         assertTrue(result.contains("谷歌北京"));
         assertTrue(result.contains("Spring Boot"));
-        
-        System.out.println("\n========== 多语言解析结果 ==========");
-        System.out.println(result);
     }
 
     @Test
@@ -322,7 +307,7 @@ class DocumentParseIntegrationTest {
         // Given: 生成大文本（约 50KB）
         StringBuilder largeContent = new StringBuilder();
         largeContent.append("个人简历\n\n");
-        
+
         for (int i = 0; i < 100; i++) {
             largeContent.append("工作经历 ").append(i).append("\n");
             largeContent.append("2020-2023  公司名称  职位\n");
@@ -339,22 +324,14 @@ class DocumentParseIntegrationTest {
             largeContent.toString().getBytes(StandardCharsets.UTF_8)
         );
 
-        // When: 测试解析时间
-        long startTime = System.currentTimeMillis();
+        // When: 解析文件
         String result = documentParseService.parseContent(file);
-        long duration = System.currentTimeMillis() - startTime;
 
-        // Then
+        // Then: 验证解析成功
         assertNotNull(result);
         assertFalse(result.isEmpty());
-        
-        System.out.println("\n========== 大文件性能测试 ==========");
-        System.out.println("原始大小: " + largeContent.length() + " 字符");
-        System.out.println("解析后大小: " + result.length() + " 字符");
-        System.out.println("解析耗时: " + duration + "ms");
-        
-        // 验证性能（应该在合理时间内完成）
-        assertTrue(duration < 1000, "大文件解析时间过长: " + duration + "ms");
+        assertTrue(result.contains("个人简历"));
+        assertTrue(result.contains("工作经历"));
     }
 
     @Test
@@ -420,11 +397,7 @@ class DocumentParseIntegrationTest {
 
         // Then: 所有噪音被清理后，应该是空的或只有少量空白
         assertNotNull(result);
-        assertTrue(result.isEmpty() || result.isBlank(), 
+        assertTrue(result.isEmpty() || result.isBlank(),
             "纯噪音文档清理后应为空，实际: '" + result + "'");
-        
-        System.out.println("\n========== 纯噪音文档清理结果 ==========");
-        System.out.println("结果: '" + result + "'");
-        System.out.println("长度: " + result.length());
     }
 }

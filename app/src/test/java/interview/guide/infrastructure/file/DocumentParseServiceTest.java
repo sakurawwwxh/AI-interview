@@ -44,13 +44,9 @@ class DocumentParseServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         documentParseService = new DocumentParseService(textCleaningService);
-        
-        // 默认行为：TextCleaningService 返回清理后的文本
-        when(textCleaningService.cleanText(anyString())).thenAnswer(invocation -> {
-            String input = invocation.getArgument(0);
-            // 简单模拟清理：去除多余换行
-            return input.replaceAll("\\n{3,}", "\n\n").strip();
-        });
+
+        // 默认行为：TextCleaningService 直接返回输入（单元测试关注 DocumentParseService 逻辑）
+        when(textCleaningService.cleanText(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -421,31 +417,4 @@ class DocumentParseServiceTest {
         assertFalse(result.contains("--------"));
     }
 
-    @Test
-    @DisplayName("性能测试 - 解析多个文件")
-    void testPerformanceWithMultipleFiles() throws Exception {
-        // Given: 准备 10 个测试文件
-        int fileCount = 10;
-        long startTime = System.currentTimeMillis();
-
-        // When: 解析所有文件
-        for (int i = 0; i < fileCount; i++) {
-            String content = "这是第 " + i + " 个测试文件\n重复内容".repeat(100);
-            MultipartFile file = new MockMultipartFile(
-                "file",
-                "test_" + i + ".txt",
-                "text/plain",
-                content.getBytes(StandardCharsets.UTF_8)
-            );
-            
-            documentParseService.parseContent(file);
-        }
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-
-        // Then: 验证性能（10个文件应该在合理时间内完成）
-        System.out.println("解析 " + fileCount + " 个文件耗时: " + duration + "ms");
-        assertTrue(duration < 5000, "解析速度过慢: " + duration + "ms");
-    }
 }

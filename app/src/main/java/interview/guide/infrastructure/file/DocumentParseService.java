@@ -46,6 +46,12 @@ public class DocumentParseService {
         String fileName = file.getOriginalFilename();
         log.info("开始解析文件: {}", fileName);
 
+        // 处理空文件
+        if (file.isEmpty() || file.getSize() == 0) {
+            log.warn("文件为空: {}", fileName);
+            return "";
+        }
+
         try (InputStream inputStream = file.getInputStream()) {
             String content = parseContent(inputStream);
             String cleanedContent = textCleaningService.cleanText(content);
@@ -66,6 +72,12 @@ public class DocumentParseService {
      */
     public String parseContent(byte[] fileBytes, String fileName) {
         log.info("开始解析文件（从字节数组）: {}", fileName);
+
+        // 处理空文件
+        if (fileBytes == null || fileBytes.length == 0) {
+            log.warn("文件字节数组为空: {}", fileName);
+            return "";
+        }
 
         try (InputStream inputStream = new ByteArrayInputStream(fileBytes)) {
             String content = parseContent(inputStream);
