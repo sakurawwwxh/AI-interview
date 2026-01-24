@@ -76,13 +76,13 @@ public class ResumeController {
         try {
             var result = historyService.exportAnalysisPdf(id);
             String filename = URLEncoder.encode(result.filename(), StandardCharsets.UTF_8);
-            
+
             return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(result.pdfBytes());
         } catch (Exception e) {
-            log.error("导出PDF失败", e);
+            log.error("导出PDF失败: resumeId={}", id, e);
             return ResponseEntity.internalServerError().build();
         }
     }

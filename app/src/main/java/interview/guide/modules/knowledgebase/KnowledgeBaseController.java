@@ -93,7 +93,7 @@ public class KnowledgeBaseController {
     @PostMapping(value = "/api/knowledgebase/query/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 5)
     public Flux<String> queryKnowledgeBaseStream(@Valid @RequestBody QueryRequest request) {
-        log.info("收到知识库流式查询请求: kbIds={}, question={}", request.knowledgeBaseIds(), request.question());
+        log.debug("收到知识库流式查询请求: kbIds={}, question={}", request.knowledgeBaseIds(), request.question());
         return queryService.answerQuestionStream(request.knowledgeBaseIds(), request.question());
     }
 
