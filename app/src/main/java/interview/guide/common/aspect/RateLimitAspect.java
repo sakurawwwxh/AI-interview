@@ -127,13 +127,26 @@ public class RateLimitAspect {
      * 将结果对象安全转换为 Long
      */
     private Long convertToLong(Object obj) {
+        if (obj == null) {
+            return null;
+        }
         if (obj instanceof Long) {
             return (Long) obj;
         } else if (obj instanceof Integer) {
             return ((Integer) obj).longValue();
+        } else if (obj instanceof Short) {
+            return ((Short) obj).longValue();
+        } else if (obj instanceof Byte) {
+            return ((Byte) obj).longValue();
         } else if (obj instanceof String) {
-            return Long.parseLong((String) obj);
+            try {
+                return Long.parseLong((String) obj);
+            } catch (NumberFormatException e) {
+                log.warn("无法将字符串转换为Long: {}", obj);
+                return null;
+            }
         }
+        log.warn("不支持的对象类型转换为Long: {}", obj.getClass().getName());
         return null;
     }
 

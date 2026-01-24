@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * </pre>
  */
 @DisplayName("限流功能集成测试（需要 Redis）")
-// @Disabled
+@Disabled
 class RateLimitIntegrationTest {
 
     private static final String REDIS_ADDRESS = "redis://localhost:6379";
