@@ -1,5 +1,6 @@
 package interview.guide.modules.interview;
 
+import interview.guide.common.annotation.RateLimit;
 import interview.guide.common.result.Result;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.service.InterviewHistoryService;
@@ -33,6 +34,7 @@ public class InterviewController {
      * 创建面试会话
      */
     @PostMapping("/api/interview/sessions")
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 5)
     public Result<InterviewSessionDTO> createSession(@RequestBody CreateInterviewRequest request) {
         log.info("创建面试会话，题目数量: {}", request.questionCount());
         InterviewSessionDTO session = sessionService.createSession(request);
@@ -60,6 +62,7 @@ public class InterviewController {
      * 提交答案
      */
     @PostMapping("/api/interview/sessions/{sessionId}/answers")
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL}, count = 10)
     public Result<SubmitAnswerResponse> submitAnswer(
             @PathVariable String sessionId,
             @RequestBody Map<String, Object> body) {
