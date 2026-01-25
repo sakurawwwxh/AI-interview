@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef} from 'react';
 import {motion} from 'framer-motion';
+import {Virtuoso, type VirtuosoHandle} from 'react-virtuoso';
 import type {InterviewQuestion, InterviewSession} from '../types/interview';
 import {
   Send,
@@ -41,14 +42,8 @@ export default function InterviewChatPanel({
   // showCompleteConfirm, // 暂时未使用
   onShowCompleteConfirm
 }: InterviewChatPanelProps) {
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
-
   const progress = useMemo(() => {
     if (!session || !currentQuestion) return 0;
     return ((currentQuestion.questionIndex + 1) / session.totalQuestions) * 100;
@@ -83,15 +78,19 @@ export default function InterviewChatPanel({
       </div>
 
       {/* 聊天区域 */}
-      <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
-        <div 
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-6 space-y-4"
-        >
-          {messages.map((msg, idx) => (
-            <MessageBubble key={idx} message={msg} />
-          ))}
-        </div>
+      <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
+        <Virtuoso
+          ref={virtuosoRef}
+          data={messages}
+          initialTopMostItemIndex={messages.length - 1}
+          followOutput="smooth"
+          className="flex-1"
+          itemContent={(_index, msg) => (
+            <div className="pb-4 px-6 first:pt-6">
+              <MessageBubble message={msg} />
+            </div>
+          )}
+        />
 
         {/* 输入区域 */}
         <div className="border-t border-slate-200 p-4 bg-slate-50">
