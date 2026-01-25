@@ -69,10 +69,12 @@ public class InterviewQuestionService {
      * 
      * @param resumeText 简历文本
      * @param questionCount 问题数量
+     * @param historicalQuestions 历史问题列表（可选）
      * @return 面试问题列表
      */
-    public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount) {
-        log.info("开始生成面试问题，简历长度: {}, 问题数量: {}", resumeText.length(), questionCount);
+    public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount, List<String> historicalQuestions) {
+        log.info("开始生成面试问题，简历长度: {}, 问题数量: {}, 历史问题数: {}", 
+            resumeText.length(), questionCount, historicalQuestions != null ? historicalQuestions.size() : 0);
         
         // 计算各类型问题数量
         QuestionDistribution distribution = calculateDistribution(questionCount);
@@ -92,6 +94,15 @@ public class InterviewQuestionService {
             variables.put("javaConcurrentCount", distribution.javaConcurrent);
             variables.put("springCount", distribution.spring);
             variables.put("resumeText", resumeText);
+            
+            // 添加历史问题
+            if (historicalQuestions != null && !historicalQuestions.isEmpty()) {
+                String historicalText = String.join("\n", historicalQuestions);
+                variables.put("historicalQuestions", historicalText);
+            } else {
+                variables.put("historicalQuestions", "暂无历史提问");
+            }
+            
             String userPrompt = userPromptTemplate.render(variables);
             
             // 添加格式指令到系统提示词
@@ -123,6 +134,13 @@ public class InterviewQuestionService {
             // 返回默认问题集
             return generateDefaultQuestions(questionCount);
         }
+    }
+
+    /**
+     * 生成面试问题（不带历史问题）
+     */
+    public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount) {
+        return generateQuestions(resumeText, questionCount, null);
     }
     
     /**

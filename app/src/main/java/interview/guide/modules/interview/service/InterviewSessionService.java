@@ -56,10 +56,17 @@ public class InterviewSessionService {
         log.info("创建新面试会话: {}, 题目数量: {}, resumeId: {}",
             sessionId, request.questionCount(), request.resumeId());
 
+        // 获取历史问题
+        List<String> historicalQuestions = null;
+        if (request.resumeId() != null) {
+            historicalQuestions = persistenceService.getHistoricalQuestionsByResumeId(request.resumeId());
+        }
+
         // 生成面试问题
         List<InterviewQuestionDTO> questions = questionService.generateQuestions(
             request.resumeText(),
-            request.questionCount()
+            request.questionCount(),
+            historicalQuestions
         );
 
         // 保存到 Redis 缓存

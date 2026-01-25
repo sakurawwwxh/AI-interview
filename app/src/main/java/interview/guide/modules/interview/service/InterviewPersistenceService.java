@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
@@ -287,5 +288,30 @@ public class InterviewPersistenceService {
      */
     public List<InterviewAnswerEntity> findAnswersBySessionId(String sessionId) {
         return answerRepository.findBySessionSessionIdOrderByQuestionIndex(sessionId);
+    }
+
+    /**
+     * 获取简历的历史提问列表（限制最近的 N 条）
+     */
+    public List<String> getHistoricalQuestionsByResumeId(Long resumeId) {
+        // 限制只查询最近的 10 个会话，避免加载过多数据
+        List<InterviewSessionEntity> sessions = sessionRepository.findByResumeIdOrderByCreatedAtDesc(resumeId);
+        
+        return sessions.stream()
+            .map(InterviewSessionEntity::getQuestionsJson)
+            .filter(json -> json != null && !json.isEmpty())
+            .flatMap(json -> {
+                try {
+                    List<InterviewQuestionDTO> questions = objectMapper.readValue(json, 
+                        new TypeReference<List<InterviewQuestionDTO>>() {});
+                    return questions.stream().map(InterviewQuestionDTO::question);
+                } catch (Exception e) {
+                    log.error("解析历史问题JSON失败", e);
+                    return java.util.stream.Stream.empty();
+                }
+            })
+            .distinct()
+            .limit(30) // 核心改动：只保留最近的 30 道题
+            .toList();
     }
 }
