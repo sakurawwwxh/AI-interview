@@ -2,6 +2,7 @@ import {useEffect, useState, useRef, useTransition, useMemo} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {Virtuoso, type VirtuosoHandle} from 'react-virtuoso';
 import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/knowledgebase';
 import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
 import {formatDateOnly} from '../utils/date';
@@ -64,8 +65,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [loading, setLoading] = useState(false);
 
   // refs
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const isUserScrollingRef = useRef(false);
   const rafRef = useRef<number>();
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -82,43 +82,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       loadKnowledgeBases();
     }
   }, [sortBy]);
-
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      isUserScrollingRef.current = !isNearBottom;
-
-      if (isNearBottom) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => {
-          isUserScrollingRef.current = false;
-        }, 1000);
-      }
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isUserScrollingRef.current && !isPending) {
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'end'
-        });
-      });
-    }
-  }, [messages, isPending]);
 
   const loadKnowledgeBases = async () => {
     setLoadingList(true);
@@ -369,10 +332,6 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         () => {
           setLoading(false);
           loadSessions();
-          setTimeout(() => {
-            isUserScrollingRef.current = false;
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
         },
         (error: Error) => {
           console.error('流式查询失败:', error);
@@ -558,82 +517,84 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                 </div>
 
                 {/* 消息列表 */}
-                <div
-                  ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-4 space-y-4"
-                >
+                <div className="flex-1 min-h-0 relative">
                   {messages.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
                       <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p className="text-sm">开始提问吧！</p>
                     </div>
                   ) : (
-                    <AnimatePresence>
-                      {messages.map((msg, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
-                              msg.type === 'user'
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-white border border-slate-100 text-slate-800'
-                            }`}
+                    <Virtuoso
+                      ref={virtuosoRef}
+                      data={messages}
+                      initialTopMostItemIndex={messages.length - 1}
+                      followOutput="smooth"
+                      className="h-full w-full"
+                      itemContent={(index, msg) => (
+                        <div className="pb-4 px-4 first:pt-4">
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
                           >
-                            {msg.type === 'user' ? (
-                              <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</p>
-                            ) : (
-                              <div className="prose prose-slate prose-sm max-w-none
-                                prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
-                                prose-p:leading-7 prose-p:text-slate-700 prose-p:mb-3
-                                prose-strong:text-slate-900 prose-strong:font-bold
-                                prose-ul:my-3 prose-ol:my-3
-                                prose-li:my-1 prose-li:leading-7
-                                prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-code:font-normal
-                                marker:text-primary-500 marker:font-bold">
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkGfm]}
-                                  components={{
-                                    // 自定义代码块渲染
-                                    code: ({ className, children }) => {
-                                      const match = /language-(\w+)/.exec(className || '');
-                                      const isInline = !match;
+                            <div
+                              className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
+                                msg.type === 'user'
+                                  ? 'bg-primary-600 text-white'
+                                  : 'bg-white border border-slate-100 text-slate-800'
+                              }`}
+                            >
+                              {msg.type === 'user' ? (
+                                <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</p>
+                              ) : (
+                                <div className="prose prose-slate prose-sm max-w-none
+                                  prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mb-2 prose-headings:mt-4
+                                  prose-p:leading-7 prose-p:text-slate-700 prose-p:mb-3
+                                  prose-strong:text-slate-900 prose-strong:font-bold
+                                  prose-ul:my-3 prose-ol:my-3
+                                  prose-li:my-1 prose-li:leading-7
+                                  prose-code:bg-slate-100 prose-code:text-primary-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-code:font-normal
+                                  marker:text-primary-500 marker:font-bold">
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                      // 自定义代码块渲染
+                                      code: ({ className, children }) => {
+                                        const match = /language-(\w+)/.exec(className || '');
+                                        const isInline = !match;
 
-                                      if (isInline) {
+                                        if (isInline) {
+                                          return (
+                                            <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded-md text-sm font-normal">
+                                              {children}
+                                            </code>
+                                          );
+                                        }
+
+                                        // 代码块使用 CodeBlock 组件
                                         return (
-                                          <code className="bg-slate-100 text-primary-600 px-1.5 py-0.5 rounded-md text-sm font-normal">
-                                            {children}
-                                          </code>
+                                          <CodeBlock language={match[1]}>
+                                            {String(children).replace(/\n$/, '')}
+                                          </CodeBlock>
                                         );
-                                      }
-
-                                      // 代码块使用 CodeBlock 组件
-                                      return (
-                                        <CodeBlock language={match[1]}>
-                                          {String(children).replace(/\n$/, '')}
-                                        </CodeBlock>
-                                      );
-                                    },
-                                    // 禁用默认 pre 渲染，由 CodeBlock 处理
-                                    pre: ({ children }) => <>{children}</>,
-                                  }}
-                                >
-                                  {formatMarkdown(msg.content)}
-                                </ReactMarkdown>
-                                {loading && index === messages.length - 1 && (
-                                  <span className="inline-block w-0.5 h-5 bg-primary-500 ml-1 animate-pulse" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
+                                      },
+                                      // 禁用默认 pre 渲染，由 CodeBlock 处理
+                                      pre: ({ children }) => <>{children}</>,
+                                    }}
+                                  >
+                                    {formatMarkdown(msg.content)}
+                                  </ReactMarkdown>
+                                  {loading && index === messages.length - 1 && (
+                                    <span className="inline-block w-0.5 h-5 bg-primary-500 ml-1 animate-pulse" />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        </div>
+                      )}
+                    />
                   )}
-                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* 输入区域 */}
