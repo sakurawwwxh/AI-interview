@@ -1,16 +1,25 @@
-import {BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams} from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
-import UploadPage from './pages/UploadPage';
-import HistoryList from './pages/HistoryPage';
-import ResumeDetailPage from './pages/ResumeDetailPage';
-import Interview from './pages/InterviewPage';
-import InterviewHistoryPage from './pages/InterviewHistoryPage';
-import KnowledgeBaseQueryPage from './pages/KnowledgeBaseQueryPage';
-import KnowledgeBaseUploadPage from './pages/KnowledgeBaseUploadPage';
-import KnowledgeBaseManagePage from './pages/KnowledgeBaseManagePage';
-import {historyApi} from './api/history';
-import {useEffect, useState} from 'react';
-import type {UploadKnowledgeBaseResponse} from './api/knowledgebase';
+import { useEffect, useState, Suspense, lazy } from 'react';
+import { historyApi } from './api/history';
+import type { UploadKnowledgeBaseResponse } from './api/knowledgebase';
+
+// Lazy load components
+const UploadPage = lazy(() => import('./pages/UploadPage'));
+const HistoryList = lazy(() => import('./pages/HistoryPage'));
+const ResumeDetailPage = lazy(() => import('./pages/ResumeDetailPage'));
+const Interview = lazy(() => import('./pages/InterviewPage'));
+const InterviewHistoryPage = lazy(() => import('./pages/InterviewHistoryPage'));
+const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
+const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
+const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
+
+// Loading component
+const Loading = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-10 h-10 border-3 border-slate-200 border-t-primary-500 rounded-full animate-spin" />
+  </div>
+);
 
 // 上传页面包装器
 function UploadPageWrapper() {
@@ -27,11 +36,11 @@ function UploadPageWrapper() {
 // 历史记录列表包装器
 function HistoryListWrapper() {
   const navigate = useNavigate();
-  
+
   const handleSelectResume = (id: number) => {
     navigate(`/history/${id}`);
   };
-  
+
   return <HistoryList onSelectResume={handleSelectResume} />;
 }
 
@@ -39,19 +48,19 @@ function HistoryListWrapper() {
 function ResumeDetailWrapper() {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
-  
+
   if (!resumeId) {
     return <Navigate to="/history" replace />;
   }
-  
+
   const handleBack = () => {
     navigate('/history');
   };
-  
+
   const handleStartInterview = (resumeText: string, resumeId: number) => {
     navigate(`/interview/${resumeId}`, { state: { resumeText } });
   };
-  
+
   return (
     <ResumeDetailPage
       resumeId={parseInt(resumeId, 10)}
@@ -129,36 +138,38 @@ function InterviewWrapper() {
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          {/* 默认重定向到上传页面 */}
-          <Route index element={<Navigate to="/upload" replace />} />
-          
-          {/* 上传页面 */}
-          <Route path="upload" element={<UploadPageWrapper />} />
-          
-          {/* 历史记录列表（简历库） */}
-          <Route path="history" element={<HistoryListWrapper />} />
-          
-          {/* 简历详情 */}
-          <Route path="history/:resumeId" element={<ResumeDetailWrapper />} />
-          
-          {/* 面试记录列表 */}
-          <Route path="interviews" element={<InterviewHistoryWrapper />} />
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            {/* 默认重定向到上传页面 */}
+            <Route index element={<Navigate to="/upload" replace />} />
 
-          {/* 模拟面试 */}
-          <Route path="interview/:resumeId" element={<InterviewWrapper />} />
+            {/* 上传页面 */}
+            <Route path="upload" element={<UploadPageWrapper />} />
 
-          {/* 知识库管理 */}
-          <Route path="knowledgebase" element={<KnowledgeBaseManagePageWrapper />} />
+            {/* 历史记录列表（简历库） */}
+            <Route path="history" element={<HistoryListWrapper />} />
 
-          {/* 知识库上传 */}
-          <Route path="knowledgebase/upload" element={<KnowledgeBaseUploadPageWrapper />} />
+            {/* 简历详情 */}
+            <Route path="history/:resumeId" element={<ResumeDetailWrapper />} />
 
-          {/* 问答助手（知识库聊天） */}
-          <Route path="knowledgebase/chat" element={<KnowledgeBaseQueryPageWrapper />} />
-        </Route>
-      </Routes>
+            {/* 面试记录列表 */}
+            <Route path="interviews" element={<InterviewHistoryWrapper />} />
+
+            {/* 模拟面试 */}
+            <Route path="interview/:resumeId" element={<InterviewWrapper />} />
+
+            {/* 知识库管理 */}
+            <Route path="knowledgebase" element={<KnowledgeBaseManagePageWrapper />} />
+
+            {/* 知识库上传 */}
+            <Route path="knowledgebase/upload" element={<KnowledgeBaseUploadPageWrapper />} />
+
+            {/* 问答助手（知识库聊天） */}
+            <Route path="knowledgebase/chat" element={<KnowledgeBaseQueryPageWrapper />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
@@ -166,16 +177,16 @@ function App() {
 // 面试记录页面包装器
 function InterviewHistoryWrapper() {
   const navigate = useNavigate();
-  
+
   const handleBack = () => {
     navigate('/upload');
   };
-  
+
   const handleViewInterview = async (sessionId: string, resumeId?: number) => {
     if (resumeId) {
       // 如果有简历ID，跳转到简历详情页的面试详情
-      navigate(`/history/${resumeId}`, { 
-        state: { viewInterview: sessionId } 
+      navigate(`/history/${resumeId}`, {
+        state: { viewInterview: sessionId }
       });
     } else {
       // 否则尝试从面试详情中获取简历ID
@@ -189,7 +200,7 @@ function InterviewHistoryWrapper() {
       }
     }
   };
-  
+
   return <InterviewHistoryPage onBack={handleBack} onViewInterview={handleViewInterview} />;
 }
 
@@ -213,7 +224,7 @@ function KnowledgeBaseQueryPageWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const isChatMode = location.pathname === '/knowledgebase/chat';
-  
+
   const handleBack = () => {
     if (isChatMode) {
       navigate('/knowledgebase');
@@ -221,11 +232,11 @@ function KnowledgeBaseQueryPageWrapper() {
       navigate('/upload');
     }
   };
-  
+
   const handleUpload = () => {
     navigate('/knowledgebase/upload');
   };
-  
+
   return <KnowledgeBaseQueryPage onBack={handleBack} onUpload={handleUpload} />;
 }
 
@@ -241,7 +252,7 @@ function KnowledgeBaseUploadPageWrapper() {
   const handleBack = () => {
     navigate('/knowledgebase');
   };
-  
+
   return <KnowledgeBaseUploadPage onUploadComplete={handleUploadComplete} onBack={handleBack} />;
 }
 
