@@ -1,11 +1,11 @@
-import {useEffect, useState, useRef, useTransition, useMemo} from 'react';
-import {motion, AnimatePresence} from 'framer-motion';
+import { useEffect, useState, useRef, useTransition, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {Virtuoso, type VirtuosoHandle} from 'react-virtuoso';
-import {knowledgeBaseApi, type KnowledgeBaseItem, type SortOption} from '../api/knowledgebase';
-import {ragChatApi, type RagChatSessionListItem} from '../api/ragChat';
-import {formatDateOnly} from '../utils/date';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { knowledgeBaseApi, type KnowledgeBaseItem, type SortOption } from '../api/knowledgebase';
+import { ragChatApi, type RagChatSessionListItem } from '../api/ragChat';
+import { formatDateOnly } from '../utils/date';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import CodeBlock from '../components/CodeBlock';
 import {
@@ -66,11 +66,9 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
 
   // refs
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const isUserScrollingRef = useRef(false);
   const rafRef = useRef<number>();
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     loadKnowledgeBases();
@@ -432,11 +430,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                     <div
                       key={session.id}
                       onClick={() => handleLoadSession(session.id)}
-                      className={`p-3 rounded-lg cursor-pointer transition-all group ${
-                        currentSessionId === session.id
-                          ? 'bg-primary-50 border border-primary-500'
-                          : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
-                      } ${session.isPinned ? 'border-l-4 border-l-primary-500' : ''}`}
+                      className={`p-3 rounded-lg cursor-pointer transition-all group ${currentSessionId === session.id
+                        ? 'bg-primary-50 border border-primary-500'
+                        : 'bg-slate-50 hover:bg-slate-100 border border-transparent'
+                        } ${session.isPinned ? 'border-l-4 border-l-primary-500' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
@@ -453,11 +450,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                           <button
                             onClick={(e) => handleTogglePin(session.id, e)}
-                            className={`p-1 rounded transition-colors ${
-                              session.isPinned
-                                ? 'text-primary-500 hover:text-primary-600'
-                                : 'text-slate-400 hover:text-primary-500'
-                            }`}
+                            className={`p-1 rounded transition-colors ${session.isPinned
+                              ? 'text-primary-500 hover:text-primary-600'
+                              : 'text-slate-400 hover:text-primary-500'
+                              }`}
                             title={session.isPinned ? '取消置顶' : '置顶'}
                           >
                             <Pin className={`w-4 h-4 ${session.isPinned ? 'fill-primary-500' : ''}`} />
@@ -538,11 +534,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                             className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
                           >
                             <div
-                              className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${
-                                msg.type === 'user'
-                                  ? 'bg-primary-600 text-white'
-                                  : 'bg-white border border-slate-100 text-slate-800'
-                              }`}
+                              className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${msg.type === 'user'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white border border-slate-100 text-slate-800'
+                                }`}
                             >
                               {msg.type === 'user' ? (
                                 <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</p>
@@ -625,7 +620,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
               <div className="flex-1 flex items-center justify-center text-slate-400">
                 <div className="text-center">
                   <svg className="w-12 h-12 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <p className="text-sm">请先在右侧选择知识库</p>
                 </div>
@@ -740,11 +735,10 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                                     <div
                                       key={kb.id}
                                       onClick={() => handleToggleKb(kb.id)}
-                                      className={`p-2 rounded-lg cursor-pointer transition-all ${
-                                        selectedKbIds.has(kb.id)
-                                          ? 'bg-primary-50 border border-primary-500'
-                                          : 'bg-white hover:bg-slate-50 border border-transparent'
-                                      }`}
+                                      className={`p-2 rounded-lg cursor-pointer transition-all ${selectedKbIds.has(kb.id)
+                                        ? 'bg-primary-50 border border-primary-500'
+                                        : 'bg-white hover:bg-slate-50 border border-transparent'
+                                        }`}
                                     >
                                       <div className="flex items-center gap-2">
                                         <input
