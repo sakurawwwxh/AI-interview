@@ -1,7 +1,7 @@
-import {useEffect, useMemo, useRef} from 'react';
-import {motion} from 'framer-motion';
-import {Virtuoso, type VirtuosoHandle} from 'react-virtuoso';
-import type {InterviewQuestion, InterviewSession} from '../types/interview';
+import { useMemo, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import type { InterviewQuestion, InterviewSession } from '../types/interview';
 import {
   Send,
   User
@@ -43,7 +43,7 @@ export default function InterviewChatPanel({
   onShowCompleteConfirm
 }: InterviewChatPanelProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  
+
   const progress = useMemo(() => {
     if (!session || !currentQuestion) return 0;
     return ((currentQuestion.questionIndex + 1) / session.totalQuestions) * 100;
@@ -114,7 +114,7 @@ export default function InterviewChatPanel({
               >
                 {isSubmitting ? (
                   <>
-                    <motion.div 
+                    <motion.div
                       className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -187,8 +187,8 @@ function MessageBubble({ message }: { message: Message }) {
       </div>
       <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
         <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
         </svg>
       </div>
     </motion.div>
