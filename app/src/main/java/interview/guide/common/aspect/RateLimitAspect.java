@@ -26,7 +26,7 @@ import java.util.UUID;
 
 /**
  * 限流 AOP 切面
- * 实现基于令牌桶算法的多维度限流
+ * 基于滑动时间窗口实现的多维度原子限流
  */
 @Slf4j
 @Aspect
