@@ -8,6 +8,12 @@ spring:
   application:
     name: ai-interview-platform
 
+  # 启用虚拟线程 (Java 21+)
+  # 显著提升 I/O 密集型场景的并发能力，特别适合 AI 调用和 SSE 长连接
+  threads:
+    virtual:
+      enabled: true
+
   # PostgreSQL数据库配置
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}
