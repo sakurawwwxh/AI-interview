@@ -83,7 +83,7 @@ public class InterviewSessionService {
         if (request.resumeId() != null) {
             try {
                 persistenceService.saveSession(sessionId, request.resumeId(),
-                    request.questionCount(), questions);
+                    questions.size(), questions);
             } catch (Exception e) {
                 log.warn("保存面试会话到数据库失败: {}", e.getMessage());
             }

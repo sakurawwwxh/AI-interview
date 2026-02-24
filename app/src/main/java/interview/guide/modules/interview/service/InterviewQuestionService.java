@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 面试问题生成服务
@@ -33,6 +34,7 @@ public class InterviewQuestionService {
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<QuestionListDTO> outputConverter;
+    private final int followUpCount;
     
     // 问题类型权重分配（按优先级）
     private static final double PROJECT_RATIO = 0.20;      // 20% 项目经历
@@ -42,6 +44,7 @@ public class InterviewQuestionService {
     private static final double JAVA_COLLECTION_RATIO = 0.10; // 10% 集合
     private static final double JAVA_CONCURRENT_RATIO = 0.10; // 10% 并发
     private static final double SPRING_RATIO = 0.10;       // 10% Spring/SpringBoot
+    private static final int MAX_FOLLOW_UP_COUNT = 2;
     
     // 中间DTO用于接收AI响应
     private record QuestionListDTO(
@@ -51,17 +54,20 @@ public class InterviewQuestionService {
     private record QuestionDTO(
         String question,
         String type,
-        String category
+        String category,
+        List<String> followUps
     ) {}
     
     public InterviewQuestionService(
             ChatClient.Builder chatClientBuilder,
             @Value("classpath:prompts/interview-question-system.st") Resource systemPromptResource,
-            @Value("classpath:prompts/interview-question-user.st") Resource userPromptResource) throws IOException {
+            @Value("classpath:prompts/interview-question-user.st") Resource userPromptResource,
+            @Value("${app.interview.follow-up-count:1}") int followUpCount) throws IOException {
         this.chatClient = chatClientBuilder.build();
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(QuestionListDTO.class);
+        this.followUpCount = Math.max(0, Math.min(followUpCount, MAX_FOLLOW_UP_COUNT));
     }
     
     /**
@@ -93,6 +99,7 @@ public class InterviewQuestionService {
             variables.put("javaCollectionCount", distribution.javaCollection);
             variables.put("javaConcurrentCount", distribution.javaConcurrent);
             variables.put("springCount", distribution.spring);
+            variables.put("followUpCount", followUpCount);
             variables.put("resumeText", resumeText);
             
             // 添加历史问题
@@ -172,10 +179,27 @@ public class InterviewQuestionService {
     private List<InterviewQuestionDTO> convertToQuestions(QuestionListDTO dto) {
         List<InterviewQuestionDTO> questions = new ArrayList<>();
         int index = 0;
-        
+
+        if (dto == null || dto.questions() == null) {
+            return questions;
+        }
+
         for (QuestionDTO q : dto.questions()) {
+            if (q == null || q.question() == null || q.question().isBlank()) {
+                continue;
+            }
             QuestionType type = parseQuestionType(q.type());
             questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category()));
+
+            List<String> followUps = sanitizeFollowUps(q.followUps());
+            for (int i = 0; i < followUps.size(); i++) {
+                questions.add(InterviewQuestionDTO.create(
+                    index++,
+                    followUps.get(i),
+                    type,
+                    buildFollowUpCategory(q.category(), i + 1)
+                ));
+            }
         }
         
         return questions;
@@ -208,15 +232,51 @@ public class InterviewQuestionService {
             {"线程池的核心参数有哪些？如何合理配置？", "JAVA_CONCURRENT", "Java并发"},
         };
         
+        int index = 0;
         for (int i = 0; i < Math.min(count, defaultQuestions.length); i++) {
+            String mainQuestion = defaultQuestions[i][0];
+            QuestionType type = QuestionType.valueOf(defaultQuestions[i][1]);
+            String category = defaultQuestions[i][2];
             questions.add(InterviewQuestionDTO.create(
-                i,
-                defaultQuestions[i][0],
-                QuestionType.valueOf(defaultQuestions[i][1]),
-                defaultQuestions[i][2]
+                index++,
+                mainQuestion,
+                type,
+                category
             ));
+
+            for (int j = 0; j < followUpCount; j++) {
+                questions.add(InterviewQuestionDTO.create(
+                    index++,
+                    buildDefaultFollowUp(mainQuestion, j + 1),
+                    type,
+                    buildFollowUpCategory(category, j + 1)
+                ));
+            }
         }
         
         return questions;
+    }
+
+    private List<String> sanitizeFollowUps(List<String> followUps) {
+        if (followUpCount == 0 || followUps == null || followUps.isEmpty()) {
+            return List.of();
+        }
+        return followUps.stream()
+            .filter(item -> item != null && !item.isBlank())
+            .map(String::trim)
+            .limit(followUpCount)
+            .collect(Collectors.toList());
+    }
+
+    private String buildFollowUpCategory(String category, int order) {
+        String baseCategory = (category == null || category.isBlank()) ? "追问" : category;
+        return baseCategory + "（追问" + order + "）";
+    }
+
+    private String buildDefaultFollowUp(String mainQuestion, int order) {
+        if (order == 1) {
+            return "基于“" + mainQuestion + "”，请结合你亲自做过的一个真实场景展开说明。";
+        }
+        return "基于“" + mainQuestion + "”，如果线上出现异常，你会如何定位并给出修复方案？";
     }
 }

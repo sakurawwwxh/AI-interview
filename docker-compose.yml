@@ -162,6 +162,10 @@ services:
       # 这里的变量值来自宿主机的环境变量或 .env 文件
       AI_BAILIAN_API_KEY: ${AI_BAILIAN_API_KEY}
       AI_MODEL: ${AI_MODEL:-qwen-plus}
+
+      # === 面试参数配置 ===
+      APP_INTERVIEW_FOLLOW_UP_COUNT: ${APP_INTERVIEW_FOLLOW_UP_COUNT:-1}
+      APP_INTERVIEW_EVALUATION_BATCH_SIZE: ${APP_INTERVIEW_EVALUATION_BATCH_SIZE:-8}
     ports:
       - "8080:8080"
 
