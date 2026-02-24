@@ -91,32 +91,25 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 
 ### 简历管理模块
 
-- 多格式支持：PDF、DOCX、DOC、TXT
-- 异步简历分析
-- 实时显示分析进度（待分析/分析中/已完成/失败）
-- 简历分析失败自动重试（最多 3 次）
-- 基于内容哈希检测重复
-- PDF 简历分析报告导出
+- **多格式解析**：支持 PDF、DOCX、DOC、TXT 等多种简历格式。
+- **异步处理流**：基于 Redis Stream 实现异步简历分析，支持实时查看处理进度（待分析/分析中/已完成/失败）。
+- **稳定性保障**：内置分析失败自动重试机制（最多 3 次）与基于内容哈希的重复检测。
+- **分析报告导出**：支持将 AI 分析结果一键导出为结构化的 PDF 简历分析报告。
 
 ### 模拟面试模块
 
-- 基于简历生成个性化面试问题
-- 实时问答交互
-- 针对面试提供针对性改进建议
-- 异步生成模拟面试评估报告
-- 展示面试表现趋势
-- 面试统计信息
-- PDF 简历分析报告导出
+- **个性化出题**：基于简历内容智能生成针对性的面试题目，支持实时问答交互。
+- **智能追问流**：支持配置多轮智能追问（默认 1 条），构建模拟真实场景的线性问答流。
+- **分批评估机制**：创新性采用分批评估策略，有效规避大模型 Token 溢出风险，确保长文本评估稳定性。
+- **智能汇总建议**：对分批评估结果进行二次汇总，提供多维度的改进建议、表现趋势与统计信息。
+- **报告一键导出**：支持异步生成并导出详细的 PDF 模拟面试评估报告。
 
 ### 知识库管理模块
 
-- 多格式支持（PDF、DOCX、DOC、TXT、Markdown）
-- 文档上传和自动分块
-- 异步向量化处理
-- RAG 检索增强生成
-- 流式响应（SSE）
-- 智能问答对话
-- 知识库统计信息
+- **文档智能处理**：支持 PDF、DOCX、Markdown 等多种格式文档的自动上传、分块与异步向量化。
+- **RAG 检索增强**：集成向量数据库，通过检索增强生成（RAG）提升 AI 问答的准确性与专业度。
+- **流式响应交互**：基于 SSE（Server-Sent Events）技术实现打字机式流式响应。
+- **智能问答对话**：支持基于知识库内容的智能问答，并提供直观的知识库统计信息。
 
 ### TODO
 
@@ -126,7 +119,7 @@ InterviewGuide 是一个集成了简历分析、模拟面试和知识库管理�
 - [x] Docker 快速部署
 - [x] 添加 API 限流保护
 - [x] 前端性能优化（RAG 聊天 - 虚拟列表）
-- [ ] 模拟面试增加追问功能
+- [x] 模拟面试增加追问功能
 - [ ] 打通模拟面试和知识库
 
 ## 效果展示
@@ -272,13 +265,18 @@ spring:
 
 # RustFS (S3兼容) 存储配置
 app:
+  # 面试配置
+  interview:
+    follow-up-count: ${APP_INTERVIEW_FOLLOW_UP_COUNT:1}    # 每个主问题生成追问数量
+    evaluation:
+      batch-size: ${APP_INTERVIEW_EVALUATION_BATCH_SIZE:8} # 回答评估分批大小
   storage:
     endpoint: ${APP_STORAGE_ENDPOINT:http://localhost:9000}
     access-key: ${APP_STORAGE_ACCESS_KEY:wr45VXJZhCxc6FAWz0YR}
     secret-key: ${APP_STORAGE_SECRET_KEY:GtKxV57WJkpw4CvASPBzTy2DYElLnRqh8dIXQa0m}
     bucket: ${APP_STORAGE_BUCKET:interview-guide}
     region: ${APP_STORAGE_REGION:us-east-1}
-    
+
 
 
 ```
@@ -329,6 +327,10 @@ cp .env.example .env
 # 必填：AI_BAILIAN_API_KEY=your_key_here
 # 可选：AI_MODEL=qwen-plus        # 默认值为 qwen-plus
 #        # 也可以改为 qwen-max、qwen-long 等其他可用模型
+#
+# 面试参数配置（可选）：
+# APP_INTERVIEW_FOLLOW_UP_COUNT=1         # 每个主问题生成追问数量（默认 1）
+# APP_INTERVIEW_EVALUATION_BATCH_SIZE=8   # 回答评估分批大小（默认 8）
 
 # 3. 构建并启动所有服务
 docker-compose up -d --build
