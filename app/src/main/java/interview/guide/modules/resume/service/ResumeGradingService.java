@@ -1,5 +1,6 @@
 package interview.guide.modules.resume.service;
 
+import interview.guide.common.ai.StructuredOutputInvoker;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
@@ -33,6 +34,7 @@ public class ResumeGradingService {
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<ResumeAnalysisResponseDTO> outputConverter;
+    private final StructuredOutputInvoker structuredOutputInvoker;
     
     // 中间DTO用于接收AI响应
     private record ResumeAnalysisResponseDTO(
@@ -60,9 +62,11 @@ public class ResumeGradingService {
     
     public ResumeGradingService(
             ChatClient.Builder chatClientBuilder,
+            StructuredOutputInvoker structuredOutputInvoker,
             @Value("classpath:prompts/resume-analysis-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/resume-analysis-user.st") Resource userPromptResource) throws IOException {
         this.chatClient = chatClientBuilder.build();
+        this.structuredOutputInvoker = structuredOutputInvoker;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(ResumeAnalysisResponseDTO.class);
@@ -92,11 +96,16 @@ public class ResumeGradingService {
             // 调用AI
             ResumeAnalysisResponseDTO dto;
             try {
-                dto = chatClient.prompt()
-                    .system(systemPromptWithFormat)
-                    .user(userPrompt)
-                    .call()
-                    .entity(outputConverter);
+                dto = structuredOutputInvoker.invoke(
+                    chatClient,
+                    systemPromptWithFormat,
+                    userPrompt,
+                    outputConverter,
+                    ErrorCode.RESUME_ANALYSIS_FAILED,
+                    "简历分析失败：",
+                    "简历分析",
+                    log
+                );
                 log.debug("AI响应解析成功: overallScore={}", dto.overallScore());
             } catch (Exception e) {
                 log.error("简历分析AI调用失败: {}", e.getMessage(), e);

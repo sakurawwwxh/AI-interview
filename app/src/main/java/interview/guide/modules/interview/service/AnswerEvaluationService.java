@@ -1,5 +1,6 @@
 package interview.guide.modules.interview.service;
 
+import interview.guide.common.ai.StructuredOutputInvoker;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
@@ -34,13 +35,6 @@ import java.util.stream.Collectors;
 public class AnswerEvaluationService {
     
     private static final Logger log = LoggerFactory.getLogger(AnswerEvaluationService.class);
-    private static final int MAX_STRUCTURED_ATTEMPTS = 2;
-    private static final String STRICT_JSON_INSTRUCTION = """
-请仅返回可被 JSON 解析器直接解析的 JSON 对象，并严格满足字段结构要求：
-1) 不要输出 Markdown 代码块（如 ```json）。
-2) 不要输出任何解释文字、前后缀、注释。
-3) 所有字符串内引号必须正确转义。
-""";
     
     private final ChatClient chatClient;
     private final PromptTemplate systemPromptTemplate;
@@ -49,6 +43,7 @@ public class AnswerEvaluationService {
     private final PromptTemplate summarySystemPromptTemplate;
     private final PromptTemplate summaryUserPromptTemplate;
     private final BeanOutputConverter<FinalSummaryDTO> summaryOutputConverter;
+    private final StructuredOutputInvoker structuredOutputInvoker;
     private final int evaluationBatchSize;
     
     // 中间DTO用于接收AI响应
@@ -82,12 +77,14 @@ public class AnswerEvaluationService {
     
     public AnswerEvaluationService(
             ChatClient.Builder chatClientBuilder,
+            StructuredOutputInvoker structuredOutputInvoker,
             @Value("classpath:prompts/interview-evaluation-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/interview-evaluation-user.st") Resource userPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-system.st") Resource summarySystemPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-user.st") Resource summaryUserPromptResource,
             @Value("${app.interview.evaluation.batch-size:8}") int evaluationBatchSize) throws IOException {
         this.chatClient = chatClientBuilder.build();
+        this.structuredOutputInvoker = structuredOutputInvoker;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(EvaluationReportDTO.class);
@@ -193,7 +190,16 @@ public class AnswerEvaluationService {
 
         String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
         try {
-            EvaluationReportDTO dto = callBatchEvaluationStructured(systemPromptWithFormat, userPrompt);
+            EvaluationReportDTO dto = structuredOutputInvoker.invoke(
+                chatClient,
+                systemPromptWithFormat,
+                userPrompt,
+                outputConverter,
+                ErrorCode.INTERVIEW_EVALUATION_FAILED,
+                "面试评估失败：",
+                "批次评估",
+                log
+            );
             log.debug("批次评估完成: sessionId={}, range=[{}, {}), batchSize={}",
                 sessionId, start, end, batchQuestions.size());
             return dto;
@@ -281,7 +287,16 @@ public class AnswerEvaluationService {
             String summaryUserPrompt = summaryUserPromptTemplate.render(variables);
 
             String systemPromptWithFormat = summarySystemPrompt + "\n\n" + summaryOutputConverter.getFormat();
-            FinalSummaryDTO dto = callSummaryStructured(systemPromptWithFormat, summaryUserPrompt);
+            FinalSummaryDTO dto = structuredOutputInvoker.invoke(
+                chatClient,
+                systemPromptWithFormat,
+                summaryUserPrompt,
+                summaryOutputConverter,
+                ErrorCode.INTERVIEW_EVALUATION_FAILED,
+                "面试总结失败：",
+                "总结评估",
+                log
+            );
 
             String overallFeedback = dto != null && dto.overallFeedback() != null && !dto.overallFeedback().isBlank()
                 ? dto.overallFeedback()
@@ -318,54 +333,6 @@ public class AnswerEvaluationService {
             .distinct()
             .limit(8)
             .toList();
-    }
-
-    private EvaluationReportDTO callBatchEvaluationStructured(String systemPromptWithFormat, String userPrompt) {
-        Exception lastError = null;
-        for (int attempt = 1; attempt <= MAX_STRUCTURED_ATTEMPTS; attempt++) {
-            String attemptSystemPrompt = attempt == 1
-                ? systemPromptWithFormat
-                : systemPromptWithFormat + "\n\n" + STRICT_JSON_INSTRUCTION
-                    + "\n上次输出解析失败，请仅返回合法 JSON。";
-            try {
-                return chatClient.prompt()
-                    .system(attemptSystemPrompt)
-                    .user(userPrompt)
-                    .call()
-                    .entity(outputConverter);
-            } catch (Exception e) {
-                lastError = e;
-                log.warn("批次评估结构化解析失败，准备重试: attempt={}, error={}", attempt, e.getMessage());
-            }
-        }
-        throw new BusinessException(
-            ErrorCode.INTERVIEW_EVALUATION_FAILED,
-            "面试评估失败：" + (lastError != null ? lastError.getMessage() : "unknown")
-        );
-    }
-
-    private FinalSummaryDTO callSummaryStructured(String systemPromptWithFormat, String userPrompt) {
-        Exception lastError = null;
-        for (int attempt = 1; attempt <= MAX_STRUCTURED_ATTEMPTS; attempt++) {
-            String attemptSystemPrompt = attempt == 1
-                ? systemPromptWithFormat
-                : systemPromptWithFormat + "\n\n" + STRICT_JSON_INSTRUCTION
-                    + "\n上次输出解析失败，请仅返回合法 JSON。";
-            try {
-                return chatClient.prompt()
-                    .system(attemptSystemPrompt)
-                    .user(userPrompt)
-                    .call()
-                    .entity(summaryOutputConverter);
-            } catch (Exception e) {
-                lastError = e;
-                log.warn("总结评估结构化解析失败，准备重试: attempt={}, error={}", attempt, e.getMessage());
-            }
-        }
-        throw new BusinessException(
-            ErrorCode.INTERVIEW_EVALUATION_FAILED,
-            "面试总结失败：" + (lastError != null ? lastError.getMessage() : "unknown")
-        );
     }
 
     private String buildCategorySummary(List<InterviewQuestionDTO> questions, List<QuestionEvaluationDTO> evaluations) {

@@ -77,6 +77,11 @@ spring:
 
 # Application custom configuration
 app:
+  ai:
+    # 结构化输出重试次数（用于 BeanOutputConverter 解析失败时的业务层重试）
+    structured-max-attempts: ${APP_AI_STRUCTURED_MAX_ATTEMPTS:2}
+    # 重试时是否将上次错误原因注入提示词，帮助模型定向修复输出
+    structured-include-last-error: ${APP_AI_STRUCTURED_INCLUDE_LAST_ERROR:true}
   interview:
     follow-up-count: ${APP_INTERVIEW_FOLLOW_UP_COUNT:1}
     evaluation:
