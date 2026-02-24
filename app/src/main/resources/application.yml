@@ -57,7 +57,7 @@ spring:
       chat:
         options:
           model: ${AI_MODEL:qwen-plus}
-          temperature: 0.7
+          temperature: 0.2
       # Embedding模型配置 - 使用text-embedding-v3
       embedding:
         options:

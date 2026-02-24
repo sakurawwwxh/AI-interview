@@ -29,6 +29,13 @@ import java.util.stream.Collectors;
 public class InterviewQuestionService {
     
     private static final Logger log = LoggerFactory.getLogger(InterviewQuestionService.class);
+    private static final int MAX_STRUCTURED_ATTEMPTS = 2;
+    private static final String STRICT_JSON_INSTRUCTION = """
+请仅返回可被 JSON 解析器直接解析的 JSON 对象，并严格满足字段结构要求：
+1) 不要输出 Markdown 代码块（如 ```json）。
+2) 不要输出任何解释文字、前后缀、注释。
+3) 所有字符串内引号必须正确转义。
+""";
     
     private final ChatClient chatClient;
     private final PromptTemplate systemPromptTemplate;
@@ -118,11 +125,7 @@ public class InterviewQuestionService {
             // 调用AI
             QuestionListDTO dto;
             try {
-                dto = chatClient.prompt()
-                    .system(systemPromptWithFormat)
-                    .user(userPrompt)
-                    .call()
-                    .entity(outputConverter);
+                dto = callStructuredQuestionGeneration(systemPromptWithFormat, userPrompt);
                 log.debug("AI响应解析成功: questions count={}", dto.questions().size());
             } catch (Exception e) {
                 log.error("面试问题生成AI调用失败: {}", e.getMessage(), e);
@@ -266,6 +269,30 @@ public class InterviewQuestionService {
             .map(String::trim)
             .limit(followUpCount)
             .collect(Collectors.toList());
+    }
+
+    private QuestionListDTO callStructuredQuestionGeneration(String systemPromptWithFormat, String userPrompt) {
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= MAX_STRUCTURED_ATTEMPTS; attempt++) {
+            String attemptSystemPrompt = attempt == 1
+                ? systemPromptWithFormat
+                : systemPromptWithFormat + "\n\n" + STRICT_JSON_INSTRUCTION
+                    + "\n上次输出解析失败，请仅返回合法 JSON。";
+            try {
+                return chatClient.prompt()
+                    .system(attemptSystemPrompt)
+                    .user(userPrompt)
+                    .call()
+                    .entity(outputConverter);
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("结构化问题生成解析失败，准备重试: attempt={}, error={}", attempt, e.getMessage());
+            }
+        }
+        throw new BusinessException(
+            ErrorCode.INTERVIEW_QUESTION_GENERATION_FAILED,
+            "面试问题生成失败：" + (lastError != null ? lastError.getMessage() : "unknown")
+        );
     }
 
     private String buildFollowUpCategory(String category, int order) {
