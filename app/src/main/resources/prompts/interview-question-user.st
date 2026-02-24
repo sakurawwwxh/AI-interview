@@ -1,5 +1,6 @@
 # Input Data
-请根据以下候选人简历内容，生成共 {questionCount} 个面试问题。
+请根据以下候选人简历内容，生成共 {questionCount} 个主问题。
+每个主问题必须额外生成 {followUpCount} 个追问。
 
 ## 问题分布要求
 | 类型 | 数量 | 说明 |
