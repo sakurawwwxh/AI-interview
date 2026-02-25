@@ -197,7 +197,8 @@ public class InterviewQuestionService {
                 continue;
             }
             QuestionType type = parseQuestionType(q.type());
-            questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category()));
+            int mainQuestionIndex = index;
+            questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category(), false, null));
 
             List<String> followUps = sanitizeFollowUps(q.followUps());
             for (int i = 0; i < followUps.size(); i++) {
@@ -205,7 +206,9 @@ public class InterviewQuestionService {
                     index++,
                     followUps.get(i),
                     type,
-                    buildFollowUpCategory(q.category(), i + 1)
+                    buildFollowUpCategory(q.category(), i + 1),
+                    true,
+                    mainQuestionIndex
                 ));
             }
         }
@@ -249,15 +252,20 @@ public class InterviewQuestionService {
                 index++,
                 mainQuestion,
                 type,
-                category
+                category,
+                false,
+                null
             ));
 
+            int mainQuestionIndex = index - 1;
             for (int j = 0; j < followUpCount; j++) {
                 questions.add(InterviewQuestionDTO.create(
                     index++,
                     buildDefaultFollowUp(mainQuestion, j + 1),
                     type,
-                    buildFollowUpCategory(category, j + 1)
+                    buildFollowUpCategory(category, j + 1),
+                    true,
+                    mainQuestionIndex
                 ));
             }
         }
