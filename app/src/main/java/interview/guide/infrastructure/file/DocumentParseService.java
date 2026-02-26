@@ -92,7 +92,7 @@ public class DocumentParseService {
 
     /**
      * 核心解析方法：使用显式 Parser + Context 方式解析文档
-     * 
+     * <p>
      * 优化点：
      * 1. 使用 BodyContentHandler 只提取正文内容
      * 2. 禁用 EmbeddedDocumentExtractor，不解析嵌入资源（图片、附件）
