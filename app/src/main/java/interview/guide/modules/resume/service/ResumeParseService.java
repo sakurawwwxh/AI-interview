@@ -24,7 +24,7 @@ public class ResumeParseService {
     /**
      * 解析上传的简历文件，提取文本内容
      *
-     * @param file 上传的文件（支持PDF、DOCX、DOC、TXT）
+     * @param file 上传的文件（支持PDF、DOCX、DOC、TXT、MD等）
      * @return 提取的文本内容
      */
     public String parseResume(MultipartFile file) {
