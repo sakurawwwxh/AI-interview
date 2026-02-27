@@ -38,10 +38,10 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
     e.stopPropagation(); // 阻止触发行点击事件
     setDeleteConfirm({ id, filename });
   };
-  
+
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
-    
+
     const { id } = deleteConfirm;
     setDeletingId(id);
     try {
@@ -61,7 +61,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
   );
 
   return (
-    <motion.div 
+      <motion.div
       className="w-full"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -69,15 +69,15 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
       {/* 头部 */}
       <div className="flex justify-between items-start mb-10 flex-wrap gap-6">
         <div>
-          <motion.h1 
-            className="text-4xl font-bold text-slate-900 mb-2"
+            <motion.h1
+                className="text-4xl font-bold text-slate-900 dark:text-white mb-2"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
           >
             简历库
           </motion.h1>
-          <motion.p 
-            className="text-slate-500"
+            <motion.p
+                className="text-slate-500 dark:text-slate-400"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.1 }}
@@ -85,9 +85,9 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
             管理您已分析过的所有简历及面试记录
           </motion.p>
         </div>
-        
-        <motion.div 
-          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all"
+
+          <motion.div
+              className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
         >
@@ -108,43 +108,45 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
       {/* 加载状态 */}
       {loading && (
         <div className="text-center py-20">
-          <motion.div 
-            className="w-10 h-10 border-3 border-slate-200 border-t-primary-500 rounded-full mx-auto mb-4"
+            <motion.div
+                className="w-10 h-10 border-3 border-slate-200 dark:text-slate-200 border-t-primary-500 rounded-full mx-auto mb-4"
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           />
-          <p className="text-slate-500">加载中...</p>
+            <p className="text-slate-500 dark:text-slate-400">加载中...</p>
         </div>
       )}
 
       {/* 空状态 */}
       {!loading && filteredResumes.length === 0 && (
-        <motion.div 
-          className="text-center py-20 bg-white rounded-2xl"
+          <motion.div
+              className="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
         >
           <div className="text-6xl mb-6">📄</div>
-          <h3 className="text-xl font-semibold text-slate-700 mb-2">暂无简历记录</h3>
-          <p className="text-slate-500">上传简历开始您的第一次 AI 面试分析</p>
+              <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">暂无简历记录</h3>
+              <p className="text-slate-500 dark:text-slate-400">上传简历开始您的第一次 AI 面试分析</p>
         </motion.div>
       )}
 
       {/* 表格 */}
       {!loading && filteredResumes.length > 0 && (
-        <motion.div 
-          className="bg-white rounded-2xl shadow-sm overflow-hidden"
+          <motion.div
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm overflow-hidden"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">简历名称</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">上传日期</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">AI 评分</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wide">面试状态</th>
+            <tr className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
+                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">简历名称</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">上传日期</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">AI
+                    评分
+                </th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">面试状态</th>
                 <th className="w-20"></th>
               </tr>
             </thead>
@@ -157,40 +159,42 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                     onClick={() => onSelectResume(resume.id)}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors group"
+                    className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition-colors group"
                   >
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary-500">
+                          <div
+                              className="w-10 h-10 bg-primary-50 dark:bg-primary-900/30 rounded-xl flex items-center justify-center text-primary-500 dark:text-primary-400">
                           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
                             <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </div>
-                        <span className="font-medium text-slate-800">{resume.filename}</span>
+                          <span className="font-medium text-slate-800 dark:text-white">{resume.filename}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-slate-500">{formatDateOnly(resume.uploadedAt)}</td>
+                      <td className="px-6 py-5 text-slate-500 dark:text-slate-400">{formatDateOnly(resume.uploadedAt)}</td>
                     <td className="px-6 py-5">
                       {resume.latestScore !== undefined ? (
                         <div className="flex items-center gap-3">
-                          <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <motion.div 
+                            <div className="w-20 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <motion.div
                               className={`h-full ${getScoreProgressColor(resume.latestScore)} rounded-full`}
                               initial={{ width: 0 }}
                               animate={{ width: `${resume.latestScore}%` }}
                               transition={{ duration: 0.8, delay: index * 0.05 }}
                             />
                           </div>
-                          <span className="font-bold text-slate-800">{resume.latestScore}</span>
+                            <span className="font-bold text-slate-800 dark:text-white">{resume.latestScore}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                          <span className="text-slate-400 dark:text-slate-500">-</span>
                       )}
                     </td>
                     <td className="px-6 py-5">
                       {resume.interviewCount > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-sm font-medium">
+                          <span
+                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-900 text-emerald-600 rounded-full text-sm font-medium">
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
                             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
                             <polyline points="9,12 11,14 15,10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -198,7 +202,8 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                           已完成
                         </span>
                       ) : (
-                        <span className="inline-flex px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-sm">待面试</span>
+                          <span
+                              className="inline-flex px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-full text-sm">待面试</span>
                       )}
                     </td>
                     <td className="px-4">
@@ -206,7 +211,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                         <button
                           onClick={(e) => handleDeleteClick(resume.id, resume.filename, e)}
                           disabled={deletingId === resume.id}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="删除简历"
                         >
                           {deletingId === resume.id ? (
@@ -222,7 +227,9 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                             </svg>
                           )}
                         </button>
-                        <svg className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" viewBox="0 0 24 24" fill="none">
+                          <svg
+                              className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all"
+                              viewBox="0 0 24 24" fill="none">
                           <polyline points="9,18 15,12 9,6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
@@ -234,8 +241,8 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
           </table>
         </motion.div>
       )}
-      
-      {/* 删除确认对话框 */}
+
+          {/* 删除确认对话框 */}
       <DeleteConfirmDialog
         open={deleteConfirm !== null}
         item={deleteConfirm}
@@ -247,8 +254,8 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
           deleteConfirm ? (
             <>
               <p className="mb-2">确定要删除简历 <strong>"{deleteConfirm.filename}"</strong> 吗？</p>
-              <p className="text-sm text-slate-500 mb-2">删除后将同时删除：</p>
-              <ul className="text-sm text-slate-500 list-disc list-inside mb-2">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">删除后将同时删除：</p>
+                <ul className="text-sm text-slate-500 dark:text-red-400 list-disc list-inside mb-2">
                 <li>简历评价记录</li>
                 <li>所有模拟面试记录</li>
               </ul>
