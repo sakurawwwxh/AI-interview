@@ -36,7 +36,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [forceCreateNew, setForceCreateNew] = useState(false);
-  
+
   // 检查是否有未完成的面试（组件挂载时和resumeId变化时）
   useEffect(() => {
     if (resumeId) {
@@ -44,10 +44,10 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId]);
-  
+
   const checkUnfinishedSession = async () => {
     if (!resumeId) return;
-    
+
     setCheckingUnfinished(true);
     try {
       const foundSession = await interviewApi.findUnfinishedSession(resumeId);
@@ -60,33 +60,33 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       setCheckingUnfinished(false);
     }
   };
-  
+
   const handleContinueUnfinished = () => {
     if (!unfinishedSession) return;
     setForceCreateNew(false);  // 重置强制创建标志
     restoreSession(unfinishedSession);
     setUnfinishedSession(null);
   };
-  
-  const handleStartNew = () => {
+
+    const handleStartNew = () => {
     setUnfinishedSession(null);
     setForceCreateNew(true);  // 标记需要强制创建新会话
   };
-  
-  const restoreSession = (sessionToRestore: InterviewSession) => {
+
+    const restoreSession = (sessionToRestore: InterviewSession) => {
     setSession(sessionToRestore);
-    
-    // 恢复当前问题
+
+        // 恢复当前问题
     const currentQ = sessionToRestore.questions[sessionToRestore.currentQuestionIndex];
     if (currentQ) {
       setCurrentQuestion(currentQ);
-      
-      // 如果当前问题已有答案，显示在输入框中
+
+        // 如果当前问题已有答案，显示在输入框中
       if (currentQ.userAnswer) {
         setAnswer(currentQ.userAnswer);
       }
-      
-      // 恢复消息历史
+
+        // 恢复消息历史
       const restoredMessages: Message[] = [];
       for (let i = 0; i <= sessionToRestore.currentQuestionIndex; i++) {
         const q = sessionToRestore.questions[i];
@@ -105,15 +105,15 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       }
       setMessages(restoredMessages);
     }
-    
-    setStage('interview');
+
+        setStage('interview');
   };
-  
-  const startInterview = async () => {
+
+    const startInterview = async () => {
     setIsCreating(true);
     setError('');
-    
-    try {
+
+        try {
       // 创建新面试（如果 forceCreateNew 为 true，则强制创建新会话）
       const newSession = await interviewApi.createSession({
         resumeText,
@@ -121,23 +121,23 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         resumeId,
         forceCreate: forceCreateNew
       });
-      
-      // 重置强制创建标志
+
+            // 重置强制创建标志
       setForceCreateNew(false);
-      
-      // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
-      const hasProgress = newSession.currentQuestionIndex > 0 || 
+
+            // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
+            const hasProgress = newSession.currentQuestionIndex > 0 ||
                           newSession.questions.some(q => q.userAnswer) ||
                           newSession.status === 'IN_PROGRESS';
-      
-      if (hasProgress) {
+
+            if (hasProgress) {
         // 这是恢复的会话
         restoreSession(newSession);
       } else {
         // 全新的会话
         setSession(newSession);
-        
-        if (newSession.questions.length > 0) {
+
+                if (newSession.questions.length > 0) {
           const firstQuestion = newSession.questions[0];
           setCurrentQuestion(firstQuestion);
           setMessages([{
@@ -147,8 +147,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
             questionIndex: 0
           }]);
         }
-        
-        setStage('interview');
+
+                setStage('interview');
       }
     } catch (err) {
       setError('创建面试失败，请重试');
@@ -158,8 +158,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       setIsCreating(false);
     }
   };
-  
-  const handleSubmitAnswer = async () => {
+
+    const handleSubmitAnswer = async () => {
     if (!answer.trim() || !session || !currentQuestion) return;
 
     setIsSubmitting(true);
@@ -215,8 +215,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       setIsSubmitting(false);
     }
   };
-  
-  // 配置界面
+
+    // 配置界面
   const renderConfig = () => {
     return (
       <InterviewConfigPanel
@@ -234,8 +234,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       />
     );
   };
-  
-  // 面试对话界面
+
+    // 面试对话界面
   const renderInterview = () => {
     if (!session || !currentQuestion) return null;
 
@@ -259,16 +259,16 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     config: '配置您的面试参数',
     interview: '认真回答每个问题，展示您的实力'
   };
-  
-  return (
+
+    return (
     <div className="pb-10">
       {/* 页面头部 */}
-      <motion.div 
+        <motion.div
         className="text-center mb-10"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center justify-center gap-3">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center justify-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
             <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -279,10 +279,10 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
           </div>
           模拟面试
         </h1>
-        <p className="text-slate-500">{stageSubtitles[stage]}</p>
+            <p className="text-slate-500 dark:text-slate-400">{stageSubtitles[stage]}</p>
       </motion.div>
-      
-      <AnimatePresence mode="wait" initial={false}>
+
+        <AnimatePresence mode="wait" initial={false}>
         {stage === 'config' && (
           <motion.div
             key="config"
@@ -306,8 +306,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* 提前交卷确认对话框 */}
+
+        {/* 提前交卷确认对话框 */}
       <ConfirmDialog
         open={showCompleteConfirm}
         title="提前交卷"

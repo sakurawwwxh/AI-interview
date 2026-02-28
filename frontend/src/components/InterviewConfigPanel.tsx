@@ -34,15 +34,17 @@ export default function InterviewConfigPanel({
   const questionCounts = [6, 8, 10, 12, 15];
 
   return (
-    <motion.div 
+      <motion.div
       className="max-w-2xl mx-auto"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <div className="bg-white rounded-2xl p-8 shadow-sm">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-            <svg className="w-5 h-5 text-primary-600" viewBox="0 0 24 24" fill="none">
+          <div
+              className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-sm dark:shadow-slate-900/50 border border-slate-100 dark:border-slate-700">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
+                  <div
+                      className="w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
               <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2"/>
               <circle cx="12" cy="12" r="2" fill="currentColor"/>
@@ -50,7 +52,7 @@ export default function InterviewConfigPanel({
           </div>
           面试配置
         </h2>
-        
+
         {/* 未完成面试提示 */}
         <AnimatePresence>
           {checkingUnfinished && (
@@ -58,10 +60,10 @@ export default function InterviewConfigPanel({
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm text-center"
+              className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl text-blue-700 dark:text-blue-400 text-sm text-center"
             >
               <div className="flex items-center justify-center gap-2">
-                <motion.div 
+                  <motion.div
                   className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -70,25 +72,26 @@ export default function InterviewConfigPanel({
               </div>
             </motion.div>
           )}
-          
+
           {unfinishedSession && !checkingUnfinished && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl"
+              className="mb-6 p-5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 border-2 border-amber-200 dark:border-amber-800 rounded-xl"
             >
               <div className="flex items-start gap-3 mb-4">
-                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none">
+                  <div
+                      className="w-8 h-8 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 mb-1">检测到未完成的模拟面试</h3>
-                  <p className="text-sm text-amber-700">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-300 mb-1">检测到未完成的模拟面试</h3>
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
                     已完成 {unfinishedSession.currentQuestionIndex} / {unfinishedSession.totalQuestions} 题
                   </p>
                 </div>
@@ -104,7 +107,7 @@ export default function InterviewConfigPanel({
                 </motion.button>
                 <motion.button
                   onClick={onStartNew}
-                  className="flex-1 px-4 py-2.5 bg-white border border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-700 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 rounded-lg font-medium hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -114,10 +117,10 @@ export default function InterviewConfigPanel({
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
               题目数量
             </label>
             <div className="grid grid-cols-5 gap-3">
@@ -128,7 +131,7 @@ export default function InterviewConfigPanel({
                   className={`px-4 py-3 rounded-xl font-medium transition-all ${
                     questionCount === count
                       ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -138,17 +141,18 @@ export default function InterviewConfigPanel({
               ))}
             </div>
           </div>
-          
+
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-slate-600 mb-3">简历预览（前500字）</label>
-            <textarea 
+              <label
+                  className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3">简历预览（前500字）</label>
+              <textarea
               value={resumeText.substring(0, 500) + (resumeText.length > 500 ? '...' : '')}
               readOnly
-              className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-sm resize-none"
+              className="w-full h-32 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-400 text-sm resize-none"
             />
           </div>
-          
-          <p className="text-sm text-slate-500 mb-6">
+
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
             题目分布：项目经历(20%) + MySQL(20%) + Redis(20%) + Java基础/集合/并发(30%) + Spring(10%)
           </p>
 
@@ -158,17 +162,17 @@ export default function InterviewConfigPanel({
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm"
+                className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm"
               >
                 ⚠️ {error}
               </motion.div>
             )}
           </AnimatePresence>
-          
-          <div className="flex justify-center gap-4">
-            <motion.button 
+
+            <div className="flex justify-center gap-4">
+                <motion.button
               onClick={onBack}
-              className="px-6 py-3 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all"
+              className="px-6 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -183,7 +187,7 @@ export default function InterviewConfigPanel({
             >
               {isCreating ? (
                 <>
-                  <motion.span 
+                    <motion.span
                     className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -202,4 +206,3 @@ export default function InterviewConfigPanel({
     </motion.div>
   );
 }
-

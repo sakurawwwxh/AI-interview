@@ -41,6 +41,9 @@ dependencies {
     // AWS S3 SDK for RustFS storage
     implementation "software.amazon.awssdk:s3:${libs.versions.aws.sdk.get()}"
 
+    // Pinyin4j - 汉字转拼音
+    implementation libs.pinyin4j
+
     // Redisson 4.0 - Redis客户端 (Boot 4.0 compatible)
     implementation "org.redisson:redisson-spring-boot-starter:${libs.versions.redisson.get()}"
 

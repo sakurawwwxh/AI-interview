@@ -28,15 +28,15 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 public class ResumeController {
-    
+
     private final ResumeUploadService uploadService;
     private final ResumeDeleteService deleteService;
     private final ResumeHistoryService historyService;
-    
+
     /**
      * 上传简历并获取分析结果
      *
-     * @param file 简历文件（支持PDF、DOCX、DOC、TXT）
+     * @param file 简历文件（支持PDF、DOCX、DOC、TXT、MD等）
      * @return 简历分析结果，包含评分和建议
      */
     @PostMapping(value = "/api/resumes/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -49,7 +49,7 @@ public class ResumeController {
         }
         return Result.success(result);
     }
-    
+
     /**
      * 获取所有简历列表
      */
@@ -58,7 +58,7 @@ public class ResumeController {
         List<ResumeListItemDTO> resumes = historyService.getAllResumes();
         return Result.success(resumes);
     }
-    
+
     /**
      * 获取简历详情（包含分析历史）
      */
@@ -67,7 +67,7 @@ public class ResumeController {
         ResumeDetailDTO detail = historyService.getResumeDetail(id);
         return Result.success(detail);
     }
-    
+
     /**
      * 导出简历分析报告为PDF
      */
@@ -86,7 +86,7 @@ public class ResumeController {
             return ResponseEntity.internalServerError().build();
         }
     }
-    
+
     /**
      * 删除简历
      *
@@ -112,7 +112,7 @@ public class ResumeController {
         uploadService.reanalyze(id);
         return Result.success(null);
     }
-    
+
     /**
      * 健康检查接口
      */
@@ -123,5 +123,5 @@ public class ResumeController {
             "service", "AI Interview Platform - Resume Service"
         ));
     }
-    
+
 }

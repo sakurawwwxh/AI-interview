@@ -1,4 +1,5 @@
-import { request, getErrorMessage } from './request';
+import {getErrorMessage, request} from './request';
+import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
 
@@ -73,6 +74,16 @@ export const knowledgeBaseApi = {
     }
     return request.upload<UploadKnowledgeBaseResponse>('/api/knowledgebase/upload', formData);
   },
+
+    /**
+     * 下载知识库文件
+     */
+    async downloadKnowledgeBase(id: number): Promise<Blob> {
+        const response = await axios.get(`${API_BASE_URL}/api/knowledgebase/${id}/download`, {
+            responseType: 'blob',
+        });
+        return response.data;
+    },
 
   /**
    * 获取所有知识库列表
