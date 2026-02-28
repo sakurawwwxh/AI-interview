@@ -1,4 +1,4 @@
-import {useEffect, useState, useCallback} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {AnimatePresence, motion} from 'framer-motion';
 import {historyApi, InterviewDetail, ResumeDetail} from '../api/history';
@@ -6,14 +6,7 @@ import AnalysisPanel from '../components/AnalysisPanel';
 import InterviewPanel from '../components/InterviewPanel';
 import InterviewDetailPanel from '../components/InterviewDetailPanel';
 import {formatDateOnly} from '../utils/date';
-import {
-  ChevronLeft,
-  Clock,
-  Download,
-  Mic,
-  CheckSquare,
-  MessageSquare
-} from 'lucide-react';
+import {CheckSquare, ChevronLeft, Clock, Download, MessageSquare, Mic} from 'lucide-react';
 
 interface ResumeDetailPageProps {
   resumeId: number;
@@ -208,8 +201,8 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <motion.div 
-          className="w-12 h-12 border-4 border-slate-200 border-t-primary-500 rounded-full"
+          <motion.div
+              className="w-12 h-12 border-4 border-slate-200 dark:border-slate-600 border-t-primary-500 rounded-full"
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
@@ -241,34 +234,34 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
       {/* 顶部导航栏 */}
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <motion.button 
+            <motion.button
             onClick={detailView === 'interviewDetail' ? handleBackToInterviewList : onBack}
-            className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all shadow-sm"
+            className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-all shadow-sm"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             <ChevronLeft className="w-5 h-5" />
           </motion.button>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
               {detailView === 'interviewDetail' ? `面试详情 #${selectedInterview?.sessionId?.slice(-6) || ''}` : resume.filename}
             </h2>
-            <p className="text-sm text-slate-500 flex items-center gap-1.5">
+              <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
-              {detailView === 'interviewDetail' 
+                  {detailView === 'interviewDetail'
                 ? `完成于 ${formatDateOnly(selectedInterview?.completedAt || selectedInterview?.createdAt || '')}`
                 : `上传于 ${formatDateOnly(resume.uploadedAt)}`
               }
             </p>
           </div>
         </div>
-        
+
         <div className="flex gap-3">
           {detailView === 'interviewDetail' && selectedInterview && (
             <motion.button
               onClick={() => handleExportInterviewPdf(selectedInterview.sessionId)}
               disabled={exporting === selectedInterview.sessionId}
-              className="px-5 py-2.5 border border-slate-200 bg-white rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 transition-all disabled:opacity-50 flex items-center gap-2"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -292,20 +285,20 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
 
       {/* 标签页切换 - 仅在非面试详情时显示 */}
       {detailView !== 'interviewDetail' && (
-        <div className="bg-white rounded-2xl p-2 mb-6 inline-flex gap-1">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-2 mb-6 inline-flex gap-1">
           {tabs.map((tab) => (
             <motion.button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`relative px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-colors
-                ${activeTab === tab.id ? 'text-primary-600' : 'text-slate-500 hover:text-slate-700'}`}
+                ${activeTab === tab.id ? 'text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               {activeTab === tab.id && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute inset-0 bg-primary-50 rounded-xl"
+                  className="absolute inset-0 bg-primary-50 dark:bg-primary-900 rounded-xl"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -313,7 +306,8 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
                 <tab.icon className="w-5 h-5" />
                 {tab.label}
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">{tab.count}</span>
+                    <span
+                        className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 text-xs rounded-full">{tab.count}</span>
                 )}
               </span>
             </motion.button>
@@ -347,8 +341,8 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
                   reanalyzing={reanalyzing}
                 />
               ) : (
-                <InterviewPanel 
-                  interviews={resume.interviews || []} 
+                  <InterviewPanel
+                      interviews={resume.interviews || []}
                   onStartInterview={() => onStartInterview(resume.resumeText, resumeId)}
                   onViewInterview={handleViewInterview}
                   onExportInterview={handleExportInterviewPdf}

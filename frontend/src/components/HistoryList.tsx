@@ -1,24 +1,24 @@
-import { useEffect, useState, useCallback } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { historyApi, ResumeListItem, ResumeStats, AnalyzeStatus } from '../api/history';
+import {useCallback, useEffect, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {AnalyzeStatus, historyApi, ResumeListItem, ResumeStats} from '../api/history';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
-import { getScoreColor } from '../utils/score';
-import { formatDate } from '../utils/date';
+import {getScoreColor} from '../utils/score';
+import {formatDate} from '../utils/date';
 import {
-  Search,
-  FileText,
-  CheckCircle2,
-  Trash2,
-  ChevronRight,
-  Download,
-  RefreshCw,
-  Loader2,
-  Clock,
   AlertCircle,
   CheckCircle,
-  FileStack,
-  MessageSquare,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Download,
   Eye,
+  FileStack,
+  FileText,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  Trash2,
 } from 'lucide-react';
 
 interface HistoryListProps {
@@ -387,7 +387,8 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                           {resume.interviewCount} 次
                         </span>
                       ) : (
-                        <span className="inline-flex px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-sm">待面试</span>
+                          <span
+                              className="inline-flex px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-full text-sm">待面试</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">

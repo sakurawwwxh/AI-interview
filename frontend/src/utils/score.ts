@@ -30,6 +30,13 @@ export function normalizeScore(
 }
 
 /**
+ * 检测是否为深色模式
+ */
+function isDarkMode(): boolean {
+  return typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+}
+
+/**
  * 根据分数获取颜色类名
  * @param score 分数
  * @param thresholds 阈值配置，默认 [85, 70]
@@ -39,6 +46,16 @@ export function getScoreColor(
   score: number,
   thresholds: [number, number] = [80, 70]
 ): string {
+  const dark = isDarkMode();
+
+  if (dark) {
+    // 深色模式：使用更柔和的颜色
+    if (score >= thresholds[0]) return 'bg-emerald-500/20 text-emerald-400';
+    if (score >= thresholds[1]) return 'bg-yellow-500/20 text-yellow-400';
+    return 'bg-red-500/20 text-red-400';
+  }
+
+  // 浅色模式
   if (score >= thresholds[0]) return 'bg-emerald-100 text-emerald-600';
   if (score >= thresholds[1]) return 'bg-amber-100 text-amber-600';
   return 'bg-red-100 text-red-600';
@@ -51,16 +68,23 @@ export function getScoreBadgeColor(
   score: number,
   thresholds: [number, number] = [80, 60]
 ): string {
-  if (score >= thresholds[0]) return 'bg-emerald-500';
-  if (score >= thresholds[1]) return 'bg-amber-500';
-  return 'bg-red-500';
+  const dark = isDarkMode();
+
+  if (dark) {
+    // 深色模式
+    if (score >= thresholds[0]) return 'bg-emerald-500/20 text-emerald-400';
+    if (score >= thresholds[1]) return 'bg-yellow-500/20 text-yellow-400';
+    return 'bg-red-500/20 text-red-400';
+  }
+
+  // 浅色模式
+  if (score >= thresholds[0]) return 'bg-emerald-500 text-white';
+  if (score >= thresholds[1]) return 'bg-amber-500 text-white';
+  return 'bg-red-500 text-white';
 }
 
 /**
  * 根据分数获取进度条颜色类名（用于进度条）
- * @param score 分数 (0-100)
- * @param thresholds 阈值配置，默认 [85, 70]
- * @returns Tailwind CSS 背景颜色类名
  */
 export function getScoreProgressColor(
   score: number,
@@ -70,4 +94,3 @@ export function getScoreProgressColor(
   if (score >= thresholds[1]) return 'bg-amber-500';
   return 'bg-red-500';
 }
-

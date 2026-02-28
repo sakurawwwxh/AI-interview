@@ -1,6 +1,6 @@
-import { ChangeEvent, DragEvent, useCallback, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, X, AlertCircle, Loader2 } from 'lucide-react';
+import {ChangeEvent, DragEvent, useCallback, useState} from 'react';
+import {AnimatePresence, motion} from 'framer-motion';
+import {AlertCircle, FileText, Loader2, Upload, X} from 'lucide-react';
 
 export interface FileUploadCardProps {
   /** 标题 */
@@ -105,7 +105,7 @@ export default function FileUploadCard({
       {/* 标题 */}
       <div className="text-center mb-12">
         <motion.h1
-          className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight"
+            className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -113,7 +113,7 @@ export default function FileUploadCard({
           {title}
         </motion.h1>
         <motion.p
-          className="text-lg text-slate-500"
+            className="text-lg text-slate-500 dark:text-slate-400"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
@@ -124,8 +124,8 @@ export default function FileUploadCard({
 
       {/* 上传区域 */}
       <motion.div
-        className={`relative bg-white rounded-2xl p-12 cursor-pointer transition-all duration-300
-          ${dragOver ? 'scale-[1.02] shadow-xl' : 'shadow-lg hover:shadow-xl'}`}
+          className={`relative bg-white dark:bg-slate-800 rounded-2xl p-12 cursor-pointer transition-all duration-300
+          ${dragOver ? 'scale-[1.02] shadow-xl' : 'shadow-lg hover:shadow-xl dark:shadow-slate-900/50'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -137,9 +137,9 @@ export default function FileUploadCard({
         {/* 渐变边框效果 */}
         <div
           className={`absolute inset-0 rounded-2xl p-[2px] bg-gradient-to-r from-indigo-200 via-purple-200 to-indigo-200 -z-10
-          ${dragOver ? 'from-indigo-400 via-purple-400 to-indigo-400' : ''}`}
+            ${dragOver ? 'from-indigo-400 via-purple-400 to-indigo-400' : ''}`}
         >
-          <div className="w-full h-full bg-white rounded-2xl" />
+          <div className="w-full h-full bg-white dark:bg-slate-800 rounded-2xl"/>
         </div>
 
         <input
@@ -161,16 +161,18 @@ export default function FileUploadCard({
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="space-y-4"
               >
-                <div className="w-20 h-20 mx-auto bg-primary-100 rounded-full flex items-center justify-center">
-                  <FileText className="w-10 h-10 text-primary-600" />
+                <div
+                    className="w-20 h-20 mx-auto bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center">
+                  <FileText className="w-10 h-10 text-primary-600 dark:text-primary-400"/>
                 </div>
-                <div className="flex items-center justify-center gap-4 bg-slate-50 px-6 py-4 rounded-xl max-w-md mx-auto">
+                <div
+                    className="flex items-center justify-center gap-4 bg-slate-50 dark:bg-slate-700/50 px-6 py-4 rounded-xl max-w-md mx-auto">
                   <div className="text-left flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 truncate">{selectedFile.name}</p>
-                    <p className="text-sm text-slate-500">{formatFileSize(selectedFile.size)}</p>
+                    <p className="font-semibold text-slate-900 dark:text-white truncate">{selectedFile.name}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{formatFileSize(selectedFile.size)}</p>
                   </div>
                   <button
-                    className="w-8 h-8 bg-red-100 text-red-500 rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center"
+                      className="w-8 h-8 bg-red-100 dark:bg-red-900/50 text-red-500 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors flex items-center justify-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedFile(null);
@@ -190,14 +192,14 @@ export default function FileUploadCard({
               >
                 <motion.div
                   className={`w-20 h-20 mx-auto rounded-2xl flex items-center justify-center transition-colors
-                    ${dragOver ? 'bg-primary-100 text-primary-600' : 'bg-slate-100 text-slate-400'}`}
+                    ${dragOver ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500'}`}
                   animate={{ y: dragOver ? -5 : 0 }}
                 >
                   <Upload className="w-10 h-10" />
                 </motion.div>
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">点击或拖拽文件至此处</h3>
-                  <p className="text-slate-400 mb-4">
+                  <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">点击或拖拽文件至此处</h3>
+                  <p className="text-slate-400 dark:text-slate-500 mb-4">
                     {formatHint}（{maxSizeHint}）
                   </p>
                 </div>
@@ -221,17 +223,17 @@ export default function FileUploadCard({
       {/* 名称输入框 */}
       {showNameInput && selectedFile && (
         <motion.div
-          className="mt-6 bg-white rounded-2xl p-6 shadow-lg"
+            className="mt-6 bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg dark:shadow-slate-900/50"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <label className="block text-sm font-semibold text-slate-700 mb-2">{nameLabel}</label>
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{nameLabel}</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={namePlaceholder}
-            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
             disabled={uploading}
             onClick={(e) => e.stopPropagation()}
           />
@@ -245,7 +247,7 @@ export default function FileUploadCard({
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-center flex items-center justify-center gap-2"
+            className="mt-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-center flex items-center justify-center gap-2"
           >
             <AlertCircle className="w-5 h-5" />
             {error}
@@ -258,7 +260,7 @@ export default function FileUploadCard({
         {onBack && (
           <motion.button
             onClick={onBack}
-            className="px-6 py-3 border border-slate-200 rounded-xl text-slate-600 font-medium hover:bg-slate-50 transition-all"
+            className="px-6 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >

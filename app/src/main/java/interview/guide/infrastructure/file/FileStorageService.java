@@ -5,6 +5,11 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -32,27 +37,6 @@ public class FileStorageService {
      */
     public String uploadResume(MultipartFile file) {
         return uploadFile(file, "resumes");
-    }
-
-    /**
-     * 下载简历文件
-     */
-    public byte[] downloadResume(String fileKey) {
-        // 先检查文件是否存在
-        if (!fileExists(fileKey)) {
-            throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件不存在: " + fileKey);
-        }
-        
-        try {
-            GetObjectRequest getRequest = GetObjectRequest.builder()
-                    .bucket(storageConfig.getBucket())
-                    .key(fileKey)
-                    .build();
-            return s3Client.getObjectAsBytes(getRequest).asByteArray();
-        } catch (S3Exception e) {
-            log.error("下载文件失败: {} - {}", fileKey, e.getMessage(), e);
-            throw new BusinessException(ErrorCode.STORAGE_DOWNLOAD_FAILED, "文件下载失败: " + e.getMessage());
-        }
     }
 
     /**
@@ -176,7 +160,7 @@ public class FileStorageService {
             log.warn("文件不存在，跳过删除: {}", fileKey);
             return;
         }
-        
+
         try {
             DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                     .bucket(storageConfig.getBucket())
@@ -227,9 +211,69 @@ public class FileStorageService {
         return String.format("%s/%s/%s_%s", prefix, datePath, uuid, safeName);
     }
 
+    /**
+     * 清理文件名，移除不安全的字符
+     * <p>
+     * 汉字转换为大驼峰拼音，保留字母、数字、点号、下划线和连字符，
+     * 其他字符统一替换为下划线，防止 S3 存储出现问题。
+     *
+     * @param filename 原始文件名
+     * @return 清理后的安全文件名
+     */
     private String sanitizeFilename(String filename) {
-        if (filename == null)
+        if (filename == null || filename.isEmpty()) {
             return "unknown";
-        return filename.replaceAll("[^a-zA-Z0-9._-]", "_");
+        }
+        return convertToPinyin(filename);
+    }
+
+    /**
+     * 将字符串中的汉字转换为大驼峰拼音，非汉字字符保持不变
+     *
+     * @param input 输入字符串
+     * @return 转换后的字符串
+     */
+    private String convertToPinyin(String input) {
+        HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
+        format.setCaseType(HanyuPinyinCaseType.LOWERCASE);
+        format.setToneType(HanyuPinyinToneType.WITHOUT_TONE);
+
+        StringBuilder result = new StringBuilder();
+        for (char ch : input.toCharArray()) {
+            try {
+                String[] pinyins = PinyinHelper.toHanyuPinyinStringArray(ch, format);
+                if (pinyins != null && pinyins.length > 0) {
+                    // 首字母大写（大驼峰）
+                    result.append(capitalize(pinyins[0]));
+                } else {
+                    // 非汉字字符直接保留，但特殊字符需要处理
+                    result.append(sanitizeChar(ch));
+                }
+            } catch (BadHanyuPinyinOutputFormatCombination e) {
+                result.append(sanitizeChar(ch));
+            }
+        }
+        return result.toString();
+    }
+
+    /**
+     * 处理单个字符，保留安全字符，其他替换为下划线
+     */
+    private char sanitizeChar(char ch) {
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+                || (ch >= '0' && ch <= '9') || ch == '.' || ch == '_' || ch == '-') {
+            return ch;
+        }
+        return '_';
+    }
+
+    /**
+     * 首字母大写
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 }
