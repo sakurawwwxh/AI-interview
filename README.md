@@ -181,12 +181,12 @@ pnpm dev
 
 | 配置项              | 说明                    | 默认值                      |
 | ------------------- | ---------------------- | -------------------------- |
-| `POSTGRES_HOST`     | PostgreSQL 地址        | 8.163.23.204               |
+| `POSTGRES_HOST`     | PostgreSQL 地址        | localhost                   |
 | `POSTGRES_PORT`     | PostgreSQL 端口        | 5432                       |
 | `POSTGRES_DB`        | 数据库名              | interview_guide            |
 | `POSTGRES_PASSWORD`  | 数据库密码            | 123456                     |
-| `REDIS_HOST`         | Redis 地址            | 8.163.23.204               |
-| `APP_STORAGE_ENDPOINT`| S3 存储地址           | http://8.163.23.204:9002   |
+| `REDIS_HOST`         | Redis 地址            | localhost                   |
+| `APP_STORAGE_ENDPOINT`| S3 存储地址           | http://localhost:9000     |
 | `CORS_ALLOWED_ORIGINS`| 允许的跨域来源       | localhost:5173,5174,80     |
 
 > 首次启动设置 `ddl-auto: create`，表创建完成后改为 `update`
