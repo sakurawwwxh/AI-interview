@@ -147,7 +147,7 @@ cd AI-interview
 ### 2. 配置数据库
 
 ```sql
-CREATE DATABASE interview_guide;
+CREATE DATABASE Ai_interview;
 CREATE EXTENSION vector;
 ```
 
@@ -183,7 +183,7 @@ pnpm dev
 | ------------------- | ---------------------- | -------------------------- |
 | `POSTGRES_HOST`     | PostgreSQL 地址        | localhost                   |
 | `POSTGRES_PORT`     | PostgreSQL 端口        | 5432                       |
-| `POSTGRES_DB`        | 数据库名              | interview_guide            |
+| `POSTGRES_DB`        | 数据库名              | Ai_interview            |
 | `POSTGRES_PASSWORD`  | 数据库密码            | 123456                     |
 | `REDIS_HOST`         | Redis 地址            | localhost                   |
 | `APP_STORAGE_ENDPOINT`| S3 存储地址           | http://localhost:9000     |
