@@ -3,6 +3,7 @@ package interview.guide.modules.knowledgebase.service;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileStorageService;
+import interview.guide.modules.dify.service.DifySyncService;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.RagChatSessionEntity;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
@@ -27,6 +28,7 @@ public class KnowledgeBaseDeleteService {
     private final RagChatSessionRepository sessionRepository;
     private final KnowledgeBaseVectorService vectorService;
     private final FileStorageService storageService;
+    private final DifySyncService difySyncService;
     
     /**
      * 删除知识库
@@ -56,14 +58,17 @@ public class KnowledgeBaseDeleteService {
             log.warn("删除向量数据失败，继续删除知识库: kbId={}, error={}", id, e.getMessage());
         }
         
-        // 4. 删除RustFS中的文件（FileStorageService 已内置存在性检查）
+        // 4. 从 Dify 删除文档
+        difySyncService.deleteFromDify(kb);
+
+        // 5. 删除RustFS中的文件（FileStorageService 已内置存在性检查）
         try {
             storageService.deleteKnowledgeBase(kb.getStorageKey());
         } catch (Exception e) {
             log.warn("删除RustFS文件失败，继续删除知识库记录: kbId={}, error={}", id, e.getMessage());
         }
-        
-        // 5. 删除知识库记录（在事务中）
+
+        // 6. 删除知识库记录（在事务中）
         knowledgeBaseRepository.deleteById(id);
         log.info("知识库已删除: id={}", id);
     }
