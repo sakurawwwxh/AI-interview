@@ -1,5 +1,6 @@
 package interview.guide.modules.knowledgebase.model;
 
+import interview.guide.modules.dify.model.DifySyncStatus;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -72,7 +73,23 @@ public class KnowledgeBaseEntity {
 
     // 向量分块数量
     private Integer chunkCount = 0;
-    
+
+    // Dify 文档 ID（用于与 Dify 知识库关联）
+    @Column(length = 100)
+    private String difyDocumentId;
+
+    // Dify 同步状态
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private DifySyncStatus difySyncStatus = DifySyncStatus.PENDING;
+
+    // Dify 最后同步时间
+    private LocalDateTime difySyncTime;
+
+    // Dify 同步错误信息（失败时记录）
+    @Column(length = 500)
+    private String difySyncError;
+
     @PrePersist
     protected void onCreate() {
         uploadedAt = LocalDateTime.now();
@@ -217,6 +234,39 @@ public class KnowledgeBaseEntity {
 
     public void setChunkCount(Integer chunkCount) {
         this.chunkCount = chunkCount;
+    }
+
+    // Dify 相关字段的 getter 和 setter
+    public String getDifyDocumentId() {
+        return difyDocumentId;
+    }
+
+    public void setDifyDocumentId(String difyDocumentId) {
+        this.difyDocumentId = difyDocumentId;
+    }
+
+    public DifySyncStatus getDifySyncStatus() {
+        return difySyncStatus;
+    }
+
+    public void setDifySyncStatus(DifySyncStatus difySyncStatus) {
+        this.difySyncStatus = difySyncStatus;
+    }
+
+    public LocalDateTime getDifySyncTime() {
+        return difySyncTime;
+    }
+
+    public void setDifySyncTime(LocalDateTime difySyncTime) {
+        this.difySyncTime = difySyncTime;
+    }
+
+    public String getDifySyncError() {
+        return difySyncError;
+    }
+
+    public void setDifySyncError(String difySyncError) {
+        this.difySyncError = difySyncError;
     }
 }
 
