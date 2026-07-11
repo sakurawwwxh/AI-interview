@@ -1,11 +1,15 @@
-# Ignore Gradle project-specific cache directory
-.gradle
+# Maven build output
+**/target/
 
-# Ignore Gradle build output directory
+# Gradle（兼容旧构建）
+.gradle
 build
+
+# IDE
 /.claude
 /.idea
 /app/bin
+*.iml
 # Environment variables
 .env
 # IDEA code analysis
