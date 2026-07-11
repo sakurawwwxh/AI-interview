@@ -31,8 +31,8 @@ public class DifyConfig {
         /** 是否启用同步 */
         private boolean enabled = true;
 
-        /** 同步间隔（分钟） */
-        private int interval = 10;
+        /** 同步间隔（毫秒），默认600000毫秒（10分钟） */
+        private long interval = 600000;
 
         /** 重试次数 */
         private int retryCount = 3;

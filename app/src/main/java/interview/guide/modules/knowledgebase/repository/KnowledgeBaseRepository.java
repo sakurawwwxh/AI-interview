@@ -1,5 +1,6 @@
 package interview.guide.modules.knowledgebase.repository;
 
+import interview.guide.modules.dify.model.DifySyncStatus;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,6 +22,11 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      * 根据文件哈希查找知识库（用于去重）
      */
     Optional<KnowledgeBaseEntity> findByFileHash(String fileHash);
+
+    /**
+     * 根据 Dify 文档 ID 查找知识库
+     */
+    Optional<KnowledgeBaseEntity> findByDifyDocumentId(String difyDocumentId);
 
     /**
      * 检查文件哈希是否存在
@@ -103,5 +109,17 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      * 按向量化状态查找知识库（按上传时间倒序）
      */
     List<KnowledgeBaseEntity> findByVectorStatusOrderByUploadedAtDesc(VectorStatus vectorStatus);
+
+    // ==================== Dify 同步相关查询 ====================
+
+    /**
+     * 根据 Dify 同步状态查找知识库
+     */
+    List<KnowledgeBaseEntity> findByDifySyncStatus(DifySyncStatus difySyncStatus);
+
+    /**
+     * 统计指定 Dify 同步状态的数量
+     */
+    long countByDifySyncStatus(DifySyncStatus difySyncStatus);
 }
 

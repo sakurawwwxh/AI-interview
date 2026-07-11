@@ -21,9 +21,9 @@ public class DifySyncScheduler {
 
     /**
      * 定时从 Dify 拉取变更
-     * 默认每 10 分钟执行一次
+     * 默认每 10 分钟执行一次（600000毫秒）
      */
-    @Scheduled(fixedDelayString = "${dify.sync.interval:10} * 60 * 1000")
+    @Scheduled(fixedDelayString = "${dify.sync.interval:600000}")
     public void syncFromDify() {
         if (!config.getSync().isEnabled()) {
             log.debug("Dify 同步已禁用，跳过定时任务");
