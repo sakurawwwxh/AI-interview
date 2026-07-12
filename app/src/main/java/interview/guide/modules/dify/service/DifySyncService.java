@@ -64,7 +64,8 @@ public class DifySyncService {
             String difyDocumentId;
             if (entity.getDifyDocumentId() != null && !entity.getDifyDocumentId().isBlank()) {
                 // 已有 Dify 文档，更新
-                difyApiClient.updateDocument(config.getDatasetId(), entity.getDifyDocumentId(), content);
+                difyApiClient.updateDocument(config.getDatasetId(), entity.getDifyDocumentId(),
+                    entity.getName(), content);
                 difyDocumentId = entity.getDifyDocumentId();
                 log.info("更新 Dify 文档成功: kbId={}, difyDocId={}", entity.getId(), difyDocumentId);
             } else {
