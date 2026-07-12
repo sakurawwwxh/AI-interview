@@ -1,9 +1,12 @@
 import {AnimatePresence, motion} from 'framer-motion';
-import type {InterviewSession} from '../types/interview';
+import type {InterviewSession, InterviewTemplateConfig} from '../types/interview';
+import {interviewTemplates} from '../constants/interviewTemplates';
 
 interface InterviewConfigPanelProps {
   questionCount: number;
   onQuestionCountChange: (count: number) => void;
+  template: InterviewTemplateConfig;
+  onTemplateChange: (template: InterviewTemplateConfig) => void;
   onStart: () => void;
   isCreating: boolean;
   checkingUnfinished: boolean;
@@ -21,6 +24,8 @@ interface InterviewConfigPanelProps {
 export default function InterviewConfigPanel({
   questionCount,
   onQuestionCountChange,
+  template,
+  onTemplateChange,
   onStart,
   isCreating,
   checkingUnfinished,
@@ -140,6 +145,33 @@ export default function InterviewConfigPanel({
                 </motion.button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">面试模板</label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {interviewTemplates.map((item) => (
+                <motion.button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onTemplateChange(item)}
+                  className={`rounded-xl border p-4 text-left transition-all ${
+                    template.id === item.id
+                      ? 'border-primary-500 bg-primary-50 shadow-sm dark:bg-primary-900/30'
+                      : 'border-slate-200 bg-slate-50 hover:border-primary-300 dark:border-slate-600 dark:bg-slate-700/50'
+                  }`}
+                  whileHover={{ y: -1 }}
+                >
+                  <span className="block font-semibold text-slate-800 dark:text-white">{item.name}</span>
+                  <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                    基础 {item.difficultyDistribution.basic}% · 进阶 {item.difficultyDistribution.advanced}% · 专家 {item.difficultyDistribution.expert}%
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              当前模板：{template.questionTypes.map(item => `${item.type} ${item.weight}%`).join(' · ')}；每个主问题追问 {template.followUpCount} 次。
+            </p>
           </div>
 
           <div className="mb-6">

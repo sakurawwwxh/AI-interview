@@ -22,7 +22,11 @@ public record InterviewQuestionDTO(
         MYSQL,            // MySQL
         REDIS,            // Redis
         SPRING,           // Spring
-        SPRING_BOOT       // Spring Boot
+        SPRING_BOOT,      // Spring Boot
+        FRONTEND,         // 前端工程化与框架
+        DISTRIBUTED_SYSTEM, // 分布式系统
+        ARCHITECTURE,     // 架构设计
+        SOFT_SKILLS       // 软技能与沟通协作
     }
     
     /**

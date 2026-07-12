@@ -3,6 +3,7 @@ package interview.guide.modules.interview.service;
 import interview.guide.common.ai.StructuredOutputInvoker;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO.QuestionType;
 import org.slf4j.Logger;
@@ -82,11 +83,20 @@ public class InterviewQuestionService {
      * @return 面试问题列表
      */
     public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount, List<String> historicalQuestions) {
+        return generateQuestions(resumeText, questionCount, historicalQuestions,
+            InterviewTemplateConfig.defaultBackend(followUpCount));
+    }
+
+    public List<InterviewQuestionDTO> generateQuestions(
+            String resumeText,
+            int questionCount,
+            List<String> historicalQuestions,
+            InterviewTemplateConfig template) {
         log.info("开始生成面试问题，简历长度: {}, 问题数量: {}, 历史问题数: {}", 
             resumeText.length(), questionCount, historicalQuestions != null ? historicalQuestions.size() : 0);
         
-        // 计算各类型问题数量
-        QuestionDistribution distribution = calculateDistribution(questionCount);
+        InterviewTemplateConfig normalizedTemplate = template.normalize(followUpCount);
+        TemplateDistribution distribution = calculateTemplateDistribution(questionCount, normalizedTemplate);
         
         try {
             // 加载系统提示词
@@ -95,14 +105,9 @@ public class InterviewQuestionService {
             // 加载用户提示词并填充变量
             Map<String, Object> variables = new HashMap<>();
             variables.put("questionCount", questionCount);
-            variables.put("projectCount", distribution.project);
-            variables.put("mysqlCount", distribution.mysql);
-            variables.put("redisCount", distribution.redis);
-            variables.put("javaBasicCount", distribution.javaBasic);
-            variables.put("javaCollectionCount", distribution.javaCollection);
-            variables.put("javaConcurrentCount", distribution.javaConcurrent);
-            variables.put("springCount", distribution.spring);
-            variables.put("followUpCount", followUpCount);
+            variables.put("questionPlan", distribution.questionPlan());
+            variables.put("difficultyDistribution", difficultyText(normalizedTemplate.difficultyDistribution()));
+            variables.put("followUpCount", normalizedTemplate.followUpCount());
             variables.put("resumeText", resumeText);
             
             // 添加历史问题
@@ -139,7 +144,7 @@ public class InterviewQuestionService {
             }
             
             // 转换为业务对象
-            List<InterviewQuestionDTO> questions = convertToQuestions(dto);
+            List<InterviewQuestionDTO> questions = convertToQuestions(dto, normalizedTemplate.followUpCount());
             log.info("成功生成 {} 个面试问题", questions.size());
             
             return questions;
@@ -147,7 +152,7 @@ public class InterviewQuestionService {
         } catch (Exception e) {
             log.error("生成面试问题失败: {}", e.getMessage(), e);
             // 返回默认问题集
-            return generateDefaultQuestions(questionCount);
+            return generateDefaultQuestions(questionCount, normalizedTemplate.followUpCount());
         }
     }
 
@@ -184,7 +189,7 @@ public class InterviewQuestionService {
     /**
      * 转换DTO为业务对象
      */
-    private List<InterviewQuestionDTO> convertToQuestions(QuestionListDTO dto) {
+    private List<InterviewQuestionDTO> convertToQuestions(QuestionListDTO dto, int followUpLimit) {
         List<InterviewQuestionDTO> questions = new ArrayList<>();
         int index = 0;
 
@@ -200,7 +205,7 @@ public class InterviewQuestionService {
             int mainQuestionIndex = index;
             questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category(), false, null));
 
-            List<String> followUps = sanitizeFollowUps(q.followUps());
+            List<String> followUps = sanitizeFollowUps(q.followUps(), followUpLimit);
             for (int i = 0; i < followUps.size(); i++) {
                 questions.add(InterviewQuestionDTO.create(
                     index++,
@@ -227,7 +232,7 @@ public class InterviewQuestionService {
     /**
      * 生成默认问题（备用）
      */
-    private List<InterviewQuestionDTO> generateDefaultQuestions(int count) {
+    private List<InterviewQuestionDTO> generateDefaultQuestions(int count, int followUpLimit) {
         List<InterviewQuestionDTO> questions = new ArrayList<>();
         
         String[][] defaultQuestions = {
@@ -258,7 +263,7 @@ public class InterviewQuestionService {
             ));
 
             int mainQuestionIndex = index - 1;
-            for (int j = 0; j < followUpCount; j++) {
+            for (int j = 0; j < followUpLimit; j++) {
                 questions.add(InterviewQuestionDTO.create(
                     index++,
                     buildDefaultFollowUp(mainQuestion, j + 1),
@@ -273,20 +278,68 @@ public class InterviewQuestionService {
         return questions;
     }
 
-    private List<String> sanitizeFollowUps(List<String> followUps) {
-        if (followUpCount == 0 || followUps == null || followUps.isEmpty()) {
+    private List<String> sanitizeFollowUps(List<String> followUps, int followUpLimit) {
+        if (followUpLimit == 0 || followUps == null || followUps.isEmpty()) {
             return List.of();
         }
         return followUps.stream()
             .filter(item -> item != null && !item.isBlank())
             .map(String::trim)
-            .limit(followUpCount)
+            .limit(followUpLimit)
             .collect(Collectors.toList());
     }
 
     private String buildFollowUpCategory(String category, int order) {
         String baseCategory = (category == null || category.isBlank()) ? "追问" : category;
         return baseCategory + "（追问" + order + "）";
+    }
+
+    private TemplateDistribution calculateTemplateDistribution(int total, InterviewTemplateConfig template) {
+        int totalWeight = template.questionTypes().stream()
+            .mapToInt(InterviewTemplateConfig.QuestionTypeWeight::weight)
+            .sum();
+        List<Integer> counts = new ArrayList<>();
+        List<Double> remainders = new ArrayList<>();
+        int assigned = 0;
+        for (InterviewTemplateConfig.QuestionTypeWeight item : template.questionTypes()) {
+            double exact = (double) total * item.weight() / totalWeight;
+            int count = (int) Math.floor(exact);
+            counts.add(count);
+            remainders.add(exact - count);
+            assigned += count;
+        }
+        for (int i = assigned; i < total; i++) {
+            int maxIndex = 0;
+            for (int j = 1; j < remainders.size(); j++) {
+                if (remainders.get(j) > remainders.get(maxIndex)) {
+                    maxIndex = j;
+                }
+            }
+            counts.set(maxIndex, counts.get(maxIndex) + 1);
+            remainders.set(maxIndex, -1D);
+        }
+        StringBuilder plan = new StringBuilder("| 类型 | 数量 |\\n|------|------|\\n");
+        for (int i = 0; i < template.questionTypes().size(); i++) {
+            if (counts.get(i) > 0) {
+                plan.append("| ").append(template.questionTypes().get(i).type().name())
+                    .append(" | ").append(counts.get(i)).append(" 题 |\\n");
+            }
+        }
+        return new TemplateDistribution(plan.toString());
+    }
+
+    private String difficultyText(InterviewTemplateConfig.DifficultyDistribution difficulty) {
+        int total = difficulty.basic() + difficulty.advanced() + difficulty.expert();
+        return "基础 " + Math.round(difficulty.basic() * 100.0 / total) + "% / 进阶 "
+            + Math.round(difficulty.advanced() * 100.0 / total) + "% / 专家 "
+            + Math.round(difficulty.expert() * 100.0 / total) + "%";
+    }
+
+    private record TemplateDistribution(String questionPlan) {
+    }
+
+    public int getDefaultFollowUpCount() {
+        return followUpCount;
     }
 
     private String buildDefaultFollowUp(String mainQuestion, int order) {

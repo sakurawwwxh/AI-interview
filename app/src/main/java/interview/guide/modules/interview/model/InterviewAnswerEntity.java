@@ -55,6 +55,9 @@ public class InterviewAnswerEntity {
     // 关键点 (JSON)
     @Column(columnDefinition = "TEXT")
     private String keyPointsJson;
+
+    // 本题答题时长（秒），由前端在提交时记录
+    private Integer answerDurationSeconds;
     
     // 回答时间
     @Column(nullable = false)
@@ -144,6 +147,14 @@ public class InterviewAnswerEntity {
     
     public void setKeyPointsJson(String keyPointsJson) {
         this.keyPointsJson = keyPointsJson;
+    }
+
+    public Integer getAnswerDurationSeconds() {
+        return answerDurationSeconds;
+    }
+
+    public void setAnswerDurationSeconds(Integer answerDurationSeconds) {
+        this.answerDurationSeconds = answerDurationSeconds;
     }
     
     public LocalDateTime getAnsweredAt() {

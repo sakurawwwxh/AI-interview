@@ -38,7 +38,11 @@ export const interviewApi = {
   async submitAnswer(req: SubmitAnswerRequest): Promise<SubmitAnswerResponse> {
     return request.post<SubmitAnswerResponse>(
       `/api/interview/sessions/${req.sessionId}/answers`,
-      { questionIndex: req.questionIndex, answer: req.answer },
+      {
+        questionIndex: req.questionIndex,
+        answer: req.answer,
+        answerDurationSeconds: req.answerDurationSeconds,
+      },
       {
         timeout: 180000, // 3分钟超时
       }
@@ -72,7 +76,11 @@ export const interviewApi = {
   async saveAnswer(req: SubmitAnswerRequest): Promise<void> {
     return request.put<void>(
       `/api/interview/sessions/${req.sessionId}/answers`,
-      { questionIndex: req.questionIndex, answer: req.answer }
+      {
+        questionIndex: req.questionIndex,
+        answer: req.answer,
+        answerDurationSeconds: req.answerDurationSeconds,
+      }
     );
   },
 

@@ -2,7 +2,7 @@ import {useMemo, useRef} from 'react';
 import {motion} from 'framer-motion';
 import {Virtuoso, type VirtuosoHandle} from 'react-virtuoso';
 import type {InterviewQuestion, InterviewSession} from '../types/interview';
-import {Send, User} from 'lucide-react';
+import {Clock3, Send, User} from 'lucide-react';
 
 interface Message {
   type: 'interviewer' | 'user';
@@ -18,6 +18,7 @@ interface InterviewChatPanelProps {
   answer: string;
   onAnswerChange: (answer: string) => void;
   onSubmit: () => void;
+  elapsedSeconds: number;
   onCompleteEarly: () => void;
   isSubmitting: boolean;
   showCompleteConfirm: boolean;
@@ -34,6 +35,7 @@ export default function InterviewChatPanel({
   answer,
   onAnswerChange,
   onSubmit,
+  elapsedSeconds,
   // onCompleteEarly, // 暂时未使用
   isSubmitting,
   // showCompleteConfirm, // 暂时未使用
@@ -52,6 +54,8 @@ export default function InterviewChatPanel({
     }
   };
 
+  const formattedElapsed = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
+
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] max-w-4xl mx-auto">
       {/* 进度条 */}
@@ -61,9 +65,10 @@ export default function InterviewChatPanel({
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             题目 {currentQuestion ? currentQuestion.questionIndex + 1 : 0} / {session.totalQuestions}
           </span>
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-            {Math.round(progress)}%
-          </span>
+            <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+              <span className="inline-flex items-center gap-1"><Clock3 className="h-4 w-4" />{formattedElapsed}</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
         </div>
             <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
           <motion.div

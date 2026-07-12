@@ -35,7 +35,8 @@ public record InterviewDetailDTO(
         String feedback,
         String referenceAnswer,
         List<String> keyPoints,
-        LocalDateTime answeredAt
+        LocalDateTime answeredAt,
+        Integer answerDurationSeconds
     ) {}
 }
 

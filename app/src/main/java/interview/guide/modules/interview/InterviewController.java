@@ -70,8 +70,10 @@ public class InterviewController {
             @RequestBody Map<String, Object> body) {
         Integer questionIndex = (Integer) body.get("questionIndex");
         String answer = (String) body.get("answer");
+        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
+            ? duration.intValue() : null;
         log.info("提交答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
         SubmitAnswerResponse response = sessionService.submitAnswer(request);
         return Result.success(response);
     }
@@ -104,8 +106,10 @@ public class InterviewController {
             @RequestBody Map<String, Object> body) {
         Integer questionIndex = (Integer) body.get("questionIndex");
         String answer = (String) body.get("answer");
+        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
+            ? duration.intValue() : null;
         log.info("暂存答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
         sessionService.saveAnswer(request);
         return Result.success(null);
     }

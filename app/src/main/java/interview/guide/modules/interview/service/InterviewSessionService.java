@@ -52,6 +52,9 @@ public class InterviewSessionService {
         }
 
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        InterviewTemplateConfig template = (request.template() == null
+            ? InterviewTemplateConfig.defaultBackend(questionService.getDefaultFollowUpCount())
+            : request.template()).normalize(questionService.getDefaultFollowUpCount());
 
         log.info("创建新面试会话: {}, 题目数量: {}, resumeId: {}",
             sessionId, request.questionCount(), request.resumeId());
@@ -66,7 +69,8 @@ public class InterviewSessionService {
         List<InterviewQuestionDTO> questions = questionService.generateQuestions(
             request.resumeText(),
             request.questionCount(),
-            historicalQuestions
+            historicalQuestions,
+            template
         );
 
         // 保存到 Redis 缓存
@@ -83,7 +87,7 @@ public class InterviewSessionService {
         if (request.resumeId() != null) {
             try {
                 persistenceService.saveSession(sessionId, request.resumeId(),
-                    questions.size(), questions);
+                    questions.size(), questions, template);
             } catch (Exception e) {
                 log.warn("保存面试会话到数据库失败: {}", e.getMessage());
             }
@@ -309,7 +313,7 @@ public class InterviewSessionService {
             persistenceService.saveAnswer(
                 request.sessionId(), index,
                 question.question(), question.category(),
-                request.answer(), 0, null  // 分数在报告生成时更新
+                request.answer(), 0, null, request.answerDurationSeconds()  // 分数在报告生成时更新
             );
             persistenceService.updateCurrentQuestionIndex(request.sessionId(), newIndex);
             persistenceService.updateSessionStatus(request.sessionId(),
@@ -368,7 +372,7 @@ public class InterviewSessionService {
             persistenceService.saveAnswer(
                 request.sessionId(), index,
                 question.question(), question.category(),
-                request.answer(), 0, null
+                request.answer(), 0, null, request.answerDurationSeconds()
             );
             persistenceService.updateSessionStatus(request.sessionId(),
                 InterviewSessionEntity.SessionStatus.IN_PROGRESS);
