@@ -1,12 +1,14 @@
 package interview.guide.modules.dify.controller;
 
 import interview.guide.common.result.Result;
+import interview.guide.modules.dify.client.DifyApiClient;
 import interview.guide.modules.dify.model.*;
 import interview.guide.modules.dify.service.DifyChatService;
 import interview.guide.modules.dify.service.DifySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -25,6 +27,7 @@ public class DifyController {
 
     private final DifySyncService syncService;
     private final DifyChatService chatService;
+    private final DifyApiClient difyApiClient;
 
     /**
      * 手动触发同步
@@ -68,23 +71,36 @@ public class DifyController {
     }
 
     /**
-     * 流式对话
+     * 流式运行 Dify 聊天助手（SSE）
+     *
+     * <p>请求体格式：{ "query": "你的问题", "conversationId": "" }
+     * 以 streaming 模式调用 Dify chat-messages API，逐块返回 LLM 输出。
+     * Dify 聊天助手应用已关联知识库，可在 Dify 控制台查看召回率。
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatStream(@RequestBody DifyChatRequest request) {
-        log.info("Dify 流式对话请求: query={}", request.query());
-        return chatService.chatStream(request.query(), request.conversationId());
-    }
+    public Flux<ServerSentEvent<String>> difyChatStream(@RequestBody DifyChatRequest request) {
+        log.info("流式运行 Dify 聊天: query={}",
+            request.query().length() > 50 ? request.query().substring(0, 50) + "..." : request.query());
 
-    /**
-     * 运行工作流
-     */
-    @PostMapping("/workflow/{workflowId}")
-    public Result<DifyWorkflowResponse> runWorkflow(
-            @PathVariable String workflowId,
-            @RequestBody Map<String, Object> inputs) {
-        log.info("运行 Dify 工作流: workflowId={}", workflowId);
-        // TODO: 实现工作流运行
-        return Result.error("工作流功能暂未实现");
+        // 心跳事件
+        ServerSentEvent<String> heartbeat = ServerSentEvent.<String>builder()
+            .event("ping")
+            .data("")
+            .build();
+
+        Flux<ServerSentEvent<String>> contentFlux = difyApiClient.chatStream(
+                request.query(), request.conversationId())
+            .map(chunk -> ServerSentEvent.<String>builder()
+                .data(chunk.replace("\n", "\\n").replace("\r", "\\r"))
+                .build())
+            .onErrorResume(e -> {
+                log.error("Dify 聊天流式错误", e);
+                return Flux.just(ServerSentEvent.<String>builder()
+                    .event("error")
+                    .data("Dify 聊天调用失败，请稍后重试")
+                    .build());
+            });
+
+        return Flux.concat(Flux.just(heartbeat), contentFlux);
     }
 }

@@ -2,6 +2,7 @@ package interview.guide.modules.knowledgebase.repository;
 
 import interview.guide.modules.knowledgebase.model.RagChatMessageEntity;
 import interview.guide.modules.knowledgebase.model.RagChatMessageEntity.MessageType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -31,6 +32,12 @@ public interface RagChatMessageRepository extends JpaRepository<RagChatMessageEn
      */
     @Query("SELECT COUNT(m) FROM RagChatMessageEntity m WHERE m.session.id = :sessionId")
     Integer countBySessionId(@Param("sessionId") Long sessionId);
+
+    /**
+     * 获取会话最近的 N 条消息（按消息顺序降序，即最新的在前）
+     * 用于多轮对话上下文注入
+     */
+    List<RagChatMessageEntity> findBySessionIdOrderByMessageOrderDesc(Long sessionId, Pageable pageable);
 
     /**
      * 查找未完成的消息（流式响应中断时清理用）
