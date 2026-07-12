@@ -44,6 +44,7 @@ public class AnswerEvaluationService {
     private final PromptTemplate summaryUserPromptTemplate;
     private final BeanOutputConverter<FinalSummaryDTO> summaryOutputConverter;
     private final StructuredOutputInvoker structuredOutputInvoker;
+    private final InterviewEvaluationEvidenceService evidenceService;
     private final int evaluationBatchSize;
     
     // 中间DTO用于接收AI响应
@@ -78,6 +79,7 @@ public class AnswerEvaluationService {
     public AnswerEvaluationService(
             ChatClient.Builder chatClientBuilder,
             StructuredOutputInvoker structuredOutputInvoker,
+            InterviewEvaluationEvidenceService evidenceService,
             @Value("classpath:prompts/interview-evaluation-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/interview-evaluation-user.st") Resource userPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-system.st") Resource summarySystemPromptResource,
@@ -85,6 +87,7 @@ public class AnswerEvaluationService {
             @Value("${app.interview.evaluation.batch-size:8}") int evaluationBatchSize) throws IOException {
         this.chatClient = chatClientBuilder.build();
         this.structuredOutputInvoker = structuredOutputInvoker;
+        this.evidenceService = evidenceService;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(EvaluationReportDTO.class);
@@ -181,11 +184,13 @@ public class AnswerEvaluationService {
         int end
     ) {
         String qaRecords = buildQARecords(batchQuestions);
+        String ragEvidence = evidenceService.buildEvidence(batchQuestions);
         String systemPrompt = systemPromptTemplate.render();
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("resumeText", resumeSummary);
         variables.put("qaRecords", qaRecords);
+        variables.put("ragEvidence", ragEvidence);
         String userPrompt = userPromptTemplate.render(variables);
 
         String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
