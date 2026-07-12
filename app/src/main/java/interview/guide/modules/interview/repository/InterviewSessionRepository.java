@@ -39,6 +39,13 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
     List<InterviewSessionEntity> findByResumeIdOrderByCreatedAtDesc(Long resumeId);
 
     /**
+     * 查询所有已有评分的面试及其答案，用于本地个人面试统计看板。
+     */
+    @Query("SELECT DISTINCT s FROM InterviewSessionEntity s LEFT JOIN FETCH s.answers " +
+           "WHERE s.overallScore IS NOT NULL ORDER BY s.completedAt ASC, s.createdAt ASC")
+    List<InterviewSessionEntity> findEvaluatedWithAnswers();
+
+    /**
      * 根据简历ID查找最近的面试记录（用于历史题去重）
      */
     List<InterviewSessionEntity> findTop10ByResumeIdOrderByCreatedAtDesc(Long resumeId);

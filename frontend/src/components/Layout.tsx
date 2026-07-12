@@ -1,6 +1,6 @@
 import {Link, Outlet, useLocation} from 'react-router-dom';
 import {motion} from 'framer-motion';
-import {ChevronRight, Database, FileStack, MessageSquare, Moon, Sparkles, Sun, Upload, Users,} from 'lucide-react';
+import {BarChart3, ChevronRight, Database, FileStack, MessageSquare, Moon, Sparkles, Sun, Upload, Users,} from 'lucide-react';
 import {useTheme} from '../hooks/useTheme';
 
 interface NavItem {
@@ -28,6 +28,7 @@ export default function Layout() {
       id: 'career',
       title: '简历与面试',
       items: [
+        { id: 'interview-statistics', path: '/interview-statistics', label: '能力统计', icon: BarChart3, description: '跟踪分数趋势与薄弱项' },
         { id: 'upload', path: '/upload', label: '上传简历', icon: Upload, description: 'AI 分析简历' },
         { id: 'resumes', path: '/history', label: '简历库', icon: FileStack, description: '管理所有简历' },
         { id: 'interviews', path: '/interviews', label: '面试记录', icon: Users, description: '查看面试历史' },
