@@ -1,10 +1,12 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion} from 'framer-motion';
 import {interviewApi} from '../api/interview';
 import ConfirmDialog from '../components/ConfirmDialog';
 import InterviewConfigPanel from '../components/InterviewConfigPanel';
 import InterviewChatPanel from '../components/InterviewChatPanel';
 import type {InterviewQuestion, InterviewSession} from '../types/interview';
+import type {InterviewTemplateConfig} from '../types/interview';
+import {interviewTemplates} from '../constants/interviewTemplates';
 
 type InterviewStage = 'config' | 'interview';
 
@@ -25,6 +27,7 @@ interface InterviewProps {
 export default function Interview({ resumeText, resumeId, onBack, onInterviewComplete }: InterviewProps) {
   const [stage, setStage] = useState<InterviewStage>('config');
   const [questionCount, setQuestionCount] = useState(8);
+  const [template, setTemplate] = useState<InterviewTemplateConfig>(interviewTemplates[0]);
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestion | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,6 +39,18 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [forceCreateNew, setForceCreateNew] = useState(false);
+  const questionStartedAtRef = useRef(performance.now());
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!currentQuestion) return;
+    questionStartedAtRef.current = performance.now();
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((performance.now() - questionStartedAtRef.current) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [currentQuestion?.questionIndex]);
 
   // 检查是否有未完成的面试（组件挂载时和resumeId变化时）
   useEffect(() => {
@@ -119,7 +134,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         resumeText,
         questionCount,
         resumeId,
-        forceCreate: forceCreateNew
+        forceCreate: forceCreateNew,
+        template,
       });
 
             // 重置强制创建标志
@@ -174,7 +190,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       const response = await interviewApi.submitAnswer({
         sessionId: session.sessionId,
         questionIndex: currentQuestion.questionIndex,
-        answer: answer.trim()
+        answer: answer.trim(),
+        answerDurationSeconds: Math.max(1, Math.floor((performance.now() - questionStartedAtRef.current) / 1000))
       });
 
       setAnswer('');
@@ -222,6 +239,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       <InterviewConfigPanel
         questionCount={questionCount}
         onQuestionCountChange={setQuestionCount}
+        template={template}
+        onTemplateChange={setTemplate}
         onStart={startInterview}
         isCreating={isCreating}
         checkingUnfinished={checkingUnfinished}
@@ -247,6 +266,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         answer={answer}
         onAnswerChange={setAnswer}
         onSubmit={handleSubmitAnswer}
+        elapsedSeconds={elapsedSeconds}
         onCompleteEarly={handleCompleteEarly}
         isSubmitting={isSubmitting}
         showCompleteConfirm={showCompleteConfirm}

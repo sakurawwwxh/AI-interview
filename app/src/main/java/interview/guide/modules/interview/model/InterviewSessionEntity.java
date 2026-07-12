@@ -45,6 +45,10 @@ public class InterviewSessionEntity {
     // 问题列表 (JSON格式)
     @Column(columnDefinition = "TEXT")
     private String questionsJson;
+
+    // 创建时选定的出题模板快照（JSON）
+    @Column(columnDefinition = "TEXT")
+    private String templateJson;
     
     // 总分 (0-100)
     private Integer overallScore;
@@ -152,6 +156,14 @@ public class InterviewSessionEntity {
     
     public void setQuestionsJson(String questionsJson) {
         this.questionsJson = questionsJson;
+    }
+
+    public String getTemplateJson() {
+        return templateJson;
+    }
+
+    public void setTemplateJson(String templateJson) {
+        this.templateJson = templateJson;
     }
     
     public Integer getOverallScore() {

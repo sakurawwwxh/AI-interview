@@ -16,5 +16,8 @@ public record SubmitAnswerRequest(
     Integer questionIndex,
     
     @NotBlank(message = "答案不能为空")
-    String answer
+    String answer,
+
+    @Min(value = 0, message = "答题时长不能为负数")
+    Integer answerDurationSeconds
 ) {}

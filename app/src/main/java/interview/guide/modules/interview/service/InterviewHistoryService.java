@@ -112,7 +112,8 @@ public class InterviewHistoryService {
                         question.feedback(),  // feedback
                         null,  // referenceAnswer
                         null,  // keyPoints
-                        null   // answeredAt
+                        null,  // answeredAt
+                        null   // answerDurationSeconds
                     );
                 }
             })

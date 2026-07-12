@@ -7,6 +7,7 @@ import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.interview.repository.InterviewAnswerRepository;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
 import interview.guide.modules.resume.model.ResumeEntity;
@@ -43,7 +44,8 @@ public class InterviewPersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public InterviewSessionEntity saveSession(String sessionId, Long resumeId, 
                                               int totalQuestions, 
-                                              List<InterviewQuestionDTO> questions) {
+                                              List<InterviewQuestionDTO> questions,
+                                              InterviewTemplateConfig template) {
         try {
             Optional<ResumeEntity> resumeOpt = resumeRepository.findById(resumeId);
             if (resumeOpt.isEmpty()) {
@@ -57,6 +59,7 @@ public class InterviewPersistenceService {
             session.setCurrentQuestionIndex(0);
             session.setStatus(InterviewSessionEntity.SessionStatus.CREATED);
             session.setQuestionsJson(objectMapper.writeValueAsString(questions));
+            session.setTemplateJson(objectMapper.writeValueAsString(template));
             
             InterviewSessionEntity saved = sessionRepository.save(session);
             log.info("面试会话已保存: sessionId={}, resumeId={}", sessionId, resumeId);
@@ -124,7 +127,8 @@ public class InterviewPersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public InterviewAnswerEntity saveAnswer(String sessionId, int questionIndex,
                                             String question, String category,
-                                            String userAnswer, int score, String feedback) {
+                                            String userAnswer, int score, String feedback,
+                                            Integer answerDurationSeconds) {
         Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
@@ -144,6 +148,7 @@ public class InterviewPersistenceService {
         answer.setUserAnswer(userAnswer);
         answer.setScore(score);
         answer.setFeedback(feedback);
+        answer.setAnswerDurationSeconds(answerDurationSeconds);
 
         InterviewAnswerEntity saved = answerRepository.save(answer);
         log.info("面试答案已保存: sessionId={}, questionIndex={}, score={}", 
