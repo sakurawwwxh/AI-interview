@@ -194,6 +194,12 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         answerDurationSeconds: Math.max(1, Math.floor((performance.now() - questionStartedAtRef.current) / 1000))
       });
 
+      setSession(previous => previous ? {
+        ...previous,
+        totalQuestions: response.totalQuestions,
+        currentQuestionIndex: response.currentIndex
+      } : previous);
+
       setAnswer('');
 
       if (response.hasNextQuestion && response.nextQuestion) {

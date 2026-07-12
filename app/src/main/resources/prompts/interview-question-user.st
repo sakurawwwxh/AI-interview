@@ -1,6 +1,6 @@
 # Input Data
 
-请根据以下候选人简历内容生成 {questionCount} 个主问题。每个主问题额外生成 {followUpCount} 个追问。
+请根据以下候选人简历内容生成 {questionCount} 个主问题。追问会在候选人作答后动态生成，本次不要预先生成追问。
 
 ## 本次题型分配
 {questionPlan}

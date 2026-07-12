@@ -292,11 +292,15 @@ public class InterviewSessionService {
         InterviewQuestionDTO answeredQuestion = question.withAnswer(request.answer());
         questions.set(index, answeredQuestion);
 
-        // 移动到下一题
-        int newIndex = index + 1;
+        Optional<InterviewQuestionDTO> dynamicFollowUp = generateDynamicFollowUp(
+            request.sessionId(), questions, question, request.answer()
+        );
+        dynamicFollowUp.ifPresent(questions::add);
 
-        // 检查是否全部完成
-        boolean hasNextQuestion = newIndex < questions.size();
+        int newIndex = dynamicFollowUp
+            .map(InterviewQuestionDTO::questionIndex)
+            .orElseGet(() -> findNextUnansweredQuestionIndex(questions));
+        boolean hasNextQuestion = newIndex >= 0;
         InterviewQuestionDTO nextQuestion = hasNextQuestion ? questions.get(newIndex) : null;
 
         SessionStatus newStatus = hasNextQuestion ? SessionStatus.IN_PROGRESS : SessionStatus.COMPLETED;
@@ -340,6 +344,53 @@ public class InterviewSessionService {
             newIndex,
             questions.size()
         );
+    }
+
+    private Optional<InterviewQuestionDTO> generateDynamicFollowUp(
+        String sessionId,
+        List<InterviewQuestionDTO> questions,
+        InterviewQuestionDTO question,
+        String answer
+    ) {
+        InterviewTemplateConfig template = loadTemplate(sessionId);
+        int parentQuestionIndex = question.isFollowUp() && question.parentQuestionIndex() != null
+            ? question.parentQuestionIndex()
+            : question.questionIndex();
+        int existingFollowUpCount = (int) questions.stream()
+            .filter(InterviewQuestionDTO::isFollowUp)
+            .filter(item -> Integer.valueOf(parentQuestionIndex).equals(item.parentQuestionIndex()))
+            .count();
+        return questionService.generateDynamicFollowUp(
+            question,
+            answer,
+            questions.size(),
+            parentQuestionIndex,
+            existingFollowUpCount,
+            template.followUpCount()
+        );
+    }
+
+    private InterviewTemplateConfig loadTemplate(String sessionId) {
+        try {
+            Optional<InterviewSessionEntity> session = persistenceService.findBySessionId(sessionId);
+            if (session.isPresent() && session.get().getTemplateJson() != null) {
+                return objectMapper.readValue(session.get().getTemplateJson(), InterviewTemplateConfig.class)
+                    .normalize(questionService.getDefaultFollowUpCount());
+            }
+        } catch (Exception e) {
+            log.warn("读取面试模板快照失败，将使用默认模板: {}", e.getMessage());
+        }
+        return InterviewTemplateConfig.defaultBackend(questionService.getDefaultFollowUpCount());
+    }
+
+    private int findNextUnansweredQuestionIndex(List<InterviewQuestionDTO> questions) {
+        for (int i = 0; i < questions.size(); i++) {
+            InterviewQuestionDTO question = questions.get(i);
+            if (question.userAnswer() == null || question.userAnswer().isBlank()) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +37,7 @@ public class InterviewQuestionService {
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<QuestionListDTO> outputConverter;
+    private final BeanOutputConverter<FollowUpDecisionDTO> followUpOutputConverter;
     private final StructuredOutputInvoker structuredOutputInvoker;
     private final int followUpCount;
     
@@ -59,6 +61,12 @@ public class InterviewQuestionService {
         String category,
         List<String> followUps
     ) {}
+
+    private record FollowUpDecisionDTO(
+        boolean shouldFollowUp,
+        String followUpQuestion,
+        String category
+    ) {}
     
     public InterviewQuestionService(
             ChatClient.Builder chatClientBuilder,
@@ -71,6 +79,7 @@ public class InterviewQuestionService {
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(QuestionListDTO.class);
+        this.followUpOutputConverter = new BeanOutputConverter<>(FollowUpDecisionDTO.class);
         this.followUpCount = Math.max(0, Math.min(followUpCount, MAX_FOLLOW_UP_COUNT));
     }
     
@@ -205,17 +214,6 @@ public class InterviewQuestionService {
             int mainQuestionIndex = index;
             questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category(), false, null));
 
-            List<String> followUps = sanitizeFollowUps(q.followUps(), followUpLimit);
-            for (int i = 0; i < followUps.size(); i++) {
-                questions.add(InterviewQuestionDTO.create(
-                    index++,
-                    followUps.get(i),
-                    type,
-                    buildFollowUpCategory(q.category(), i + 1),
-                    true,
-                    mainQuestionIndex
-                ));
-            }
         }
         
         return questions;
@@ -262,17 +260,6 @@ public class InterviewQuestionService {
                 null
             ));
 
-            int mainQuestionIndex = index - 1;
-            for (int j = 0; j < followUpLimit; j++) {
-                questions.add(InterviewQuestionDTO.create(
-                    index++,
-                    buildDefaultFollowUp(mainQuestion, j + 1),
-                    type,
-                    buildFollowUpCategory(category, j + 1),
-                    true,
-                    mainQuestionIndex
-                ));
-            }
         }
         
         return questions;
@@ -340,6 +327,58 @@ public class InterviewQuestionService {
 
     public int getDefaultFollowUpCount() {
         return followUpCount;
+    }
+
+    /**
+     * 根据刚提交的回答决定是否立即深挖。失败时返回空，主流程继续下一题。
+     */
+    public Optional<InterviewQuestionDTO> generateDynamicFollowUp(
+        InterviewQuestionDTO question,
+        String answer,
+        int nextQuestionIndex,
+        int parentQuestionIndex,
+        int existingFollowUpCount,
+        int maximumFollowUpCount
+    ) {
+        if (maximumFollowUpCount <= existingFollowUpCount || answer == null || answer.isBlank()) {
+            return Optional.empty();
+        }
+        String systemPrompt = "你是一位技术面试官。基于候选人的刚刚回答，判断是否有必要追问以验证其真实理解。" +
+            "只有回答存在可深挖的技术细节、模糊点或风险时才追问；否则不要追问。" +
+            "追问必须简洁、只问一个具体点，并保持与原题相同的技术方向。\n\n" + followUpOutputConverter.getFormat();
+        String userPrompt = "原题：" + question.question() + "\n题型：" + question.type() +
+            "\n候选人回答：" + answer + "\n已有追问数：" + existingFollowUpCount +
+            "，最多追问数：" + maximumFollowUpCount;
+        try {
+            FollowUpDecisionDTO decision = structuredOutputInvoker.invoke(
+                chatClient,
+                systemPrompt,
+                userPrompt,
+                followUpOutputConverter,
+                ErrorCode.INTERVIEW_QUESTION_GENERATION_FAILED,
+                "动态追问生成失败",
+                "动态追问",
+                log
+            );
+            if (decision == null || !decision.shouldFollowUp() || decision.followUpQuestion() == null
+                || decision.followUpQuestion().isBlank()) {
+                return Optional.empty();
+            }
+            String category = decision.category() == null || decision.category().isBlank()
+                ? buildFollowUpCategory(question.category(), existingFollowUpCount + 1)
+                : decision.category().trim();
+            return Optional.of(InterviewQuestionDTO.create(
+                nextQuestionIndex,
+                decision.followUpQuestion().trim(),
+                question.type(),
+                category,
+                true,
+                parentQuestionIndex
+            ));
+        } catch (Exception e) {
+            log.warn("动态追问决策失败，将继续下一题: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private String buildDefaultFollowUp(String mainQuestion, int order) {
