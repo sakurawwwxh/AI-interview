@@ -6,10 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 
 /**
  * Dify 文档模型
+ *
+ * <p>字段与 Dify 知识库 API 的 list documents 响应对齐。
+ * 注意：Dify 返回的 created_at / updated_at 为 Unix 时间戳（秒），由客户端解析为 LocalDateTime。
  */
 @Data
 @Builder
@@ -22,18 +24,21 @@ public class DifyDocument {
     /** 文档名称 */
     private String name;
 
-    /** 文档内容预览 */
-    private String contentPreview;
+    /** 索引状态（waiting / indexing / completed / error 等） */
+    private String indexingStatus;
 
-    /** 元数据 */
-    private Map<String, Object> metadata;
+    /** 展示状态（queuing / indexing / paused / error / available / disabled / archived） */
+    private String displayStatus;
+
+    /** 字数 */
+    private Integer wordCount;
+
+    /** 命中次数 */
+    private Integer hitCount;
 
     /** 创建时间 */
     private LocalDateTime createdAt;
 
     /** 更新时间 */
     private LocalDateTime updatedAt;
-
-    /** 索引状态 */
-    private String indexingStatus;
 }

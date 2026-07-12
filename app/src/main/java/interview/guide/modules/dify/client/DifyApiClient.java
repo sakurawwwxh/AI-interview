@@ -6,13 +6,13 @@ import interview.guide.modules.dify.config.DifyConfig;
 import interview.guide.modules.dify.exception.DifyApiException;
 import interview.guide.modules.dify.model.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -21,34 +21,43 @@ import java.util.*;
 /**
  * Dify API 客户端
  * 封装所有与 Dify 平台的交互
+ *
+ * <p>使用 Spring 6.1+ 引入的 {@link RestClient} 作为 HTTP 客户端（Spring Boot 4.0 已移除
+ * RestTemplateBuilder 和 RestTemplate 的自动配置支持）。
  */
 @Service
 @Slf4j
 public class DifyApiClient {
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final DifyConfig config;
     private final ObjectMapper objectMapper;
 
-    public DifyApiClient(RestTemplateBuilder restTemplateBuilder,
-                         DifyConfig config,
+    public DifyApiClient(DifyConfig config,
                          ObjectMapper objectMapper) {
-        this.restTemplate = restTemplateBuilder.build();
         this.config = config;
         this.objectMapper = objectMapper;
+        // 构建 RestClient，统一配置 baseUrl 和默认 Authorization 头
+        this.restClient = RestClient.builder()
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey())
+            .build();
     }
 
     /**
      * 创建文档到 Dify 知识库
      *
+     * <p>调用 Dify 官方端点 {@code POST /datasets/{datasetId}/document/create-by-text}。
+     * 注意：Dify 知识库 API 要求 {@code name} 为必填字段，且不识别 {@code metadata} 字段，
+     * 因此从 metadata 中提取 name 后丢弃 metadata。
+     *
      * @param datasetId 知识库 ID
      * @param text      文档内容
-     * @param metadata  元数据
+     * @param metadata  元数据（仅从中提取 name，其余字段被 Dify 知识库 API 忽略）
      * @return Dify 文档 ID
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public String createDocument(String datasetId, String text, Map<String, Object> metadata) {
@@ -60,26 +69,37 @@ public class DifyApiClient {
             throw new IllegalArgumentException("text 不能为空");
         }
 
-        log.info("创建 Dify 文档: datasetId={}, textLength={}", datasetId, text.length());
+        // Dify 要求 name 必填，从 metadata 提取；缺失时使用默认值
+        String name = "document";
+        if (metadata != null && metadata.get("name") instanceof String n && !n.isBlank()) {
+            name = n;
+        }
 
-        String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents";
+        log.info("创建 Dify 文档: datasetId={}, name={}, textLength={}", datasetId, name, text.length());
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        String url = config.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-text";
 
+        // Dify 知识库 API 的 create-by-text 请求体，name 和 text 为必填字段
         Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
         body.put("text", text);
-        body.put("metadata", metadata != null ? metadata : Map.of());
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        body.put("indexing_technique", "high_quality");
+        body.put("doc_language", "zh-CN");
 
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(
-                url, HttpMethod.POST, request, JsonNode.class
-            );
+            ResponseEntity<JsonNode> response = restClient.post()
+                .uri(url)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(body)
+                .retrieve()
+                .toEntity(JsonNode.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                // 官方响应结构: {"document":{"id":"..."},"batch":"..."}
                 String documentId = response.getBody().path("document").path("id").asText();
+                if (documentId.isBlank()) {
+                    throw new DifyApiException("创建文档失败: 响应中缺少 document.id");
+                }
                 log.info("Dify 文档创建成功: documentId={}", documentId);
                 return documentId;
             } else {
@@ -87,7 +107,7 @@ public class DifyApiClient {
             }
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("创建文档失败: " + e.getMessage(), e);
         }
@@ -95,13 +115,21 @@ public class DifyApiClient {
 
     /**
      * 更新 Dify 文档
+     *
+     * <p>调用 Dify 官方端点 {@code POST /datasets/{datasetId}/documents/{documentId}/update-by-text}。
+     * 注意：Dify 知识库 API 要求当提供 text 时 name 必填，且使用 POST 而非 PUT。
+     *
+     * @param datasetId  知识库 ID
+     * @param documentId 文档 ID
+     * @param name       文档名称（text 提供时必填）
+     * @param text       文档内容
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
-    public void updateDocument(String datasetId, String documentId, String text) {
+    public void updateDocument(String datasetId, String documentId, String name, String text) {
         if (datasetId == null || datasetId.isBlank()) {
             throw new IllegalArgumentException("datasetId 不能为空");
         }
@@ -112,20 +140,25 @@ public class DifyApiClient {
             throw new IllegalArgumentException("text 不能为空");
         }
 
-        log.info("更新 Dify 文档: datasetId={}, documentId={}", datasetId, documentId);
+        // Dify 要求 text 提供时 name 必填，缺失时使用默认值
+        String docName = (name != null && !name.isBlank()) ? name : "document";
 
-        String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId;
+        log.info("更新 Dify 文档: datasetId={}, documentId={}, name={}", datasetId, documentId, docName);
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId + "/update-by-text";
 
-        Map<String, Object> body = Map.of("text", text);
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", docName);
+        body.put("text", text);
+        body.put("doc_language", "zh-CN");
 
         try {
-            ResponseEntity<Void> response = restTemplate.exchange(
-                url, HttpMethod.PUT, request, Void.class
-            );
+            ResponseEntity<JsonNode> response = restClient.post()
+                .uri(url)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(body)
+                .retrieve()
+                .toEntity(JsonNode.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
                 throw new DifyApiException("更新文档失败: " + response.getStatusCode());
@@ -134,7 +167,7 @@ public class DifyApiClient {
             log.info("Dify 文档更新成功: documentId={}", documentId);
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("更新文档失败: " + e.getMessage(), e);
         }
@@ -145,7 +178,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public void deleteDocument(String datasetId, String documentId) {
@@ -160,13 +193,11 @@ public class DifyApiClient {
 
         String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId;
 
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Void> request = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<Void> response = restTemplate.exchange(
-                url, HttpMethod.DELETE, request, Void.class
-            );
+            ResponseEntity<Void> response = restClient.delete()
+                .uri(url)
+                .retrieve()
+                .toEntity(Void.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
                 throw new DifyApiException("删除文档失败: " + response.getStatusCode());
@@ -175,7 +206,7 @@ public class DifyApiClient {
             log.info("Dify 文档删除成功: documentId={}", documentId);
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("删除文档失败: " + e.getMessage(), e);
         }
@@ -186,7 +217,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public DifyDocumentList listDocuments(String datasetId, int page, int limit) {
@@ -199,13 +230,11 @@ public class DifyApiClient {
 
         String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents?page=" + page + "&limit=" + limit;
 
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Void> request = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(
-                url, HttpMethod.GET, request, JsonNode.class
-            );
+            ResponseEntity<JsonNode> response = restClient.get()
+                .uri(url)
+                .retrieve()
+                .toEntity(JsonNode.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode body = response.getBody();
@@ -230,7 +259,7 @@ public class DifyApiClient {
             }
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("列出文档失败: " + e.getMessage(), e);
         }
@@ -241,7 +270,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public DifyChatResponse chat(String query, String conversationId, Map<String, String> inputs) {
@@ -256,9 +285,6 @@ public class DifyApiClient {
 
         String url = config.getApiUrl() + "/chat-messages";
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
         Map<String, Object> body = new HashMap<>();
         body.put("query", query);
         body.put("inputs", inputs != null ? inputs : Map.of());
@@ -269,12 +295,13 @@ public class DifyApiClient {
             body.put("conversation_id", conversationId);
         }
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(
-                url, HttpMethod.POST, request, JsonNode.class
-            );
+            ResponseEntity<JsonNode> response = restClient.post()
+                .uri(url)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(body)
+                .retrieve()
+                .toEntity(JsonNode.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
@@ -288,7 +315,7 @@ public class DifyApiClient {
             }
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("对话失败: " + e.getMessage(), e);
         }
@@ -299,7 +326,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
-        maxExpression = "${dify.sync.retry-count:3}",
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public DifyWorkflowResponse runWorkflow(String workflowId, Map<String, Object> inputs) {
@@ -312,21 +339,19 @@ public class DifyApiClient {
 
         String url = config.getApiUrl() + "/workflows/run";
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
         Map<String, Object> body = new HashMap<>();
         body.put("workflow_id", workflowId);
         body.put("inputs", inputs != null ? inputs : Map.of());
         body.put("response_mode", "blocking");
         body.put("user", config.getDefaultUser());
 
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<JsonNode> response = restTemplate.exchange(
-                url, HttpMethod.POST, request, JsonNode.class
-            );
+            ResponseEntity<JsonNode> response = restClient.post()
+                .uri(url)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body(body)
+                .retrieve()
+                .toEntity(JsonNode.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
@@ -341,7 +366,7 @@ public class DifyApiClient {
             }
         } catch (DifyApiException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("运行工作流失败: " + e.getMessage(), e);
         }
@@ -357,7 +382,8 @@ public class DifyApiClient {
     }
 
     @Recover
-    public void recoverUpdateDocument(DifyApiException e, String datasetId, String documentId, String text) {
+    public void recoverUpdateDocument(DifyApiException e, String datasetId, String documentId,
+                                      String name, String text) {
         log.error("Dify API 更新文档失败，已重试 {} 次: {}", config.getSync().getRetryCount(), e.getMessage());
         throw new DifyApiException("更新文档失败: " + e.getMessage(), e);
     }
@@ -391,25 +417,21 @@ public class DifyApiClient {
     // ========== 辅助方法 ==========
 
     /**
-     * 创建包含认证信息的 HTTP 请求头
-     */
-    private HttpHeaders createHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + config.getApiKey());
-        return headers;
-    }
-
-    /**
      * 解析 Dify 文档 JSON 节点为 DifyDocument 对象
+     *
+     * <p>Dify 知识库 API 的 list documents 响应字段：id、name、indexing_status、display_status、
+     * word_count、hit_count、created_at、updated_at。其中时间字段为 Unix 时间戳（秒）。
      */
     private DifyDocument parseDocument(JsonNode node) {
         return DifyDocument.builder()
             .id(node.path("id").asText())
             .name(node.path("name").asText())
-            .contentPreview(node.path("content_preview").asText())
-            .createdAt(parseDateTime(node.path("created_at").asText()))
-            .updatedAt(parseDateTime(node.path("updated_at").asText()))
             .indexingStatus(node.path("indexing_status").asText())
+            .displayStatus(node.path("display_status").asText())
+            .wordCount(node.path("word_count").asInt(0))
+            .hitCount(node.path("hit_count").asInt(0))
+            .createdAt(parseTimestamp(node.path("created_at")))
+            .updatedAt(parseTimestamp(node.path("updated_at")))
             .build();
     }
 
@@ -445,16 +467,32 @@ public class DifyApiClient {
     }
 
     /**
-     * 解析 ISO 格式的日期时间字符串
+     * 解析 Dify 返回的 Unix 时间戳（秒）为 LocalDateTime
+     *
+     * <p>Dify 知识库 API 的 created_at / updated_at 字段为 Unix 时间戳（秒，整数或浮点）。
+     * 部分旧版接口可能返回 ISO 字符串，此处做兼容处理。
      */
-    private LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.isBlank()) {
+    private LocalDateTime parseTimestamp(JsonNode node) {
+        if (node == null || node.isNull() || node.asText().isBlank()) {
             return null;
         }
         try {
-            return LocalDateTime.parse(dateTimeStr, DateTimeFormatter.ISO_DATE_TIME);
+            // 数值型时间戳（Dify 知识库 API 的标准格式）
+            if (node.isNumber()) {
+                long seconds = (long) node.asDouble();
+                return LocalDateTime.ofInstant(java.time.Instant.ofEpochSecond(seconds),
+                    java.time.ZoneId.systemDefault());
+            }
+            // 兼容 ISO 字符串格式
+            String text = node.asText();
+            if (text.matches("\\d+(\\.\\d+)?")) {
+                long seconds = (long) Double.parseDouble(text);
+                return LocalDateTime.ofInstant(java.time.Instant.ofEpochSecond(seconds),
+                    java.time.ZoneId.systemDefault());
+            }
+            return LocalDateTime.parse(text, DateTimeFormatter.ISO_DATE_TIME);
         } catch (Exception e) {
-            log.warn("解析日期时间失败: {}", dateTimeStr);
+            log.warn("解析时间戳失败: {}", node);
             return null;
         }
     }
