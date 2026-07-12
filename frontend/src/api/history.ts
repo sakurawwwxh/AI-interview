@@ -64,6 +64,7 @@ export interface AnswerItem {
   referenceAnswer?: string;
   keyPoints?: string[];
   answeredAt: string;
+  answerDurationSeconds?: number | null;
 }
 
 export interface ResumeDetail {
@@ -87,6 +88,28 @@ export interface InterviewDetail extends InterviewItem {
   answers: AnswerItem[];
 }
 
+export interface InterviewCategoryStatistic {
+  category: string;
+  averageScore: number;
+  questionCount: number;
+}
+
+export interface InterviewTrendPoint {
+  sessionId: string;
+  completedAt: string;
+  score: number;
+}
+
+export interface InterviewStatistics {
+  completedInterviewCount: number;
+  averageScore: number;
+  latestScore: number | null;
+  scoreChange: number | null;
+  abilityScores: InterviewCategoryStatistic[];
+  scoreTrend: InterviewTrendPoint[];
+  weaknesses: InterviewCategoryStatistic[];
+}
+
 export const historyApi = {
   /**
    * 获取所有简历列表
@@ -107,6 +130,13 @@ export const historyApi = {
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
     return request.get<InterviewDetail>(`/api/interview/sessions/${sessionId}/details`);
+  },
+
+  /**
+   * 获取已评分面试的跨会话统计。
+   */
+  async getInterviewStatistics(): Promise<InterviewStatistics> {
+    return request.get<InterviewStatistics>('/api/interview/statistics');
   },
 
   /**

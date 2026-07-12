@@ -6,6 +6,7 @@ import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.service.InterviewHistoryService;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.interview.service.InterviewSessionService;
+import interview.guide.modules.interview.service.InterviewStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +30,7 @@ public class InterviewController {
     private final InterviewSessionService sessionService;
     private final InterviewHistoryService historyService;
     private final InterviewPersistenceService persistenceService;
+    private final InterviewStatisticsService statisticsService;
     
     /**
      * 创建面试会话
@@ -126,6 +128,14 @@ public class InterviewController {
     public Result<InterviewDetailDTO> getInterviewDetail(@PathVariable String sessionId) {
         InterviewDetailDTO detail = historyService.getInterviewDetail(sessionId);
         return Result.success(detail);
+    }
+
+    /**
+     * 获取本地全部已评分面试的能力统计。
+     */
+    @GetMapping("/api/interview/statistics")
+    public Result<InterviewStatisticsDTO> getInterviewStatistics() {
+        return Result.success(statisticsService.getStatistics());
     }
     
     /**
