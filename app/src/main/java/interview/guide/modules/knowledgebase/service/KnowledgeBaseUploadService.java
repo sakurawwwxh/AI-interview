@@ -78,15 +78,28 @@ public class KnowledgeBaseUploadService {
         log.info("知识库已存储到RustFS: {}", fileKey);
 
         // 6. 保存知识库元数据到数据库（状态为 PENDING）
-        KnowledgeBaseEntity savedKb = persistenceService.saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
+        KnowledgeBaseEntity savedKb;
+        try {
+            savedKb = persistenceService.saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
+        } catch (Exception e) {
+            // 落库失败时补偿删除已上传的 S3 文件，避免孤儿
+            log.error("落库失败，回滚 S3 文件: fileKey={}, error={}", fileKey, e.getMessage());
+            try {
+                storageService.deleteKnowledgeBase(fileKey);
+            } catch (Exception delErr) {
+                log.error("S3 补偿删除失败，留下孤儿: fileKey={}, error={}", fileKey, delErr.getMessage());
+            }
+            throw e;
+        }
 
         // 7. 发送向量化任务到 Redis Stream（异步处理）
         vectorizeStreamProducer.sendVectorizeTask(savedKb.getId(), content);
 
         log.info("知识库上传完成，向量化任务已入队: {}, kbId={}", fileName, savedKb.getId());
 
-        // 8. 异步同步到 Dify
-        difySyncService.syncToDify(savedKb, content);
+        // 8. 异步同步到 Dify（传只读字段，避免异步 save 覆盖向量状态）
+        difySyncService.syncToDify(savedKb.getId(), savedKb.getName(), savedKb.getOriginalFilename(),
+            savedKb.getCategory(), content, savedKb.getDifyDocumentId());
 
         // 9. 返回结果（状态为 PENDING，前端可轮询获取最新状态）
         return Map.of(

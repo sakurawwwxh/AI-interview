@@ -17,8 +17,7 @@ public class RagChatDTO {
      * 创建会话请求
      */
     public record CreateSessionRequest(
-        @NotEmpty(message = "至少选择一个知识库")
-        List<Long> knowledgeBaseIds,
+        List<Long> knowledgeBaseIds,  // 可为空（Dify 模式不需要选知识库）
 
         String title  // 可选，为空则自动生成
     ) {}

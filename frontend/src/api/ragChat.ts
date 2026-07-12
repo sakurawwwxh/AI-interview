@@ -106,14 +106,98 @@ export const ragChatApi = {
   },
 
   /**
+   * 发送消息（Dify 聊天助手流式SSE，走 session 保存对话历史）
+   * @param signal 可选的 AbortSignal，用于停止生成
+   */
+  async sendDifyMessageStream(
+    sessionId: number,
+    question: string,
+    onMessage: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: Error) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/rag-chat/sessions/${sessionId}/messages/dify-stream`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+          signal,
+        }
+      );
+
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) throw new Error(errorData.message);
+        } catch { /* ignore */ }
+        throw new Error(`请求失败 (${response.status})`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('无法获取响应流');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const extractEvent = (event: string): { type: string; data: string } | null => {
+        if (!event.trim()) return null;
+        const lines = event.split('\n');
+        let eventType = 'message';
+        const contentParts: string[] = [];
+        for (const line of lines) {
+          if (line.startsWith('event:')) eventType = line.substring(6).trim();
+          else if (line.startsWith('data:')) contentParts.push(line.substring(5));
+        }
+        if (contentParts.length === 0 && eventType === 'message') return null;
+        const data = contentParts.join('').replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+        return { type: eventType, data };
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) {
+            const evt = extractEvent(buffer);
+            if (evt) {
+              if (evt.type === 'error') { onError(new Error(evt.data || '回答生成失败')); return; }
+              if (evt.data) onMessage(evt.data);
+            }
+          }
+          onComplete();
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.substring(0, idx);
+          buffer = buffer.substring(idx + 2);
+          const evt = extractEvent(block);
+          if (!evt) continue;
+          if (evt.type === 'error') { onError(new Error(evt.data || '回答生成失败')); return; }
+          if (evt.type === 'ping') continue;
+          if (evt.data) onMessage(evt.data);
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') { onComplete(); return; }
+      onError(new Error(getErrorMessage(error)));
+    }
+  },
+
+  /**
    * 发送消息（流式SSE）
+   * @param signal 可选的 AbortSignal，用于停止生成
    */
   async sendMessageStream(
     sessionId: number,
     question: string,
     onMessage: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     try {
       const response = await fetch(
@@ -122,11 +206,11 @@ export const ragChatApi = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question }),
+          signal, // 支持 AbortController 中止
         }
       );
 
       if (!response.ok) {
-        // 尝试解析错误响应
         try {
           const errorData = await response.json();
           if (errorData && errorData.message) {
@@ -146,37 +230,46 @@ export const ragChatApi = {
       const decoder = new TextDecoder();
       let buffer = '';
 
-      // 从 SSE 事件中提取内容
-      const extractEventContent = (event: string): string | null => {
+      // 从 SSE 事件中提取内容和事件类型
+      const extractEvent = (event: string): { type: string; data: string } | null => {
         if (!event.trim()) return null;
 
         const lines = event.split('\n');
+        let eventType = 'message';
         const contentParts: string[] = [];
 
         for (const line of lines) {
-          if (line.startsWith('data:')) {
-            // 提取 data: 后面的内容，保留原始格式（包括缩进空格）
-            // ServerSentEvent 不会在 data: 后添加额外空格
+          if (line.startsWith('event:')) {
+            eventType = line.substring(6).trim();
+          } else if (line.startsWith('data:')) {
             contentParts.push(line.substring(5));
           }
         }
 
-        if (contentParts.length === 0) return null;
+        if (contentParts.length === 0 && eventType === 'message') return null;
 
-        // 合并内容并还原转义的换行符
-        return contentParts.join('')
+        const data = contentParts.join('')
           .replace(/\\n/g, '\n')
           .replace(/\\r/g, '\r');
+
+        return { type: eventType, data };
       };
 
       while (true) {
         const { done, value } = await reader.read();
 
         if (done) {
-          if (buffer) {
-            const content = extractEventContent(buffer);
-            if (content) {
-              onMessage(content);
+          // 处理缓冲区剩余内容
+          if (buffer.trim()) {
+            const evt = extractEvent(buffer);
+            if (evt) {
+              if (evt.type === 'error') {
+                onError(new Error(evt.data || '回答生成失败'));
+                return;
+              }
+              if (evt.data) {
+                onMessage(evt.data);
+              }
             }
           }
           onComplete();
@@ -185,32 +278,117 @@ export const ragChatApi = {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // SSE 事件以 \n\n 分隔，但也需要处理单行的情况
-        let newlineIndex = buffer.indexOf('\n\n');
-        if (newlineIndex === -1) {
-          // 如果没有找到 \n\n，尝试处理单行 data: 格式
-          const singleLineIndex = buffer.indexOf('\n');
-          if (singleLineIndex !== -1 && buffer.substring(0, singleLineIndex).startsWith('data:')) {
-            const line = buffer.substring(0, singleLineIndex);
-            const content = extractEventContent(line);
-            if (content) {
-              onMessage(content);
-            }
-            buffer = buffer.substring(singleLineIndex + 1);
+        // 统一按 \n\n 切块处理 SSE 事件
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf('\n\n')) !== -1) {
+          const eventBlock = buffer.substring(0, newlineIndex);
+          buffer = buffer.substring(newlineIndex + 2);
+
+          const evt = extractEvent(eventBlock);
+          if (!evt) continue;
+
+          // 处理 error 事件
+          if (evt.type === 'error') {
+            onError(new Error(evt.data || '回答生成失败'));
+            return;
           }
-          continue;
-        }
 
-        // 处理完整的事件块
-        const eventBlock = buffer.substring(0, newlineIndex);
-        buffer = buffer.substring(newlineIndex + 2);
+          // 忽略 ping 心跳事件，只处理 data 内容
+          if (evt.type === 'ping') continue;
 
-        const content = extractEventContent(eventBlock);
-        if (content !== null) {
-          onMessage(content);
+          if (evt.data) {
+            onMessage(evt.data);
+          }
         }
       }
     } catch (error) {
+      // AbortError 是用户主动中止，不算错误
+      if (error instanceof Error && error.name === 'AbortError') {
+        onComplete();
+        return;
+      }
+      onError(new Error(getErrorMessage(error)));
+    }
+  },
+
+  /**
+   * 通过 Dify 聊天助手发送消息（流式SSE）
+   * @param question 用户问题
+   * @param signal 可选的 AbortSignal
+   */
+  async sendDifyChatStream(
+    question: string,
+    onMessage: (chunk: string) => void,
+    onComplete: () => void,
+    onError: (error: Error) => void,
+    signal?: AbortSignal
+  ): Promise<void> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/dify/chat/stream`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: question, conversationId: '' }),
+          signal,
+        }
+      );
+
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) throw new Error(errorData.message);
+        } catch { /* ignore */ }
+        throw new Error(`请求失败 (${response.status})`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('无法获取响应流');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const extractEvent = (event: string): { type: string; data: string } | null => {
+        if (!event.trim()) return null;
+        const lines = event.split('\n');
+        let eventType = 'message';
+        const contentParts: string[] = [];
+        for (const line of lines) {
+          if (line.startsWith('event:')) eventType = line.substring(6).trim();
+          else if (line.startsWith('data:')) contentParts.push(line.substring(5));
+        }
+        if (contentParts.length === 0 && eventType === 'message') return null;
+        const data = contentParts.join('').replace(/\\n/g, '\n').replace(/\\r/g, '\r');
+        return { type: eventType, data };
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) {
+            const evt = extractEvent(buffer);
+            if (evt) {
+              if (evt.type === 'error') { onError(new Error(evt.data || '工作流调用失败')); return; }
+              if (evt.data) onMessage(evt.data);
+            }
+          }
+          onComplete();
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.substring(0, idx);
+          buffer = buffer.substring(idx + 2);
+          const evt = extractEvent(block);
+          if (!evt) continue;
+          if (evt.type === 'error') { onError(new Error(evt.data || '工作流调用失败')); return; }
+          if (evt.type === 'ping') continue;
+          if (evt.data) onMessage(evt.data);
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') { onComplete(); return; }
       onError(new Error(getErrorMessage(error)));
     }
   },

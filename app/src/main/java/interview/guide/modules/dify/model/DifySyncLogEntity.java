@@ -23,7 +23,8 @@ public class DifySyncLogEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "knowledge_base_id", nullable = false)
+    /** 关联知识库 ID（FROM_DIFY 方向且本地无对应记录时可为 null） */
+    @Column(name = "knowledge_base_id")
     private Long knowledgeBaseId;
 
     @Column(name = "dify_document_id", length = 100)

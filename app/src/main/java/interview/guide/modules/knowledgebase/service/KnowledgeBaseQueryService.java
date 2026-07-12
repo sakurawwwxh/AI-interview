@@ -6,6 +6,9 @@ import interview.guide.modules.knowledgebase.model.QueryRequest;
 import interview.guide.modules.knowledgebase.model.QueryResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,8 +37,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 public class KnowledgeBaseQueryService {
     private static final String NO_RESULT_RESPONSE = "抱歉，在选定的知识库中未检索到相关信息。请换一个更具体的关键词或补充上下文后再试。";
-    private static final Pattern SHORT_TOKEN_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_-]{2,20}$");
+    private static final String ERROR_RESPONSE = "AI服务暂时不可用，请稍后重试。";
+    /**
+     * 短 token 模式：仅匹配 2-4 个字符的纯标识符（如 JVM、GC、IO）。
+     * 这类短 token 在向量空间中语义信息不足，需要额外做文本包含确认。
+     * 更长的短语（如"java的基本特性"）已有足够语义信息，不需要额外确认。
+     */
+    private static final Pattern SHORT_TOKEN_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_-]{2,4}$");
     private static final int STREAM_PROBE_CHARS = 120;
+    /** context 最大字符数，防止 token 溢出 */
+    private static final int MAX_CONTEXT_CHARS = 8000;
+    /** 多轮对话注入的历史消息条数（3 轮 = 6 条） */
+    private static final int MAX_HISTORY_MESSAGES = 6;
 
     private final ChatClient chatClient;
     private final KnowledgeBaseVectorService vectorService;
@@ -85,10 +98,6 @@ public class KnowledgeBaseQueryService {
 
     /**
      * 基于单个知识库回答用户问题
-     *
-     * @param knowledgeBaseId 知识库ID
-     * @param question 用户问题
-     * @return AI回答
      */
     public String answerQuestion(Long knowledgeBaseId, String question) {
         return answerQuestion(List.of(knowledgeBaseId), question);
@@ -96,21 +105,29 @@ public class KnowledgeBaseQueryService {
 
     /**
      * 基于多个知识库回答用户问题（RAG）
-     *
-     * @param knowledgeBaseIds 知识库ID列表
-     * @param question 用户问题
-     * @return AI回答
      */
     public String answerQuestion(List<Long> knowledgeBaseIds, String question) {
-        log.info("收到知识库提问: kbIds={}, question={}", knowledgeBaseIds, question);
+        return answerQuestion(knowledgeBaseIds, question, List.of());
+    }
+
+    /**
+     * 基于多个知识库回答用户问题（RAG），支持多轮对话历史
+     *
+     * @param knowledgeBaseIds 知识库 ID 列表
+     * @param question         用户问题
+     * @param history          历史对话消息（最近 N 条，按时间正序），可为空
+     * @return AI 回答
+     */
+    public String answerQuestion(List<Long> knowledgeBaseIds, String question, List<Message> history) {
+        log.info("收到知识库提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, history.size());
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
             return NO_RESULT_RESPONSE;
         }
 
-        // 1. 验证知识库是否存在并更新问题计数（合并数据库操作）
+        // 1. 验证知识库是否存在并更新问题计数
         countService.updateQuestionCounts(knowledgeBaseIds);
 
-        // 2. Query rewrite + 动态参数检索（RAG）
+        // 2. Query rewrite + 动态参数检索
         QueryContext queryContext = buildQueryContext(question);
         List<Document> relevantDocs = retrieveRelevantDocs(queryContext, knowledgeBaseIds);
 
@@ -118,10 +135,8 @@ public class KnowledgeBaseQueryService {
             return NO_RESULT_RESPONSE;
         }
 
-        // 3. 构建上下文（合并检索到的文档）
-        String context = relevantDocs.stream()
-                .map(Document::getText)
-                .collect(Collectors.joining("\n\n---\n\n"));
+        // 3. 构建上下文（带来源标注 + 长度裁剪）
+        String context = buildContextWithSources(relevantDocs, knowledgeBaseIds);
 
         log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
 
@@ -130,12 +145,14 @@ public class KnowledgeBaseQueryService {
         String userPrompt = buildUserPrompt(context, question);
 
         try {
-            // 5. 调用AI生成回答
-            String answer = chatClient.prompt()
+            // 5. 调用AI生成回答（注入历史消息）
+            var promptBuilder = chatClient.prompt()
                     .system(systemPrompt)
-                    .user(userPrompt)
-                    .call()
-                    .content();
+                    .user(userPrompt);
+            if (history != null && !history.isEmpty()) {
+                promptBuilder.messages(history);
+            }
+            String answer = promptBuilder.call().content();
             answer = normalizeAnswer(answer);
 
             log.info("知识库问答完成: kbIds={}", knowledgeBaseIds);
@@ -143,7 +160,7 @@ public class KnowledgeBaseQueryService {
 
         } catch (Exception e) {
             log.error("知识库问答失败: {}", e.getMessage(), e);
-            throw new BusinessException(ErrorCode.KNOWLEDGE_BASE_QUERY_FAILED, "知识库查询失败：" + e.getMessage());
+            throw new BusinessException(ErrorCode.KNOWLEDGE_BASE_QUERY_FAILED, ERROR_RESPONSE);
         }
     }
 
@@ -165,6 +182,46 @@ public class KnowledgeBaseQueryService {
     }
 
     /**
+     * 构建带来源标注的上下文，并裁剪总长度防止 token 溢出
+     *
+     * <p>每个检索片段前标注来源知识库名称，格式：
+     * <pre>【来源：知识库名】
+     * 文档内容...</pre>
+     */
+    private String buildContextWithSources(List<Document> docs, List<Long> knowledgeBaseIds) {
+        // 批量查询知识库名称
+        List<String> kbNames = listService.getKnowledgeBaseNames(knowledgeBaseIds);
+        Map<String, String> kbIdToName = new HashMap<>();
+        for (int i = 0; i < knowledgeBaseIds.size() && i < kbNames.size(); i++) {
+            kbIdToName.put(knowledgeBaseIds.get(i).toString(), kbNames.get(i));
+        }
+
+        StringBuilder context = new StringBuilder();
+        for (Document doc : docs) {
+            Object kbIdObj = doc.getMetadata() != null ? doc.getMetadata().get("kb_id") : null;
+            String kbName = (kbIdObj != null) ? kbIdToName.getOrDefault(kbIdObj.toString(), "未知知识库") : "未知知识库";
+            String text = doc.getText();
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+
+            if (context.length() > 0) {
+                context.append("\n\n---\n\n");
+            }
+            context.append("【来源：").append(kbName).append("】\n").append(text);
+
+            // 长度裁剪，防止 token 溢出
+            if (context.length() >= MAX_CONTEXT_CHARS) {
+                context.setLength(MAX_CONTEXT_CHARS);
+                context.append("\n\n[...内容已截断]");
+                log.info("Context 超过 {} 字符，已截断", MAX_CONTEXT_CHARS);
+                break;
+            }
+        }
+        return context.toString();
+    }
+
+    /**
      * 查询知识库并返回完整响应
      */
     public QueryResponse queryKnowledgeBase(QueryRequest request) {
@@ -182,13 +239,21 @@ public class KnowledgeBaseQueryService {
 
     /**
      * 流式查询知识库（SSE）
-     *
-     * @param knowledgeBaseIds 知识库ID列表
-     * @param question 用户问题
-     * @return 流式响应
      */
     public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question) {
-        log.info("收到知识库流式提问: kbIds={}, question={}", knowledgeBaseIds, question);
+        return answerQuestionStream(knowledgeBaseIds, question, List.of());
+    }
+
+    /**
+     * 流式查询知识库（SSE），支持多轮对话历史
+     *
+     * @param knowledgeBaseIds 知识库 ID 列表
+     * @param question         用户问题
+     * @param history          历史对话消息（按时间正序），可为空
+     * @return 流式响应
+     */
+    public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question, List<Message> history) {
+        log.info("收到知识库流式提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, history.size());
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
             return Flux.just(NO_RESULT_RESPONSE);
         }
@@ -205,10 +270,8 @@ public class KnowledgeBaseQueryService {
                 return Flux.just(NO_RESULT_RESPONSE);
             }
 
-            // 3. 构建上下文
-            String context = relevantDocs.stream()
-                    .map(Document::getText)
-                    .collect(Collectors.joining("\n\n---\n\n"));
+            // 3. 构建上下文（带来源标注 + 长度裁剪）
+            String context = buildContextWithSources(relevantDocs, knowledgeBaseIds);
 
             log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
 
@@ -216,24 +279,26 @@ public class KnowledgeBaseQueryService {
             String systemPrompt = buildSystemPrompt();
             String userPrompt = buildUserPrompt(context, question);
 
-            // 5. 流式调用 + 探测窗口归一化：既保留流式速度，又避免无信息长文
-            Flux<String> responseFlux = chatClient.prompt()
+            // 5. 流式调用（注入历史消息）+ 探测窗口归一化
+            var promptBuilder = chatClient.prompt()
                     .system(systemPrompt)
-                    .user(userPrompt)
-                    .stream()
-                    .content();
+                    .user(userPrompt);
+            if (history != null && !history.isEmpty()) {
+                promptBuilder.messages(history);
+            }
+            Flux<String> responseFlux = promptBuilder.stream().content();
 
             log.info("开始流式输出知识库回答(探测窗口): kbIds={}", knowledgeBaseIds);
             return normalizeStreamOutput(responseFlux)
                 .doOnComplete(() -> log.info("流式输出完成: kbIds={}", knowledgeBaseIds))
                 .onErrorResume(e -> {
                     log.error("流式输出失败: kbIds={}, error={}", knowledgeBaseIds, e.getMessage(), e);
-                    return Flux.just("【错误】知识库查询失败：AI服务暂时不可用，请稍后重试。");
+                    return Flux.just(ERROR_RESPONSE);
                 });
 
         } catch (Exception e) {
             log.error("知识库流式问答失败: {}", e.getMessage(), e);
-            return Flux.just("【错误】知识库查询失败：" + e.getMessage());
+            return Flux.just(ERROR_RESPONSE);
         }
     }
 
@@ -351,12 +416,20 @@ public class KnowledgeBaseQueryService {
         return normalized;
     }
 
+    /**
+     * 判断回答是否为"无信息"拒答
+     *
+     * <p>prompt 里已固化拒答话术，此处精确匹配 NO_RESULT_RESPONSE 的前缀，
+     * 减少对正常回答的误判。
+     */
     private boolean isNoResultLike(String text) {
-        return text.contains("没有找到相关信息")
-            || text.contains("未检索到相关信息")
-            || text.contains("信息不足")
-            || text.contains("超出知识库范围")
-            || text.contains("无法根据提供内容回答");
+        if (text == null || text.isBlank()) {
+            return true;
+        }
+        String trimmed = text.trim();
+        // 精确匹配固化话术的前 20 个字符
+        String noResultPrefix = NO_RESULT_RESPONSE.substring(0, 20);
+        return trimmed.startsWith(noResultPrefix);
     }
 
     /**

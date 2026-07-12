@@ -6,16 +6,25 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Dify 配置类
+ *
+ * <p>Dify 有两类 API Key：
+ * <ul>
+ *   <li>{@code datasetApiKey}（dataset-xxx）：知识库文档同步用，调用 /datasets/* 端点</li>
+ *   <li>{@code appApiKey}（app-xxx）：工作流/对话用，调用 /workflows/run、/chat-messages 端点</li>
+ * </ul>
  */
 @Configuration
 @ConfigurationProperties(prefix = "dify")
 @Data
 public class DifyConfig {
     /** Dify API 基础地址 */
-    private String apiUrl = "http://your-dify-host:80/v1";
+    private String apiUrl = "https://api.dify.ai/v1";
 
-    /** API Key */
+    /** 知识库 API Key（格式: dataset-xxx），用于文档同步 */
     private String apiKey;
+
+    /** 应用 API Key（格式: app-xxx），用于工作流/对话 */
+    private String appApiKey;
 
     /** 默认知识库 ID */
     private String datasetId;

@@ -1,7 +1,7 @@
 package interview.guide.modules.dify.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import interview.guide.modules.dify.config.DifyConfig;
 import interview.guide.modules.dify.exception.DifyApiException;
 import interview.guide.modules.dify.model.*;
@@ -13,6 +13,8 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,17 +31,31 @@ import java.util.*;
 @Slf4j
 public class DifyApiClient {
 
-    private final RestClient restClient;
+    /** 知识库文档同步用 RestClient（Dataset API Key） */
+    private final RestClient datasetClient;
+    /** 工作流/对话用 RestClient（App API Key） */
+    private final RestClient appClient;
+    /** 工作流流式用 WebClient（App API Key） */
+    private final WebClient appWebClient;
     private final DifyConfig config;
     private final ObjectMapper objectMapper;
 
-    public DifyApiClient(DifyConfig config,
-                         ObjectMapper objectMapper) {
+    public DifyApiClient(DifyConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.objectMapper = objectMapper;
-        // 构建 RestClient，统一配置 baseUrl 和默认 Authorization 头
-        this.restClient = RestClient.builder()
+        // 知识库 API 用的 RestClient（dataset-xxx key）
+        this.datasetClient = RestClient.builder()
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey())
+            .build();
+        // 工作流/对话 API 用的 RestClient（app-xxx key）
+        this.appClient = RestClient.builder()
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getAppApiKey())
+            .build();
+        // 流式工作流用的 WebClient（app-xxx key）
+        this.appWebClient = WebClient.builder()
+            .baseUrl(config.getApiUrl())
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getAppApiKey())
+            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .build();
     }
 
@@ -57,6 +73,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
@@ -87,7 +104,7 @@ public class DifyApiClient {
         body.put("doc_language", "zh-CN");
 
         try {
-            ResponseEntity<JsonNode> response = restClient.post()
+            ResponseEntity<JsonNode> response = datasetClient.post()
                 .uri(url)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(body)
@@ -96,7 +113,7 @@ public class DifyApiClient {
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 // 官方响应结构: {"document":{"id":"..."},"batch":"..."}
-                String documentId = response.getBody().path("document").path("id").asText();
+                String documentId = safeAsText(response.getBody().path("document"), "id");
                 if (documentId.isBlank()) {
                     throw new DifyApiException("创建文档失败: 响应中缺少 document.id");
                 }
@@ -126,6 +143,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
@@ -153,7 +171,7 @@ public class DifyApiClient {
         body.put("doc_language", "zh-CN");
 
         try {
-            ResponseEntity<JsonNode> response = restClient.post()
+            ResponseEntity<JsonNode> response = datasetClient.post()
                 .uri(url)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(body)
@@ -178,6 +196,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
@@ -194,7 +213,7 @@ public class DifyApiClient {
         String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId;
 
         try {
-            ResponseEntity<Void> response = restClient.delete()
+            ResponseEntity<Void> response = datasetClient.delete()
                 .uri(url)
                 .retrieve()
                 .toEntity(Void.class);
@@ -217,6 +236,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
@@ -231,7 +251,7 @@ public class DifyApiClient {
         String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents?page=" + page + "&limit=" + limit;
 
         try {
-            ResponseEntity<JsonNode> response = restClient.get()
+            ResponseEntity<JsonNode> response = datasetClient.get()
                 .uri(url)
                 .retrieve()
                 .toEntity(JsonNode.class);
@@ -270,6 +290,7 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
@@ -296,7 +317,7 @@ public class DifyApiClient {
         }
 
         try {
-            ResponseEntity<JsonNode> response = restClient.post()
+            ResponseEntity<JsonNode> response = appClient.post()
                 .uri(url)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(body)
@@ -306,8 +327,8 @@ public class DifyApiClient {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
                 return DifyChatResponse.builder()
-                    .answer(responseBody.path("answer").asText())
-                    .conversationId(responseBody.path("conversation_id").asText())
+                    .answer(safeAsText(responseBody, "answer"))
+                    .conversationId(safeAsText(responseBody, "conversation_id"))
                     .retrievalSources(parseRetrievalSources(responseBody.path("retrieval_sources")))
                     .build();
             } else {
@@ -326,27 +347,27 @@ public class DifyApiClient {
      */
     @Retryable(
         value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
         maxAttemptsExpression = "${dify.sync.retry-count:3}",
         backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
     )
     public DifyWorkflowResponse runWorkflow(String workflowId, Map<String, Object> inputs) {
-        // 参数校验
-        if (workflowId == null || workflowId.isBlank()) {
-            throw new IllegalArgumentException("workflowId 不能为空");
-        }
-
-        log.info("运行 Dify 工作流: workflowId={}", workflowId);
+        // Dify Cloud 的 App Key 已绑定具体应用，workflowId 可为空
+        log.info("运行 Dify 工作流: workflowId={}", workflowId != null ? workflowId : "(app-bound)");
 
         String url = config.getApiUrl() + "/workflows/run";
 
         Map<String, Object> body = new HashMap<>();
-        body.put("workflow_id", workflowId);
+        // workflow_id 仅自建 Dify 需要，Dify Cloud 用 App Key 绑定，不传
+        if (workflowId != null && !workflowId.isBlank()) {
+            body.put("workflow_id", workflowId);
+        }
         body.put("inputs", inputs != null ? inputs : Map.of());
         body.put("response_mode", "blocking");
         body.put("user", config.getDefaultUser());
 
         try {
-            ResponseEntity<JsonNode> response = restClient.post()
+            ResponseEntity<JsonNode> response = appClient.post()
                 .uri(url)
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(body)
@@ -356,10 +377,10 @@ public class DifyApiClient {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
                 return DifyWorkflowResponse.builder()
-                    .runId(responseBody.path("run_id").asText())
-                    .status(responseBody.path("status").asText())
+                    .runId(safeAsText(responseBody, "run_id"))
+                    .status(safeAsText(responseBody, "status"))
                     .outputs(parseOutputs(responseBody.path("outputs")))
-                    .elapsed(responseBody.path("elapsed").asLong())
+                    .elapsed(responseBody.path("elapsed").asLong(0))
                     .build();
             } else {
                 throw new DifyApiException("运行工作流失败: " + response.getStatusCode());
@@ -370,6 +391,266 @@ public class DifyApiClient {
             log.error("调用 Dify API 失败: {}", e.getMessage());
             throw new DifyApiException("运行工作流失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 流式运行 Dify 聊天助手（SSE）
+     *
+     * <p>调用 Dify 聊天 API（{@code POST /chat-messages}），以 streaming 模式运行，
+     * 逐块返回 LLM 输出。适用于在 Dify Cloud 上编排了知识检索的聊天助手应用。
+     *
+     * @param query           用户问题
+     * @param conversationId  会话 ID（可选，为空则新建会话）
+     * @return 流式输出 Flux，每个 chunk 是一段回答文本
+     */
+    public Flux<String> chatStream(String query, String conversationId) {
+        return chatStream(query, conversationId, null);
+    }
+
+    /**
+     * 流式运行 Dify 聊天助手（SSE），并捕获 conversation_id
+     *
+     * <p>与 {@link #chatStream(String, String)} 一致，额外通过回调暴露 Dify 返回的
+     * {@code conversation_id}（出现在 {@code message_end} 事件中）。调用方可在回调中
+     * 持久化该 ID，后续请求传入即可恢复多轮对话上下文。
+     *
+     * @param query                  用户问题
+     * @param conversationId         会话 ID（可选，为空则新建）
+     * @param conversationIdSink     回调，收到 conversation_id 时调用；为 null 则忽略
+     * @return 流式输出 Flux
+     */
+    public Flux<String> chatStream(String query, String conversationId,
+                                   java.util.function.Consumer<String> conversationIdSink) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("query 不能为空");
+        }
+
+        String truncatedQuery = query.length() > 50 ? query.substring(0, 50) + "..." : query;
+        log.info("流式运行 Dify 聊天: query={}, conversationId={}", truncatedQuery, conversationId);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", query);
+        body.put("inputs", Map.of());
+        body.put("response_mode", "streaming");
+        body.put("user", config.getDefaultUser());
+        if (conversationId != null && !conversationId.isBlank()) {
+            body.put("conversation_id", conversationId);
+        }
+
+        return appWebClient.post()
+            .uri("/chat-messages")
+            .bodyValue(body)
+            .retrieve()
+            .bodyToFlux(String.class)
+            .filter(chunk -> chunk != null && !chunk.isBlank())
+            .mapNotNull(chunk -> {
+                // Dify SSE 每条数据是 JSON，解析提取 answer 字段
+                // 事件类型: message（含 answer）、workflow_started、node_started、
+                // node_finished、message_end（含 conversation_id）、error 等
+                try {
+                    JsonNode node = objectMapper.readTree(chunk);
+                    String event = safeAsText(node, "event");
+                    // 处理 message 事件，提取 answer
+                    if ("message".equals(event)) {
+                        String answer = safeAsText(node, "answer");
+                        return answer.isBlank() ? null : answer;
+                    }
+                    // message_end 事件：捕获 conversation_id 供多轮对话使用
+                    if ("message_end".equals(event)) {
+                        if (conversationIdSink != null) {
+                            String convId = safeAsText(node, "conversation_id");
+                            if (!convId.isBlank()) {
+                                conversationIdSink.accept(convId);
+                                log.info("Dify chatStream 捕获 conversation_id: {}", convId);
+                            }
+                        }
+                        return null;
+                    }
+                    // error 事件
+                    if ("error".equals(event)) {
+                        String errorMsg = safeAsText(node, "message");
+                        return "【错误】" + (errorMsg.isBlank() ? "Dify 调用失败" : errorMsg);
+                    }
+                    // 其他事件（workflow_started/node_finished 等）忽略
+                    return null;
+                } catch (Exception e) {
+                    log.debug("解析 Dify SSE chunk 失败，跳过: {}", chunk.substring(0, Math.min(chunk.length(), 80)));
+                    return null;
+                }
+            })
+            .filter(answer -> answer != null && !answer.isBlank())
+            .doOnNext(answer -> log.debug("Dify 聊天流式 answer: {}",
+                answer.substring(0, Math.min(answer.length(), 80))))
+            .onErrorResume(e -> {
+                log.error("Dify 聊天流式失败: {}", e.getMessage());
+                return Flux.just("【错误】Dify 聊天调用失败，请稍后重试。");
+            });
+    }
+
+    /**
+     * 列出文档分段
+     *
+     * <p>调用 Dify 官方端点 {@code GET /datasets/{datasetId}/documents/{documentId}/segments}。
+     * 分段的 content 字段包含文档正文片段，按 position 排序拼接可重建完整文档内容。
+     *
+     * @param datasetId  知识库 ID
+     * @param documentId 文档 ID
+     * @param page       页码（从 1 开始）
+     * @param limit      每页数量
+     * @return 分段列表
+     */
+    @Retryable(
+        value = {DifyApiException.class},
+        noRetryFor = {IllegalArgumentException.class},
+        maxAttemptsExpression = "${dify.sync.retry-count:3}",
+        backoff = @Backoff(delayExpression = "${dify.sync.retry-delay:5000}")
+    )
+    public DifySegmentList listSegments(String datasetId, String documentId, int page, int limit) {
+        if (datasetId == null || datasetId.isBlank()) {
+            throw new IllegalArgumentException("datasetId 不能为空");
+        }
+        if (documentId == null || documentId.isBlank()) {
+            throw new IllegalArgumentException("documentId 不能为空");
+        }
+
+        log.info("列出 Dify 文档分段: datasetId={}, documentId={}, page={}, limit={}",
+            datasetId, documentId, page, limit);
+
+        String url = config.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId
+            + "/segments?page=" + page + "&limit=" + limit;
+
+        try {
+            ResponseEntity<JsonNode> response = datasetClient.get()
+                .uri(url)
+                .retrieve()
+                .toEntity(JsonNode.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode body = response.getBody();
+                List<DifySegment> segments = new ArrayList<>();
+
+                JsonNode dataNode = body.path("data");
+                if (dataNode.isArray()) {
+                    for (JsonNode segNode : dataNode) {
+                        segments.add(DifySegment.builder()
+                            .id(safeAsText(segNode, "id"))
+                            .position(segNode.path("position").asInt(0))
+                            .content(safeAsText(segNode, "content"))
+                            .wordCount(segNode.path("word_count").asInt(0))
+                            .build());
+                    }
+                }
+
+                return DifySegmentList.builder()
+                    .data(segments)
+                    .total(body.path("total").asInt(0))
+                    .page(page)
+                    .limit(limit)
+                    .hasMore(body.path("has_more").asBoolean(false))
+                    .build();
+            } else {
+                throw new DifyApiException("列出分段失败: " + response.getStatusCode());
+            }
+        } catch (DifyApiException e) {
+            throw e;
+        } catch (RestClientException e) {
+            log.error("调用 Dify API 失败: {}", e.getMessage());
+            throw new DifyApiException("列出分段失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 获取文档完整内容
+     *
+     * <p>通过分页调用 listSegments，按 position 升序拼接所有分段的 content，
+     * 重建文档完整内容。适用于从 Dify 拉取文档到本地的场景。
+     *
+     * @param datasetId  知识库 ID
+     * @param documentId 文档 ID
+     * @return 文档完整内容
+     */
+    public String fetchDocumentContent(String datasetId, String documentId) {
+        if (datasetId == null || datasetId.isBlank()) {
+            throw new IllegalArgumentException("datasetId 不能为空");
+        }
+        if (documentId == null || documentId.isBlank()) {
+            throw new IllegalArgumentException("documentId 不能为空");
+        }
+
+        log.info("获取 Dify 文档完整内容: datasetId={}, documentId={}", datasetId, documentId);
+
+        List<DifySegment> allSegments = new ArrayList<>();
+        int page = 1;
+        int limit = 100;
+        boolean hasMore = true;
+
+        while (hasMore) {
+            DifySegmentList segmentList = listSegments(datasetId, documentId, page, limit);
+            if (segmentList.getData() == null || segmentList.getData().isEmpty()) {
+                break;
+            }
+            allSegments.addAll(segmentList.getData());
+            hasMore = segmentList.isHasMore();
+            page++;
+        }
+
+        // 按 position 升序排序后拼接 content
+        allSegments.sort(Comparator.comparing(DifySegment::getPosition));
+
+        StringBuilder content = new StringBuilder();
+        for (DifySegment segment : allSegments) {
+            if (segment.getContent() != null && !segment.getContent().isBlank()) {
+                if (content.length() > 0) {
+                    content.append("\n");
+                }
+                content.append(segment.getContent());
+            }
+        }
+
+        log.info("获取 Dify 文档内容完成: documentId={}, segments={}, contentLength={}",
+            documentId, allSegments.size(), content.length());
+
+        return content.toString();
+    }
+
+    /**
+     * 获取文档所有分段（按 position 排序）
+     *
+     * <p>用于复用 Dify 的分块结构进行向量化，避免本地重新分块。
+     *
+     * @param datasetId  知识库 ID
+     * @param documentId 文档 ID
+     * @return 按 position 升序排列的分段列表
+     */
+    public List<DifySegment> fetchAllSegments(String datasetId, String documentId) {
+        if (datasetId == null || datasetId.isBlank()) {
+            throw new IllegalArgumentException("datasetId 不能为空");
+        }
+        if (documentId == null || documentId.isBlank()) {
+            throw new IllegalArgumentException("documentId 不能为空");
+        }
+
+        log.info("获取 Dify 文档所有分段: datasetId={}, documentId={}", datasetId, documentId);
+
+        List<DifySegment> allSegments = new ArrayList<>();
+        int page = 1;
+        int limit = 100;
+        boolean hasMore = true;
+
+        while (hasMore) {
+            DifySegmentList segmentList = listSegments(datasetId, documentId, page, limit);
+            if (segmentList.getData() == null || segmentList.getData().isEmpty()) {
+                break;
+            }
+            allSegments.addAll(segmentList.getData());
+            hasMore = segmentList.isHasMore();
+            page++;
+        }
+
+        allSegments.sort(Comparator.comparing(DifySegment::getPosition));
+
+        log.info("获取 Dify 分段完成: documentId={}, segments={}", documentId, allSegments.size());
+        return allSegments;
     }
 
     // ========== Recovery 方法 ==========
@@ -401,6 +682,13 @@ public class DifyApiClient {
     }
 
     @Recover
+    public DifySegmentList recoverListSegments(DifyApiException e, String datasetId, String documentId,
+                                                int page, int limit) {
+        log.error("Dify API 列出分段失败，已重试 {} 次: {}", config.getSync().getRetryCount(), e.getMessage());
+        throw new DifyApiException("列出分段失败: " + e.getMessage(), e);
+    }
+
+    @Recover
     public DifyChatResponse recoverChat(DifyApiException e, String query, String conversationId,
                                         Map<String, String> inputs) {
         log.error("Dify API 对话失败，已重试 {} 次: {}", config.getSync().getRetryCount(), e.getMessage());
@@ -424,10 +712,10 @@ public class DifyApiClient {
      */
     private DifyDocument parseDocument(JsonNode node) {
         return DifyDocument.builder()
-            .id(node.path("id").asText())
-            .name(node.path("name").asText())
-            .indexingStatus(node.path("indexing_status").asText())
-            .displayStatus(node.path("display_status").asText())
+            .id(safeAsText(node, "id"))
+            .name(safeAsText(node, "name"))
+            .indexingStatus(safeAsText(node, "indexing_status"))
+            .displayStatus(safeAsText(node, "display_status"))
             .wordCount(node.path("word_count").asInt(0))
             .hitCount(node.path("hit_count").asInt(0))
             .createdAt(parseTimestamp(node.path("created_at")))
@@ -436,17 +724,30 @@ public class DifyApiClient {
     }
 
     /**
+     * 安全读取 JSON 字段为字符串
+     *
+     * <p>Jackson 3.0 中 MissingNode.asText() 会抛异常，需先检查 isMissingNode。
+     */
+    private String safeAsText(JsonNode parent, String field) {
+        JsonNode child = parent.path(field);
+        if (child == null || child.isMissingNode() || child.isNull()) {
+            return "";
+        }
+        return child.asText();
+    }
+
+    /**
      * 解析检索来源 JSON 数组
      */
     private List<DifyChatResponse.DifyRetrievalSource> parseRetrievalSources(JsonNode node) {
         List<DifyChatResponse.DifyRetrievalSource> sources = new ArrayList<>();
-        if (node.isArray()) {
+        if (node != null && !node.isMissingNode() && node.isArray()) {
             for (JsonNode sourceNode : node) {
                 sources.add(DifyChatResponse.DifyRetrievalSource.builder()
-                    .datasetName(sourceNode.path("dataset_name").asText())
-                    .documentName(sourceNode.path("document_name").asText())
-                    .content(sourceNode.path("content").asText())
-                    .score(sourceNode.path("score").asDouble())
+                    .datasetName(safeAsText(sourceNode, "dataset_name"))
+                    .documentName(safeAsText(sourceNode, "document_name"))
+                    .content(safeAsText(sourceNode, "content"))
+                    .score(sourceNode.path("score").asDouble(0.0))
                     .build());
             }
         }
@@ -458,8 +759,9 @@ public class DifyApiClient {
      */
     private Map<String, Object> parseOutputs(JsonNode node) {
         Map<String, Object> outputs = new HashMap<>();
-        if (node.isObject()) {
-            node.fields().forEachRemaining(entry -> {
+        if (node != null && !node.isMissingNode() && node.isObject()
+                && node instanceof tools.jackson.databind.node.ObjectNode objNode) {
+            objNode.properties().forEach(entry -> {
                 outputs.put(entry.getKey(), entry.getValue().asText());
             });
         }
@@ -473,7 +775,8 @@ public class DifyApiClient {
      * 部分旧版接口可能返回 ISO 字符串，此处做兼容处理。
      */
     private LocalDateTime parseTimestamp(JsonNode node) {
-        if (node == null || node.isNull() || node.asText().isBlank()) {
+        // Jackson 3.0 中 MissingNode.asText() 会抛异常，需先检查 isMissingNode
+        if (node == null || node.isNull() || node.isMissingNode()) {
             return null;
         }
         try {
@@ -485,6 +788,9 @@ public class DifyApiClient {
             }
             // 兼容 ISO 字符串格式
             String text = node.asText();
+            if (text == null || text.isBlank()) {
+                return null;
+            }
             if (text.matches("\\d+(\\.\\d+)?")) {
                 long seconds = (long) Double.parseDouble(text);
                 return LocalDateTime.ofInstant(java.time.Instant.ofEpochSecond(seconds),

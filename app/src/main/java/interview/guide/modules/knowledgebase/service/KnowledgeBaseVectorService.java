@@ -76,6 +76,53 @@ public class KnowledgeBaseVectorService {
             throw new RuntimeException("向量化知识库失败: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * 使用 Dify 已有的分段直接向量化并存储
+     *
+     * <p>复用 Dify 的分块结构，不再用 TokenTextSplitter 重新分块。
+     * 每个 segment 作为一个独立的 chunk 存入 pgvector。
+     *
+     * @param knowledgeBaseId 知识库 ID
+     * @param segments        Dify 分段列表（已按 position 排序）
+     */
+    @Transactional
+    public void vectorizeSegmentsAndStore(Long knowledgeBaseId, List<String> segments) {
+        log.info("开始按 Dify 分段向量化: kbId={}, segments={}", knowledgeBaseId, segments.size());
+        try {
+            // 1. 先删除该知识库的旧向量数据
+            deleteByKnowledgeBaseId(knowledgeBaseId);
+
+            // 2. 将每个分段转为 Document，添加 kb_id metadata
+            List<Document> chunks = segments.stream()
+                .filter(content -> content != null && !content.isBlank())
+                .map(Document::new)
+                .peek(chunk -> chunk.getMetadata().put("kb_id", knowledgeBaseId.toString()))
+                .collect(Collectors.toList());
+
+            if (chunks.isEmpty()) {
+                log.warn("Dify 分段内容均为空，跳过向量化: kbId={}", knowledgeBaseId);
+                return;
+            }
+
+            // 3. 分批向量化并存储（阿里云 DashScope API 限制 batch size <= 10）
+            int totalChunks = chunks.size();
+            int batchCount = (totalChunks + MAX_BATCH_SIZE - 1) / MAX_BATCH_SIZE;
+            log.info("开始分批向量化: 总共 {} 个chunks，分 {} 批处理，每批最多 {} 个",
+                    totalChunks, batchCount, MAX_BATCH_SIZE);
+            for (int i = 0; i < batchCount; i++) {
+                int start = i * MAX_BATCH_SIZE;
+                int end = Math.min(start + MAX_BATCH_SIZE, totalChunks);
+                List<Document> batch = chunks.subList(start, end);
+                vectorStore.add(batch);
+            }
+            log.info("Dify 分段向量化完成: kbId={}, chunks={}, batches={}",
+                    knowledgeBaseId, totalChunks, batchCount);
+        } catch (Exception e) {
+            log.error("Dify 分段向量化失败: kbId={}, error={}", knowledgeBaseId, e.getMessage(), e);
+            throw new RuntimeException("向量化知识库失败: " + e.getMessage(), e);
+        }
+    }
     
     /**
      * 基于多个知识库进行相似度搜索
