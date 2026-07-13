@@ -112,8 +112,9 @@ public class InterviewSessionService {
      * 获取会话信息（优先从缓存获取，缓存未命中则从数据库恢复）
      */
     public InterviewSessionDTO getSession(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 1. 尝试从 Redis 缓存获取
-        Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
+        Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
         if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             return toDTO(cachedOpt.get());
         }
@@ -132,11 +133,12 @@ public class InterviewSessionService {
      */
     public Optional<InterviewSessionDTO> findUnfinishedSession(Long resumeId) {
         try {
+            Long userId = UserContext.getCurrentUserIdOrThrow();
             // 1. 先从 Redis 缓存查找
-            Optional<String> cachedSessionIdOpt = sessionCache.findUnfinishedSessionId(resumeId);
+            Optional<String> cachedSessionIdOpt = sessionCache.findUnfinishedSessionId(userId, resumeId);
             if (cachedSessionIdOpt.isPresent()) {
                 String sessionId = cachedSessionIdOpt.get();
-                Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
+                Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
                 if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
                     log.debug("从 Redis 缓存找到未完成会话: resumeId={}, sessionId={}", resumeId, sessionId);
                     return Optional.of(toDTO(cachedOpt.get()));
@@ -220,7 +222,7 @@ public class InterviewSessionService {
                 entity.getSessionId(), entity.getCurrentQuestionIndex(), entity.getStatus());
 
             // 返回缓存的会话
-            return sessionCache.getSession(entity.getSessionId()).orElse(null);
+            return sessionCache.getSession(entity.getUserId(), entity.getSessionId()).orElse(null);
         } catch (Exception e) {
             log.error("恢复会话失败: {}", e.getMessage(), e);
             return null;
@@ -257,6 +259,7 @@ public class InterviewSessionService {
      * 获取当前问题
      */
     public InterviewQuestionDTO getCurrentQuestion(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -267,7 +270,7 @@ public class InterviewSessionService {
         // 更新状态为进行中
         if (session.getStatus() == SessionStatus.CREATED) {
             session.setStatus(SessionStatus.IN_PROGRESS);
-            sessionCache.updateSessionStatus(sessionId, SessionStatus.IN_PROGRESS);
+            sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.IN_PROGRESS);
 
             // 同步到数据库
             try {
@@ -301,6 +304,7 @@ public class InterviewSessionService {
     }
 
     private SubmitAnswerResponse doSubmitAnswer(SubmitAnswerRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(request.sessionId());
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -328,10 +332,10 @@ public class InterviewSessionService {
         SessionStatus newStatus = hasNextQuestion ? SessionStatus.IN_PROGRESS : SessionStatus.COMPLETED;
 
         // 更新 Redis 缓存
-        sessionCache.updateQuestions(request.sessionId(), questions);
-        sessionCache.updateCurrentIndex(request.sessionId(), newIndex);
+        sessionCache.updateQuestions(userId, request.sessionId(), questions);
+        sessionCache.updateCurrentIndex(userId, request.sessionId(), newIndex);
         if (newStatus == SessionStatus.COMPLETED) {
-            sessionCache.updateSessionStatus(request.sessionId(), SessionStatus.COMPLETED);
+            sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.COMPLETED);
         }
 
         // 保存答案到数据库
@@ -355,7 +359,7 @@ public class InterviewSessionService {
             // 如果是最后一题，设置评估状态为 PENDING 并触发异步评估
             if (!hasNextQuestion) {
                 persistenceService.updateEvaluateStatus(request.sessionId(), AsyncTaskStatus.PENDING, null);
-                evaluateStreamProducer.sendEvaluateTask(request.sessionId());
+                evaluateStreamProducer.sendEvaluateTask(userId, request.sessionId());
                 log.info("会话 {} 已完成所有问题，评估任务已入队", request.sessionId());
             }
         } catch (Exception e) {
@@ -424,6 +428,7 @@ public class InterviewSessionService {
      * 暂存答案（不进入下一题）
      */
     public void saveAnswer(SubmitAnswerRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(request.sessionId());
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -438,11 +443,11 @@ public class InterviewSessionService {
         questions.set(index, answeredQuestion);
 
         // 更新 Redis 缓存
-        sessionCache.updateQuestions(request.sessionId(), questions);
+        sessionCache.updateQuestions(userId, request.sessionId(), questions);
 
         // 更新状态为进行中
         if (session.getStatus() == SessionStatus.CREATED) {
-            sessionCache.updateSessionStatus(request.sessionId(), SessionStatus.IN_PROGRESS);
+            sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.IN_PROGRESS);
         }
 
         // 保存答案到数据库（不更新currentIndex）
@@ -465,6 +470,7 @@ public class InterviewSessionService {
      * 提前交卷（触发异步评估）
      */
     public void completeInterview(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
 
         if (session.getStatus() == SessionStatus.COMPLETED || session.getStatus() == SessionStatus.EVALUATED) {
@@ -472,7 +478,7 @@ public class InterviewSessionService {
         }
 
         // 更新 Redis 缓存
-        sessionCache.updateSessionStatus(sessionId, SessionStatus.COMPLETED);
+        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
 
         // 更新数据库状态
         try {
@@ -485,7 +491,7 @@ public class InterviewSessionService {
         }
 
         // 发送评估任务到 Redis Stream
-        evaluateStreamProducer.sendEvaluateTask(sessionId);
+        evaluateStreamProducer.sendEvaluateTask(userId, sessionId);
 
         log.info("会话 {} 提前交卷，评估任务已入队", sessionId);
     }
@@ -494,11 +500,12 @@ public class InterviewSessionService {
      * 获取或恢复会话（优先从缓存获取）
      */
     private CachedSession getOrRestoreSession(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 1. 尝试从 Redis 缓存获取
-        Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
+        Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
         if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             // 刷新 TTL
-            sessionCache.refreshSessionTTL(sessionId);
+            sessionCache.refreshSessionTTL(userId, sessionId);
             return cachedOpt.get();
         }
 
@@ -520,6 +527,7 @@ public class InterviewSessionService {
      * 生成评估报告
      */
     public InterviewReportDTO generateReport(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
 
         if (session.getStatus() != SessionStatus.COMPLETED && session.getStatus() != SessionStatus.EVALUATED) {
@@ -537,7 +545,7 @@ public class InterviewSessionService {
         );
 
         // 更新 Redis 缓存状态
-        sessionCache.updateSessionStatus(sessionId, SessionStatus.EVALUATED);
+        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.EVALUATED);
 
         // 保存报告到数据库
         try {

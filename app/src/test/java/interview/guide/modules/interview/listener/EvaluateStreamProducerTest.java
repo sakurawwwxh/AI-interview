@@ -34,7 +34,7 @@ class EvaluateStreamProducerTest {
             when(redisService.streamAdd(anyString(), anyMap(), anyInt()))
                 .thenReturn("msg-123");
 
-            producer.sendEvaluateTask("session-1");
+            producer.sendEvaluateTask(1L, "session-1");
 
             verify(redisService).streamAdd(anyString(), anyMap(), anyInt());
             verify(sessionRepository, never()).findBySessionId(anyString());
@@ -52,7 +52,7 @@ class EvaluateStreamProducerTest {
                 .thenReturn(Optional.of(session));
             when(sessionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            producer.sendEvaluateTask("session-1");
+            producer.sendEvaluateTask(1L, "session-1");
 
             assertEquals(AsyncTaskStatus.FAILED, session.getEvaluateStatus());
             assertNotNull(session.getEvaluateError());
@@ -67,7 +67,7 @@ class EvaluateStreamProducerTest {
             when(sessionRepository.findBySessionId("missing"))
                 .thenReturn(Optional.empty());
 
-            assertDoesNotThrow(() -> producer.sendEvaluateTask("missing"));
+            assertDoesNotThrow(() -> producer.sendEvaluateTask(1L, "missing"));
             verify(sessionRepository, never()).save(any());
         }
     }
