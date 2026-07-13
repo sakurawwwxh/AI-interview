@@ -4,6 +4,7 @@ import interview.guide.common.ai.StructuredOutputInvoker;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewTemplateConfig;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.*;
  */
 class InterviewQuestionServiceTest {
 
-    private ChatClient.Builder chatClientBuilder;
+    private UserAiChatClientFactory chatClientFactory;
     private ChatClient chatClient;
     private StructuredOutputInvoker structuredOutputInvoker;
     private InterviewQuestionService service;
@@ -33,12 +34,12 @@ class InterviewQuestionServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         chatClient = mock(ChatClient.class);
-        chatClientBuilder = mock(ChatClient.Builder.class);
-        when(chatClientBuilder.build()).thenReturn(chatClient);
+        chatClientFactory = mock(UserAiChatClientFactory.class);
+        when(chatClientFactory.forCurrentUser()).thenReturn(chatClient);
         structuredOutputInvoker = mock(StructuredOutputInvoker.class);
 
         service = new InterviewQuestionService(
-            chatClientBuilder,
+            chatClientFactory,
             structuredOutputInvoker,
             new ClassPathResource("prompts/interview-question-system.st"),
             new ClassPathResource("prompts/interview-question-user.st"),

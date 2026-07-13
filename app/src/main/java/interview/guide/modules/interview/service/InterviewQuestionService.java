@@ -6,9 +6,9 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO.QuestionType;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +32,7 @@ public class InterviewQuestionService {
     
     private static final Logger log = LoggerFactory.getLogger(InterviewQuestionService.class);
     
-    private final ChatClient chatClient;
+    private final UserAiChatClientFactory chatClientFactory;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final PromptTemplate followUpSystemPromptTemplate;
@@ -62,13 +62,13 @@ public class InterviewQuestionService {
     ) {}
     
     public InterviewQuestionService(
-            ChatClient.Builder chatClientBuilder,
+            UserAiChatClientFactory chatClientFactory,
             StructuredOutputInvoker structuredOutputInvoker,
             @Value("classpath:prompts/interview-question-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/interview-question-user.st") Resource userPromptResource,
             @Value("classpath:prompts/interview-followup-system.st") Resource followUpSystemPromptResource,
             @Value("${app.interview.follow-up-count:1}") int followUpCount) throws IOException {
-        this.chatClient = chatClientBuilder.build();
+        this.chatClientFactory = chatClientFactory;
         this.structuredOutputInvoker = structuredOutputInvoker;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
@@ -142,7 +142,8 @@ public class InterviewQuestionService {
             QuestionListDTO dto;
             try {
                 dto = structuredOutputInvoker.invoke(
-                    chatClient,
+                    chatClientFactory.forCurrentUser(),
+                    chatClientFactory.fallbackForCurrentUser(),
                     systemPromptWithFormat,
                     userPrompt,
                     outputConverter,
@@ -323,7 +324,8 @@ public class InterviewQuestionService {
             "，最多追问数：" + maximumFollowUpCount;
         try {
             FollowUpDecisionDTO decision = structuredOutputInvoker.invoke(
-                chatClient,
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
                 systemPrompt,
                 userPrompt,
                 followUpOutputConverter,

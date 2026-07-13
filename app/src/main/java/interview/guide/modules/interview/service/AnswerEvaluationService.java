@@ -8,9 +8,9 @@ import interview.guide.modules.interview.model.InterviewReportDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO.CategoryScore;
 import interview.guide.modules.interview.model.InterviewReportDTO.QuestionEvaluation;
 import interview.guide.modules.interview.model.InterviewReportDTO.ReferenceAnswer;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +36,7 @@ public class AnswerEvaluationService {
     
     private static final Logger log = LoggerFactory.getLogger(AnswerEvaluationService.class);
     
-    private final ChatClient chatClient;
+    private final UserAiChatClientFactory chatClientFactory;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<EvaluationReportDTO> outputConverter;
@@ -108,7 +108,7 @@ public class AnswerEvaluationService {
     }
     
     public AnswerEvaluationService(
-            ChatClient.Builder chatClientBuilder,
+            UserAiChatClientFactory chatClientFactory,
             StructuredOutputInvoker structuredOutputInvoker,
             InterviewEvaluationEvidenceService evidenceService,
             @Value("classpath:prompts/interview-evaluation-system.st") Resource systemPromptResource,
@@ -116,7 +116,7 @@ public class AnswerEvaluationService {
             @Value("classpath:prompts/interview-evaluation-summary-system.st") Resource summarySystemPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-user.st") Resource summaryUserPromptResource,
             @Value("${app.interview.evaluation.batch-size:8}") int evaluationBatchSize) throws IOException {
-        this.chatClient = chatClientBuilder.build();
+        this.chatClientFactory = chatClientFactory;
         this.structuredOutputInvoker = structuredOutputInvoker;
         this.evidenceService = evidenceService;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
@@ -234,7 +234,8 @@ public class AnswerEvaluationService {
         String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
         try {
             EvaluationReportDTO dto = structuredOutputInvoker.invoke(
-                chatClient,
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
                 systemPromptWithFormat,
                 userPrompt,
                 outputConverter,
@@ -331,7 +332,8 @@ public class AnswerEvaluationService {
 
             String systemPromptWithFormat = summarySystemPrompt + "\n\n" + summaryOutputConverter.getFormat();
             FinalSummaryDTO dto = structuredOutputInvoker.invoke(
-                chatClient,
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
                 systemPromptWithFormat,
                 summaryUserPrompt,
                 summaryOutputConverter,

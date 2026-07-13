@@ -52,7 +52,40 @@ public class StructuredOutputInvoker {
     ) {
         // 调用前校验配额
         usageRecorder.checkQuota();
+        return invokeWithClient(chatClient, null, systemPromptWithFormat, userPrompt, outputConverter,
+            errorCode, errorPrefix, logContext, log);
+    }
 
+    /**
+     * Uses the platform client only when the caller explicitly supplied it as an opt-in fallback.
+     */
+    public <T> T invoke(
+        ChatClient chatClient,
+        ChatClient fallbackChatClient,
+        String systemPromptWithFormat,
+        String userPrompt,
+        BeanOutputConverter<T> outputConverter,
+        ErrorCode errorCode,
+        String errorPrefix,
+        String logContext,
+        Logger log
+    ) {
+        usageRecorder.checkQuota();
+        return invokeWithClient(chatClient, fallbackChatClient, systemPromptWithFormat, userPrompt, outputConverter,
+            errorCode, errorPrefix, logContext, log);
+    }
+
+    private <T> T invokeWithClient(
+        ChatClient chatClient,
+        ChatClient fallbackChatClient,
+        String systemPromptWithFormat,
+        String userPrompt,
+        BeanOutputConverter<T> outputConverter,
+        ErrorCode errorCode,
+        String errorPrefix,
+        String logContext,
+        Logger log
+    ) {
         Exception lastError = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             String attemptSystemPrompt = attempt == 1
@@ -79,6 +112,12 @@ public class StructuredOutputInvoker {
                 lastError = e;
                 log.warn("{}结构化解析失败，准备重试: attempt={}, error={}", logContext, attempt, e.getMessage());
             }
+        }
+
+        if (fallbackChatClient != null) {
+            log.warn("{} user-selected AI service failed after {} attempts; falling back to the platform service", logContext, maxAttempts);
+            return invokeWithClient(fallbackChatClient, null, systemPromptWithFormat, userPrompt, outputConverter,
+                errorCode, errorPrefix, logContext, log);
         }
 
         throw new BusinessException(
