@@ -194,15 +194,27 @@ public class InterviewPersistenceService {
     /**
      * 保存面试报告
      */
+    /**
+     * 保存面试报告（请求线程调用，从 SecurityContext 取 userId）
+     */
     @Transactional(rollbackFor = Exception.class)
     public void saveReport(String sessionId, InterviewReportDTO report) {
+        Long userId = UserContext.getCurrentUserId();
+        if (userId != null) {
+            saveReport(sessionId, userId, report);
+        } else {
+            // 理论上不应走到这里，保留兜底以避免请求线程异常时丢失报告
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无法获取当前用户信息");
+        }
+    }
+
+    /**
+     * 保存面试报告（显式传入 userId，供异步评估消费者调用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveReport(String sessionId, Long userId, InterviewReportDTO report) {
         try {
-            // 同时被请求线程（generateReport）和异步评估线程（EvaluateStreamConsumer）调用。
-            // 异步线程无 SecurityContext，userId 为空时跳过鉴权直接按 sessionId 查找。
-            Long userId = UserContext.getCurrentUserId();
-            Optional<InterviewSessionEntity> sessionOpt = userId != null
-                ? sessionRepository.findBySessionIdAndUserId(sessionId, userId)
-                : sessionRepository.findBySessionId(sessionId);
+            Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
             if (sessionOpt.isEmpty()) {
                 throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
             }

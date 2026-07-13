@@ -84,8 +84,8 @@ class InterviewSessionServiceTest {
         @DisplayName("正常提交无追问，前进到下一题")
         void shouldAdvanceToNextQuestion() {
             CachedSession cached = buildSession(0, SessionStatus.IN_PROGRESS);
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
             when(questionService.generateDynamicFollowUp(any(), anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(Optional.empty());
 
@@ -94,8 +94,8 @@ class InterviewSessionServiceTest {
 
             assertTrue(response.hasNextQuestion());
             assertEquals(1, response.currentIndex());
-            verify(sessionCache).updateQuestions(eq(SESSION_ID), anyList());
-            verify(sessionCache).updateCurrentIndex(SESSION_ID, 1);
+            verify(sessionCache).updateQuestions(eq(1L), eq(SESSION_ID), anyList());
+            verify(sessionCache).updateCurrentIndex(1L, SESSION_ID, 1);
             verify(persistenceService).saveAnswer(eq(SESSION_ID), eq(0), anyString(), anyString(),
                 eq("my answer"), eq(0), isNull(), eq(30));
             verify(persistenceService).updateCurrentQuestionIndex(SESSION_ID, 1);
@@ -113,8 +113,8 @@ class InterviewSessionServiceTest {
             CachedSession cached = new CachedSession(1L, SESSION_ID, "resume text", 1L,
                 questions, 1, SessionStatus.IN_PROGRESS, objectMapper);
 
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
             when(questionService.generateDynamicFollowUp(any(), anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(Optional.empty());
 
@@ -123,15 +123,15 @@ class InterviewSessionServiceTest {
 
             assertFalse(response.hasNextQuestion());
             verify(persistenceService).updateEvaluateStatus(SESSION_ID, AsyncTaskStatus.PENDING, null);
-            verify(evaluateStreamProducer).sendEvaluateTask(SESSION_ID);
+            verify(evaluateStreamProducer).sendEvaluateTask(1L, SESSION_ID);
         }
 
         @Test
         @DisplayName("追问生成后回写 questionsJson 到数据库")
         void shouldPersistQuestionsJsonWhenFollowUpGenerated() {
             CachedSession cached = buildSession(0, SessionStatus.IN_PROGRESS);
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
 
             InterviewQuestionDTO followUp = InterviewQuestionDTO.create(
                 2, "追问Q", InterviewQuestionDTO.QuestionType.JAVA_BASIC, "Java基础", true, 0);
@@ -154,8 +154,8 @@ class InterviewSessionServiceTest {
         @DisplayName("无效问题索引抛出异常")
         void shouldThrowForInvalidIndex() {
             CachedSession cached = buildSession(0, SessionStatus.IN_PROGRESS);
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
 
             SubmitAnswerRequest request = new SubmitAnswerRequest(SESSION_ID, 5, "answer", 10);
             assertThrows(BusinessException.class, () -> service.submitAnswer(request));
@@ -170,8 +170,8 @@ class InterviewSessionServiceTest {
         @DisplayName("已完成面试抛出异常")
         void shouldThrowWhenAlreadyCompleted() {
             CachedSession cached = buildSession(0, SessionStatus.COMPLETED);
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
 
             assertThrows(BusinessException.class, () -> service.completeInterview(SESSION_ID));
         }
@@ -180,15 +180,15 @@ class InterviewSessionServiceTest {
         @DisplayName("正常交卷触发评估")
         void shouldTriggerEvaluationOnComplete() {
             CachedSession cached = buildSession(0, SessionStatus.IN_PROGRESS);
-            when(sessionCache.getSession(SESSION_ID)).thenReturn(Optional.of(cached));
-            doNothing().when(sessionCache).refreshSessionTTL(SESSION_ID);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
 
             service.completeInterview(SESSION_ID);
 
-            verify(sessionCache).updateSessionStatus(SESSION_ID, SessionStatus.COMPLETED);
+            verify(sessionCache).updateSessionStatus(1L, SESSION_ID, SessionStatus.COMPLETED);
             verify(persistenceService).updateSessionStatus(eq(SESSION_ID), any());
             verify(persistenceService).updateEvaluateStatus(SESSION_ID, AsyncTaskStatus.PENDING, null);
-            verify(evaluateStreamProducer).sendEvaluateTask(SESSION_ID);
+            verify(evaluateStreamProducer).sendEvaluateTask(1L, SESSION_ID);
         }
     }
 }

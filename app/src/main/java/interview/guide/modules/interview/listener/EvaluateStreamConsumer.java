@@ -49,7 +49,7 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
         this.objectMapper = objectMapper;
     }
 
-    record EvaluatePayload(String sessionId) {}
+    record EvaluatePayload(Long userId, String sessionId) {}
 
     @Override
     protected String taskDisplayName() {
@@ -79,16 +79,22 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
     @Override
     protected EvaluatePayload parsePayload(StreamMessageId messageId, Map<String, String> data) {
         String sessionId = data.get(AsyncTaskStreamConstants.FIELD_SESSION_ID);
-        if (sessionId == null) {
+        String userIdStr = data.get(AsyncTaskStreamConstants.FIELD_USER_ID);
+        if (sessionId == null || userIdStr == null) {
             log.warn("消息格式错误，跳过: messageId={}", messageId);
             return null;
         }
-        return new EvaluatePayload(sessionId);
+        try {
+            return new EvaluatePayload(Long.valueOf(userIdStr), sessionId);
+        } catch (NumberFormatException e) {
+            log.warn("userId 格式错误，跳过: messageId={}, userId={}", messageId, userIdStr);
+            return null;
+        }
     }
 
     @Override
     protected String payloadIdentifier(EvaluatePayload payload) {
-        return "sessionId=" + payload.sessionId();
+        return "sessionId=" + payload.sessionId() + ",userId=" + payload.userId();
     }
 
     @Override
@@ -106,6 +112,14 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
         }
 
         InterviewSessionEntity session = sessionOpt.get();
+
+        // 校验异步任务归属：消息携带的 userId 必须与会话实际归属一致
+        if (!session.getUserId().equals(payload.userId())) {
+            log.warn("评估任务归属不匹配，跳过: sessionId={}, msgUserId={}, sessionUserId={}",
+                sessionId, payload.userId(), session.getUserId());
+            return;
+        }
+
         List<InterviewQuestionDTO> questions = objectMapper.readValue(
             session.getQuestionsJson(),
             new TypeReference<>() {}
@@ -123,7 +137,7 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
 
         String resumeText = session.getResume().getResumeText();
         InterviewReportDTO report = evaluationService.evaluateInterview(sessionId, resumeText, questions);
-        persistenceService.saveReport(sessionId, report);
+        persistenceService.saveReport(sessionId, payload.userId(), report);
     }
 
     @Override
@@ -142,6 +156,7 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
         try {
             Map<String, String> message = Map.of(
                 AsyncTaskStreamConstants.FIELD_SESSION_ID, sessionId,
+                AsyncTaskStreamConstants.FIELD_USER_ID, String.valueOf(payload.userId()),
                 AsyncTaskStreamConstants.FIELD_RETRY_COUNT, String.valueOf(retryCount)
             );
 
@@ -150,7 +165,7 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
                 message,
                 AsyncTaskStreamConstants.STREAM_MAX_LEN
             );
-            log.info("评估任务已重新入队: sessionId={}, retryCount={}", sessionId, retryCount);
+            log.info("评估任务已重新入队: sessionId={}, userId={}, retryCount={}", sessionId, payload.userId(), retryCount);
 
         } catch (Exception e) {
             log.error("重试入队失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
