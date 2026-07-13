@@ -1,8 +1,12 @@
 package interview.guide.modules.user.model;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.time.LocalDateTime;
 
 /**
  * 认证相关 DTO
@@ -91,5 +95,32 @@ public class AuthDTO {
         String email,
         UserRole role,
         Long dailyTokenQuota
+    ) {}
+
+    // ========== 管理员用户管理 DTO ==========
+
+    public record UpdateRoleRequest(@NotNull(message = "角色不能为空") UserRole role) {}
+
+    public record UpdateQuotaRequest(
+        @NotNull(message = "配额不能为空")
+        @Min(value = 0, message = "配额不能为负数")
+        Long dailyTokenQuota
+    ) {}
+
+    public record UserListItem(
+        Long id,
+        String username,
+        String displayName,
+        String email,
+        UserRole role,
+        Long dailyTokenQuota,
+        LocalDateTime createdAt
+    ) {}
+
+    public record UserPage(
+        java.util.List<UserListItem> items,
+        long total,
+        int page,
+        int size
     ) {}
 }

@@ -1,6 +1,6 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
 import {motion} from 'framer-motion';
-import {BarChart3, ChevronRight, Database, FileStack, LogOut, MessageSquare, Moon, Sparkles, Sun, Upload, UserRound, Users, Dumbbell,} from 'lucide-react';
+import {BarChart3, ChevronRight, Database, FileStack, LogOut, MessageSquare, Moon, Sparkles, Sun, Upload, UserRound, Users, Dumbbell, Shield,} from 'lucide-react';
 import {useTheme} from '../hooks/useTheme';
 import {useAuthStore} from '../stores/authStore';
 import {aiUsageApi, type AiUsageDTO} from '../api/aiUsage';
@@ -84,6 +84,7 @@ export default function Layout() {
       title: '账户',
       items: [
         { id: 'profile', path: '/profile', label: '个人中心', icon: UserRound, description: '账号、用量与成长档案' },
+        ...(user?.role === 'ADMIN' ? [{ id: 'admin-users', path: '/admin/users', label: '用户管理', icon: Shield, description: '管理用户、角色与配额' }] : []),
       ],
     },
   ];

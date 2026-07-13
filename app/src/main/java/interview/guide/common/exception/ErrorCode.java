@@ -73,7 +73,12 @@ public enum ErrorCode {
     REFRESH_TOKEN_INVALID(9007, "刷新令牌无效或已过期"),
 
     // ========== 复练模块错误 10xxx ==========
-    PRACTICE_TASK_NOT_FOUND(10001, "复练任务不存在");
+    PRACTICE_TASK_NOT_FOUND(10001, "复练任务不存在"),
+
+    // ========== 用户管理错误 10xxx ==========
+    CANNOT_DELETE_SELF(10002, "不能删除自己的账号"),
+    CANNOT_MODIFY_SELF_ROLE(10003, "不能修改自己的角色"),
+    LAST_ADMIN_PROTECTED(10004, "系统至少需要保留一个管理员");
     
     private final Integer code;
     private final String message;
