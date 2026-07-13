@@ -16,7 +16,16 @@ export interface JobMatch {
   matchedSkills: string[];
   missingSkills: string[];
   suggestions: string[];
+  optimizationSuggestions: ResumeOptimizationSuggestion[];
+  optimizedResumeText: string;
   analyzedAt: string;
+}
+
+export interface ResumeOptimizationSuggestion {
+  section: string;
+  issue: string;
+  recommendation: string;
+  proposedText: string;
 }
 
 export const jobTargetApi = {
