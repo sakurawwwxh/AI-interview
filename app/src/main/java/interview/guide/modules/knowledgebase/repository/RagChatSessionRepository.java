@@ -35,6 +35,11 @@ public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEn
     List<RagChatSessionEntity> findAllByUserIdOrderByPinnedAndUpdatedAtDesc(@Param("userId") Long userId);
 
     /**
+     * 查找所有未归属用户的 RAG 聊天会话（旧数据迁移用）
+     */
+    List<RagChatSessionEntity> findAllByUserIdIsNull();
+
+    /**
      * 根据知识库ID查找相关会话
      */
     @Query("SELECT DISTINCT s FROM RagChatSessionEntity s JOIN s.knowledgeBases kb WHERE kb.id IN :kbIds ORDER BY s.updatedAt DESC")

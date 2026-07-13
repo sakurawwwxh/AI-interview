@@ -26,8 +26,9 @@ public class LegacyOwnershipMigrationRunner implements ApplicationRunner {
         LegacyOwnershipMigrationService.MigrationResult result = properties.isApply()
             ? migrationService.apply(properties.getTargetUserId())
             : migrationService.preview(properties.getTargetUserId());
-        log.info("Legacy ownership migration {}: targetUserId={}, resumes={}, sessions={}, skippedOrphans={}",
+        log.info("Legacy ownership migration {}: targetUserId={}, resumes={}, sessions={}, skippedOrphans={}, knowledgeBases={}, ragChatSessions={}",
             result.applied() ? "APPLIED" : "DRY_RUN", result.targetUserId(), result.migratedResumeCount(),
-            result.migratedSessionCount(), result.skippedOrphanSessionCount());
+            result.migratedSessionCount(), result.skippedOrphanSessionCount(),
+            result.migratedKnowledgeBaseCount(), result.migratedRagChatSessionCount());
     }
 }

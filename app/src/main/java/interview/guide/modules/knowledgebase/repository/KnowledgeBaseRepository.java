@@ -39,6 +39,11 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
     List<KnowledgeBaseEntity> findAllByUserIdOrderByUploadedAtDesc(Long userId);
 
     /**
+     * 查找所有未归属用户的知识库（旧数据迁移用）
+     */
+    List<KnowledgeBaseEntity> findAllByUserIdIsNull();
+
+    /**
      * 获取用户所有不同的分类
      */
     @Query("SELECT DISTINCT k.category FROM KnowledgeBaseEntity k WHERE k.userId = :userId AND k.category IS NOT NULL ORDER BY k.category")

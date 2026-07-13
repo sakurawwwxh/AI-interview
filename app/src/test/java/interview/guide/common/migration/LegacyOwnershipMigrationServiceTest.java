@@ -2,6 +2,10 @@ package interview.guide.common.migration;
 
 import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
+import interview.guide.modules.knowledgebase.model.RagChatSessionEntity;
+import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import interview.guide.modules.knowledgebase.repository.RagChatSessionRepository;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
 import interview.guide.modules.user.repository.UserRepository;
@@ -23,10 +27,7 @@ class LegacyOwnershipMigrationServiceTest {
 
     @Test
     void previewDoesNotWriteAndReportsOnlyMigratableSessions() {
-        UserRepository userRepository = mock(UserRepository.class);
-        ResumeRepository resumeRepository = mock(ResumeRepository.class);
-        InterviewSessionRepository sessionRepository = mock(InterviewSessionRepository.class);
-        LegacyOwnershipMigrationAuditRepository auditRepository = mock(LegacyOwnershipMigrationAuditRepository.class);
+        var mocks = mocks();
         ResumeEntity legacyResume = new ResumeEntity();
         legacyResume.setId(11L);
         InterviewSessionEntity migratable = session(legacyResume);
@@ -35,31 +36,37 @@ class LegacyOwnershipMigrationServiceTest {
         alreadyOwnedResume.setUserId(7L);
         InterviewSessionEntity alreadyOwnedResumeSession = session(alreadyOwnedResume);
         InterviewSessionEntity orphan = session(null);
+        KnowledgeBaseEntity legacyKb = new KnowledgeBaseEntity();
+        legacyKb.setId(21L);
+        RagChatSessionEntity legacyRagSession = new RagChatSessionEntity();
 
-        when(userRepository.existsById(7L)).thenReturn(true);
-        when(resumeRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyResume));
-        when(sessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(migratable, alreadyOwnedResumeSession, orphan));
+        when(mocks.userRepository.existsById(7L)).thenReturn(true);
+        when(mocks.resumeRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyResume));
+        when(mocks.sessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(migratable, alreadyOwnedResumeSession, orphan));
+        when(mocks.knowledgeBaseRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyKb));
+        when(mocks.ragChatSessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyRagSession));
 
-        LegacyOwnershipMigrationService.MigrationResult result = service(
-            userRepository, resumeRepository, sessionRepository, auditRepository).preview(7L);
+        LegacyOwnershipMigrationService.MigrationResult result = mocks.service().preview(7L);
 
         assertFalse(result.applied());
         assertEquals(1, result.migratedResumeCount());
         assertEquals(1, result.migratedSessionCount());
         assertEquals(2, result.skippedOrphanSessionCount());
+        assertEquals(1, result.migratedKnowledgeBaseCount());
+        assertEquals(1, result.migratedRagChatSessionCount());
         assertNull(legacyResume.getUserId());
-        assertNull(alreadyOwnedResumeSession.getUserId());
-        verify(resumeRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
-        verify(sessionRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
-        verify(auditRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        assertNull(legacyKb.getUserId());
+        assertNull(legacyRagSession.getUserId());
+        verify(mocks.resumeRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+        verify(mocks.sessionRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+        verify(mocks.knowledgeBaseRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+        verify(mocks.ragChatSessionRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+        verify(mocks.auditRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void applyMigratesOnlyUnownedResumeSessionsAndWritesAudit() {
-        UserRepository userRepository = mock(UserRepository.class);
-        ResumeRepository resumeRepository = mock(ResumeRepository.class);
-        InterviewSessionRepository sessionRepository = mock(InterviewSessionRepository.class);
-        LegacyOwnershipMigrationAuditRepository auditRepository = mock(LegacyOwnershipMigrationAuditRepository.class);
+        var mocks = mocks();
         ResumeEntity legacyResume = new ResumeEntity();
         legacyResume.setId(11L);
         InterviewSessionEntity migratable = session(legacyResume);
@@ -68,33 +75,62 @@ class LegacyOwnershipMigrationServiceTest {
         alreadyOwnedResume.setUserId(7L);
         InterviewSessionEntity alreadyOwnedResumeSession = session(alreadyOwnedResume);
         InterviewSessionEntity orphan = session(null);
+        KnowledgeBaseEntity legacyKb = new KnowledgeBaseEntity();
+        legacyKb.setId(21L);
+        RagChatSessionEntity legacyRagSession = new RagChatSessionEntity();
 
-        when(userRepository.existsById(7L)).thenReturn(true);
-        when(resumeRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyResume));
-        when(sessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(migratable, alreadyOwnedResumeSession, orphan));
+        when(mocks.userRepository.existsById(7L)).thenReturn(true);
+        when(mocks.resumeRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyResume));
+        when(mocks.sessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(migratable, alreadyOwnedResumeSession, orphan));
+        when(mocks.knowledgeBaseRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyKb));
+        when(mocks.ragChatSessionRepository.findAllByUserIdIsNull()).thenReturn(List.of(legacyRagSession));
 
-        LegacyOwnershipMigrationService.MigrationResult result = service(
-            userRepository, resumeRepository, sessionRepository, auditRepository).apply(7L);
+        LegacyOwnershipMigrationService.MigrationResult result = mocks.service().apply(7L);
 
         assertTrue(result.applied());
         assertEquals(7L, legacyResume.getUserId());
         assertEquals(7L, migratable.getUserId());
+        assertEquals(7L, legacyKb.getUserId());
+        assertEquals(7L, legacyRagSession.getUserId());
         assertNull(alreadyOwnedResumeSession.getUserId());
         assertNull(orphan.getUserId());
-        verify(resumeRepository).saveAll(List.of(legacyResume));
-        verify(sessionRepository).saveAll(List.of(migratable));
+        verify(mocks.resumeRepository).saveAll(List.of(legacyResume));
+        verify(mocks.sessionRepository).saveAll(List.of(migratable));
+        verify(mocks.knowledgeBaseRepository).saveAll(List.of(legacyKb));
+        verify(mocks.ragChatSessionRepository).saveAll(List.of(legacyRagSession));
         ArgumentCaptor<LegacyOwnershipMigrationAuditEntity> audit = ArgumentCaptor.forClass(LegacyOwnershipMigrationAuditEntity.class);
-        verify(auditRepository).save(audit.capture());
+        verify(mocks.auditRepository).save(audit.capture());
         assertEquals(7L, audit.getValue().getTargetUserId());
         assertEquals(1, audit.getValue().getMigratedResumeCount());
         assertEquals(1, audit.getValue().getMigratedSessionCount());
         assertEquals(2, audit.getValue().getSkippedOrphanSessionCount());
+        assertEquals(1, audit.getValue().getMigratedKnowledgeBaseCount());
+        assertEquals(1, audit.getValue().getMigratedRagChatSessionCount());
     }
 
-    private LegacyOwnershipMigrationService service(UserRepository userRepository, ResumeRepository resumeRepository,
-                                                    InterviewSessionRepository sessionRepository,
-                                                    LegacyOwnershipMigrationAuditRepository auditRepository) {
-        return new LegacyOwnershipMigrationService(userRepository, resumeRepository, sessionRepository, auditRepository);
+    private record Mocks(
+        UserRepository userRepository,
+        ResumeRepository resumeRepository,
+        InterviewSessionRepository sessionRepository,
+        KnowledgeBaseRepository knowledgeBaseRepository,
+        RagChatSessionRepository ragChatSessionRepository,
+        LegacyOwnershipMigrationAuditRepository auditRepository
+    ) {
+        LegacyOwnershipMigrationService service() {
+            return new LegacyOwnershipMigrationService(userRepository, resumeRepository, sessionRepository,
+                knowledgeBaseRepository, ragChatSessionRepository, auditRepository);
+        }
+    }
+
+    private Mocks mocks() {
+        return new Mocks(
+            mock(UserRepository.class),
+            mock(ResumeRepository.class),
+            mock(InterviewSessionRepository.class),
+            mock(KnowledgeBaseRepository.class),
+            mock(RagChatSessionRepository.class),
+            mock(LegacyOwnershipMigrationAuditRepository.class)
+        );
     }
 
     private InterviewSessionEntity session(ResumeEntity resume) {
