@@ -20,6 +20,8 @@ public class LegacyOwnershipMigrationAuditEntity {
     private int migratedResumeCount;
     private int migratedSessionCount;
     private int skippedOrphanSessionCount;
+    private int migratedKnowledgeBaseCount;
+    private int migratedRagChatSessionCount;
     private String executedBy;
     private LocalDateTime executedAt;
 
@@ -27,11 +29,14 @@ public class LegacyOwnershipMigrationAuditEntity {
     }
 
     public LegacyOwnershipMigrationAuditEntity(Long targetUserId, int migratedResumeCount,
-                                               int migratedSessionCount, int skippedOrphanSessionCount) {
+                                               int migratedSessionCount, int skippedOrphanSessionCount,
+                                               int migratedKnowledgeBaseCount, int migratedRagChatSessionCount) {
         this.targetUserId = targetUserId;
         this.migratedResumeCount = migratedResumeCount;
         this.migratedSessionCount = migratedSessionCount;
         this.skippedOrphanSessionCount = skippedOrphanSessionCount;
+        this.migratedKnowledgeBaseCount = migratedKnowledgeBaseCount;
+        this.migratedRagChatSessionCount = migratedRagChatSessionCount;
         this.executedBy = "legacy-migration-profile";
         this.executedAt = LocalDateTime.now();
     }
@@ -41,6 +46,8 @@ public class LegacyOwnershipMigrationAuditEntity {
     public int getMigratedResumeCount() { return migratedResumeCount; }
     public int getMigratedSessionCount() { return migratedSessionCount; }
     public int getSkippedOrphanSessionCount() { return skippedOrphanSessionCount; }
+    public int getMigratedKnowledgeBaseCount() { return migratedKnowledgeBaseCount; }
+    public int getMigratedRagChatSessionCount() { return migratedRagChatSessionCount; }
     public String getExecutedBy() { return executedBy; }
     public LocalDateTime getExecutedAt() { return executedAt; }
 }
