@@ -65,16 +65,33 @@
 /* 自定义滚动条 */
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar {
-    @apply w-2 h-2;
+    width: calc(var(--spacing) * 2);
+    height: calc(var(--spacing) * 2);
   }
 
-    .scrollbar-thin::-webkit-scrollbar-track {
-    @apply bg-slate-100 rounded;
-        @apply dark:bg-slate-800;
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background-color: var(--color-slate-100);
+    border-radius: 0.25rem;
   }
 
-    .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded hover:bg-slate-400;
-        @apply dark:bg-slate-600 dark:hover:bg-slate-500;
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-slate-300);
+    border-radius: 0.25rem;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-400);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background-color: var(--color-slate-800);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-slate-600);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-slate-500);
   }
 }

@@ -10,6 +10,7 @@ import interview.guide.modules.interview.repository.InterviewAnswerRepository;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.practice.service.PracticeTaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,10 +35,11 @@ class InterviewPersistenceServiceTest {
     private final InterviewSessionRepository sessionRepository = mock(InterviewSessionRepository.class);
     private final InterviewAnswerRepository answerRepository = mock(InterviewAnswerRepository.class);
     private final ResumeRepository resumeRepository = mock(ResumeRepository.class);
+    private final PracticeTaskService practiceTaskService = mock(PracticeTaskService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final InterviewPersistenceService service = new InterviewPersistenceService(
-        sessionRepository, answerRepository, resumeRepository, objectMapper);
+        sessionRepository, answerRepository, resumeRepository, objectMapper, practiceTaskService);
 
     @BeforeEach
     void setUpSecurityContext() {

@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -52,6 +53,20 @@ public class FileHashService {
             log.error("哈希算法不支持: {}", HASH_ALGORITHM);
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "计算文件哈希失败");
         }
+    }
+
+    /**
+     * Builds a deterministic fingerprint for one user's copy of a file.
+     *
+     * <p>The resume module deduplicates inside a user account, rather than across accounts.
+     * Scoping the persisted fingerprint also remains compatible with databases that still have
+     * the legacy global unique constraint on {@code file_hash}.</p>
+     */
+    public String calculateUserScopedHash(String contentHash, Long userId) {
+        if (contentHash == null || contentHash.isBlank() || userId == null) {
+            throw new IllegalArgumentException("contentHash and userId are required");
+        }
+        return calculateHash((userId + ":" + contentHash).getBytes(StandardCharsets.UTF_8));
     }
 
     /**

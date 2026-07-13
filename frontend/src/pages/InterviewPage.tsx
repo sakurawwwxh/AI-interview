@@ -91,10 +91,10 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     }
   };
 
-  const handleContinueUnfinished = () => {
+  const handleContinueUnfinished = async () => {
     if (!unfinishedSession) return;
     setForceCreateNew(false);  // 重置强制创建标志
-    restoreSession(unfinishedSession);
+    await restoreSession(unfinishedSession);
     setUnfinishedSession(null);
   };
 
@@ -103,11 +103,22 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     setForceCreateNew(true);  // 标记需要强制创建新会话
   };
 
-    const restoreSession = (sessionToRestore: InterviewSession) => {
+  const loadCurrentQuestion = async (sessionToRestore: InterviewSession) => {
+    const cachedQuestion = sessionToRestore.questions?.[sessionToRestore.currentQuestionIndex];
+    if (cachedQuestion) return cachedQuestion;
+    const response = await interviewApi.getCurrentQuestion(sessionToRestore.sessionId);
+    return response.completed ? null : response.question ?? null;
+  };
+
+  const restoreSession = async (sessionToRestore: InterviewSession) => {
     setSession(sessionToRestore);
 
         // 恢复当前问题
-    const currentQ = sessionToRestore.questions[sessionToRestore.currentQuestionIndex];
+    const currentQ = await loadCurrentQuestion(sessionToRestore);
+    if (!currentQ) {
+      setError('未获取到面试题目，请返回后重新开始面试');
+      return;
+    }
     if (currentQ) {
       setCurrentQuestion(currentQ);
 
@@ -119,7 +130,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         // 恢复消息历史
       const restoredMessages: Message[] = [];
       for (let i = 0; i <= sessionToRestore.currentQuestionIndex; i++) {
-        const q = sessionToRestore.questions[i];
+        const q = sessionToRestore.questions?.[i];
+        if (!q) continue;
         restoredMessages.push({
           type: 'interviewer',
           content: q.question,
@@ -132,6 +144,14 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
             content: q.userAnswer
           });
         }
+      }
+      if (restoredMessages.length === 0) {
+        restoredMessages.push({
+          type: 'interviewer',
+          content: currentQ.question,
+          category: currentQ.category,
+          questionIndex: currentQ.questionIndex
+        });
       }
       setMessages(restoredMessages);
     }
@@ -157,13 +177,18 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
       setForceCreateNew(false);
 
             // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
+      if (!newSession.questions?.length) {
+        await restoreSession(newSession);
+        return;
+      }
+
             const hasProgress = newSession.currentQuestionIndex > 0 ||
                           newSession.questions.some(q => q.userAnswer) ||
                           newSession.status === 'IN_PROGRESS';
 
             if (hasProgress) {
         // 这是恢复的会话
-        restoreSession(newSession);
+        await restoreSession(newSession);
       } else {
         // 全新的会话
         setSession(newSession);
