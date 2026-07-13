@@ -13,6 +13,8 @@ export interface PracticeTaskItem {
   attemptCount: number;
   createdAt: string;
   lastPracticedAt: string | null;
+  nextReviewAt: string | null;
+  reviewIntervalDays: number | null;
 }
 
 export interface PracticeTaskPage {

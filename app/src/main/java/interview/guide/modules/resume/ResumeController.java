@@ -4,9 +4,12 @@ import interview.guide.common.annotation.RateLimit;
 import interview.guide.common.result.Result;
 import interview.guide.modules.resume.model.ResumeDetailDTO;
 import interview.guide.modules.resume.model.ResumeListItemDTO;
+import interview.guide.modules.resume.model.ResumeVersionDTO;
+import interview.guide.modules.resume.model.UpdateResumeContentRequest;
 import interview.guide.modules.resume.service.ResumeDeleteService;
 import interview.guide.modules.resume.service.ResumeHistoryService;
 import interview.guide.modules.resume.service.ResumeUploadService;
+import interview.guide.modules.resume.service.ResumeVersionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +35,7 @@ public class ResumeController {
     private final ResumeUploadService uploadService;
     private final ResumeDeleteService deleteService;
     private final ResumeHistoryService historyService;
+    private final ResumeVersionService versionService;
 
     /**
      * 上传简历并获取分析结果
@@ -66,6 +70,22 @@ public class ResumeController {
     public Result<ResumeDetailDTO> getResumeDetail(@PathVariable Long id) {
         ResumeDetailDTO detail = historyService.getResumeDetail(id);
         return Result.success(detail);
+    }
+
+    @GetMapping("/api/resumes/{id}/versions")
+    public Result<List<ResumeVersionDTO>> getVersions(@PathVariable Long id) {
+        return Result.success(versionService.list(id));
+    }
+
+    @PutMapping("/api/resumes/{id}/content")
+    public Result<ResumeVersionDTO> updateContent(@PathVariable Long id,
+                                                    @jakarta.validation.Valid @RequestBody UpdateResumeContentRequest request) {
+        return Result.success(versionService.update(id, request));
+    }
+
+    @PostMapping("/api/resumes/{id}/versions/{versionId}/restore")
+    public Result<ResumeVersionDTO> restoreVersion(@PathVariable Long id, @PathVariable Long versionId) {
+        return Result.success(versionService.restore(id, versionId));
     }
 
     /**

@@ -22,7 +22,9 @@ public final class PracticeDTO {
         Integer improvement,
         int attemptCount,
         LocalDateTime createdAt,
-        LocalDateTime lastPracticedAt
+        LocalDateTime lastPracticedAt,
+        LocalDateTime nextReviewAt,
+        Integer reviewIntervalDays
     ) {
     }
 
@@ -45,6 +47,8 @@ public final class PracticeDTO {
         Integer lastScore,
         Integer improvement,
         int attemptCount,
+        LocalDateTime nextReviewAt,
+        Integer reviewIntervalDays,
         List<AttemptItem> attempts
     ) {
     }

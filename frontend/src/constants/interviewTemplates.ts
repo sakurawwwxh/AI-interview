@@ -36,4 +36,34 @@ export const interviewTemplates: InterviewTemplateConfig[] = [
     difficultyDistribution: { basic: 20, advanced: 55, expert: 25 },
     followUpCount: 1,
   },
+  {
+    id: 'hr-behavioral',
+    name: 'HR 综合面',
+    questionTypes: [
+      { type: 'SOFT_SKILLS', weight: 45 }, { type: 'PROJECT', weight: 35 },
+      { type: 'ARCHITECTURE', weight: 10 }, { type: 'FRONTEND', weight: 10 },
+    ],
+    difficultyDistribution: { basic: 45, advanced: 45, expert: 10 },
+    followUpCount: 1,
+  },
+  {
+    id: 'project-deep-dive',
+    name: '项目深挖',
+    questionTypes: [
+      { type: 'PROJECT', weight: 65 }, { type: 'ARCHITECTURE', weight: 20 },
+      { type: 'DISTRIBUTED_SYSTEM', weight: 15 },
+    ],
+    difficultyDistribution: { basic: 15, advanced: 55, expert: 30 },
+    followUpCount: 2,
+  },
+  {
+    id: 'pressure-challenge',
+    name: '压力挑战',
+    questionTypes: [
+      { type: 'PROJECT', weight: 30 }, { type: 'JAVA_CONCURRENT', weight: 20 },
+      { type: 'ARCHITECTURE', weight: 25 }, { type: 'DISTRIBUTED_SYSTEM', weight: 25 },
+    ],
+    difficultyDistribution: { basic: 10, advanced: 40, expert: 50 },
+    followUpCount: 2,
+  },
 ];

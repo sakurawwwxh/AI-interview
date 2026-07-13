@@ -1,6 +1,7 @@
 import {AnimatePresence, motion} from 'framer-motion';
 import type {InterviewSession, InterviewTemplateConfig} from '../types/interview';
 import {interviewTemplates} from '../constants/interviewTemplates';
+import type {JobTarget} from '../api/jobTarget';
 
 interface InterviewConfigPanelProps {
   questionCount: number;
@@ -16,6 +17,9 @@ interface InterviewConfigPanelProps {
   resumeText: string;
   onBack: () => void;
   error?: string;
+  jobTargets: JobTarget[];
+  jobTargetId?: number;
+  onJobTargetChange: (id?: number) => void;
 }
 
 /**
@@ -34,7 +38,10 @@ export default function InterviewConfigPanel({
   onStartNew,
   resumeText,
   onBack,
-  error
+  error,
+  jobTargets,
+  jobTargetId,
+  onJobTargetChange
 }: InterviewConfigPanelProps) {
   const questionCounts = [6, 8, 10, 12, 15];
 
@@ -172,6 +179,15 @@ export default function InterviewConfigPanel({
             <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
               当前模板：{template.questionTypes.map(item => `${item.type} ${item.weight}%`).join(' · ')}；每个主问题追问 {template.followUpCount} 次。
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">目标岗位（可选）</label>
+            <select value={jobTargetId ?? ''} onChange={event => onJobTargetChange(event.target.value ? Number(event.target.value) : undefined)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+              <option value="">综合面试（不指定 JD）</option>
+              {jobTargets.map(item => <option key={item.id} value={item.id}>{item.title}{item.company ? ` · ${item.company}` : ''}{item.active ? '（当前）' : ''}</option>)}
+            </select>
+            {!jobTargets.length && <p className="mt-2 text-xs text-slate-500">可在“目标岗位”中粘贴 JD，生成更有针对性的题目。</p>}
           </div>
 
           <div className="mb-6">

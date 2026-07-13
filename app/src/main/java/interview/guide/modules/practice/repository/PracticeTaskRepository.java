@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 
 public interface PracticeTaskRepository extends JpaRepository<PracticeTaskEntity, Long> {
 
@@ -25,6 +26,7 @@ public interface PracticeTaskRepository extends JpaRepository<PracticeTaskEntity
 
     long countByUserIdAndStatus(Long userId, PracticeTaskStatus status);
     long countByUserIdAndCompletedAtGreaterThanEqual(Long userId, LocalDateTime completedAt);
+    List<PracticeTaskEntity> findByUserIdAndStatusAndNextReviewAtLessThanEqual(Long userId, PracticeTaskStatus status, LocalDateTime reviewAt);
 
     @Query("select avg(t.lastScore - t.originalScore) from PracticeTaskEntity t " +
            "where t.userId = :userId and t.status = :status")
