@@ -75,6 +75,37 @@ public class AnswerEvaluationService {
         List<String> strengths,
         List<String> improvements
     ) {}
+
+    /**
+     * Reuses the interview scoring rubric for one retry answer. The returned score and feedback
+     * intentionally come from the same evaluation path as a normal interview report.
+     */
+    public PracticeAnswerEvaluation evaluatePracticeAnswer(String taskId, String question, String category, String answer) {
+        InterviewQuestionDTO practiceQuestion = InterviewQuestionDTO.create(
+            0,
+            question,
+            InterviewQuestionDTO.QuestionType.PROJECT,
+            category == null || category.isBlank() ? "综合" : category
+        ).withAnswer(answer);
+        EvaluationReportDTO report = evaluateBatch(
+            "practice-" + taskId,
+            "",
+            List.of(practiceQuestion),
+            0,
+            1,
+            evidenceService.getAvailableKnowledgeBaseIds()
+        );
+        QuestionEvaluationDTO evaluation = report.questionEvaluations() == null || report.questionEvaluations().isEmpty()
+            ? null
+            : report.questionEvaluations().getFirst();
+        if (evaluation == null) {
+            return new PracticeAnswerEvaluation(0, "本次复练未生成有效评分，请再次提交。");
+        }
+        return new PracticeAnswerEvaluation(evaluation.score(), evaluation.feedback());
+    }
+
+    public record PracticeAnswerEvaluation(int score, String feedback) {
+    }
     
     public AnswerEvaluationService(
             ChatClient.Builder chatClientBuilder,

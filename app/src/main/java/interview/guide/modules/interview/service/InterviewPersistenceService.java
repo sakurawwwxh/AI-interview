@@ -12,6 +12,7 @@ import interview.guide.modules.interview.repository.InterviewAnswerRepository;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.practice.service.PracticeTaskService;
 import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class InterviewPersistenceService {
     private final InterviewAnswerRepository answerRepository;
     private final ResumeRepository resumeRepository;
     private final ObjectMapper objectMapper;
+    private final PracticeTaskService practiceTaskService;
     
     /**
      * 保存新的面试会话
@@ -267,6 +269,7 @@ public class InterviewPersistenceService {
             }
 
             answerRepository.saveAll(answersToSave);
+            practiceTaskService.createTasksForEvaluatedAnswers(session.getUserId(), answersToSave);
             log.info("面试报告已保存: sessionId={}, score={}, 答案数={}",
                 sessionId, report.overallScore(), answersToSave.size());
 

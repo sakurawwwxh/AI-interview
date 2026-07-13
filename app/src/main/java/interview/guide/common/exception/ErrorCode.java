@@ -70,7 +70,10 @@ public enum ErrorCode {
     PASSWORD_WRONG(9004, "用户名或密码错误"),
     TOKEN_EXPIRED(9005, "登录已过期，请重新登录"),
     TOKEN_INVALID(9006, "无效的认证凭证"),
-    REFRESH_TOKEN_INVALID(9007, "刷新令牌无效或已过期");
+    REFRESH_TOKEN_INVALID(9007, "刷新令牌无效或已过期"),
+
+    // ========== 复练模块错误 10xxx ==========
+    PRACTICE_TASK_NOT_FOUND(10001, "复练任务不存在");
     
     private final Integer code;
     private final String message;

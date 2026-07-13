@@ -4,6 +4,7 @@ import { BarChart3, Gauge, Loader2, LockKeyhole, Save, ShieldCheck, UserRound } 
 import { aiUsageApi, type AiUsageDTO } from '../api/aiUsage';
 import { authApi } from '../api/auth';
 import { getErrorMessage } from '../api/request';
+import { practiceApi, type PracticeSummary } from '../api/practice';
 import { useAuthStore } from '../stores/authStore';
 
 function formatResetTime(seconds: number) {
@@ -19,6 +20,7 @@ export default function ProfilePage() {
   const logout = useAuthStore((state) => state.logout);
   const [usage, setUsage] = useState<AiUsageDTO | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(true);
+  const [practiceSummary, setPracticeSummary] = useState<PracticeSummary | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -38,6 +40,10 @@ export default function ProfilePage() {
       .then(setUsage)
       .catch(() => setUsage(null))
       .finally(() => setLoadingUsage(false));
+  }, []);
+
+  useEffect(() => {
+    practiceApi.getSummary().then(setPracticeSummary).catch(() => setPracticeSummary(null));
   }, []);
 
   const usagePercent = usage && usage.dailyLimit > 0
@@ -111,9 +117,10 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-3">
         <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary-100 p-2.5 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300"><Gauge className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-800 dark:text-white">今日 AI 用量</h2><p className="text-sm text-slate-500 dark:text-slate-400">按账号独立统计</p></div></div>{loadingUsage ? <div className="flex h-28 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary-500" /></div> : usage ? <div className="mt-6"><div className="flex items-end justify-between gap-4"><span className="text-3xl font-bold text-slate-800 dark:text-white">{usagePercent}%</span><span className="text-sm text-slate-500 dark:text-slate-400">{usage.dailyTokens.toLocaleString()} / {usage.dailyLimit.toLocaleString()} tokens</span></div><div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div className={`h-full rounded-full ${usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 80 ? 'bg-amber-500' : 'bg-primary-500'}`} style={{ width: `${usagePercent}%` }} /></div><p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{formatResetTime(usage.secondsUntilReset)} · 今日 {usage.dailyRequestCount} 次请求</p></div> : <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">暂时无法读取用量数据。</p>}</section>
         <Link to="/interview-statistics" className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-700"><div className="flex items-center gap-3"><div className="rounded-xl bg-indigo-100 p-2.5 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300"><BarChart3 className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-800 dark:text-white">成长档案</h2><p className="text-sm text-slate-500 dark:text-slate-400">来自已评分面试的能力画像</p></div></div><p className="mt-6 text-sm leading-6 text-slate-600 dark:text-slate-300">查看能力雷达、分数趋势和优先补强方向。统计数据仍由面试模块计算，确保指标与面试记录一致。</p><p className="mt-5 text-sm font-semibold text-primary-600 transition group-hover:translate-x-1 dark:text-primary-400">查看能力统计 →</p></Link>
+        <Link to="/practice" className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-700"><div className="flex items-center gap-3"><div className="rounded-xl bg-amber-100 p-2.5 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300"><BarChart3 className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-800 dark:text-white">错题复练</h2><p className="text-sm text-slate-500 dark:text-slate-400">把低分题练成掌握点</p></div></div><div className="mt-6 flex items-end justify-between"><div><p className="text-3xl font-bold text-slate-800 dark:text-white">{practiceSummary?.todoCount ?? '-'}</p><p className="text-sm text-slate-500">待复练题目</p></div><p className="text-sm font-semibold text-primary-600 transition group-hover:translate-x-1">开始复练 →</p></div>{practiceSummary?.averageImprovement != null && <p className="mt-3 text-sm text-emerald-600">平均提升 {practiceSummary.averageImprovement >= 0 ? '+' : ''}{practiceSummary.averageImprovement} 分</p>}</Link>
       </div>
     </div>
   );

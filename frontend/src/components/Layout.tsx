@@ -1,6 +1,6 @@
 import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
 import {motion} from 'framer-motion';
-import {BarChart3, ChevronRight, Database, FileStack, LogOut, MessageSquare, Moon, Sparkles, Sun, Upload, UserRound, Users,} from 'lucide-react';
+import {BarChart3, ChevronRight, Database, FileStack, LogOut, MessageSquare, Moon, Sparkles, Sun, Upload, UserRound, Users, Dumbbell,} from 'lucide-react';
 import {useTheme} from '../hooks/useTheme';
 import {useAuthStore} from '../stores/authStore';
 import {aiUsageApi, type AiUsageDTO} from '../api/aiUsage';
@@ -65,6 +65,7 @@ export default function Layout() {
       title: '简历与面试',
       items: [
         { id: 'interview-statistics', path: '/interview-statistics', label: '能力统计', icon: BarChart3, description: '跟踪分数趋势与薄弱项' },
+        { id: 'practice', path: '/practice', label: '错题复练', icon: Dumbbell, description: '针对低分题持续练习' },
         { id: 'upload', path: '/upload', label: '上传简历', icon: Upload, description: 'AI 分析简历' },
         { id: 'resumes', path: '/history', label: '简历库', icon: FileStack, description: '管理所有简历' },
         { id: 'interviews', path: '/interviews', label: '面试记录', icon: Users, description: '查看面试历史' },

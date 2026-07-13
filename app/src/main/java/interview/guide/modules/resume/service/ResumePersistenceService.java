@@ -44,10 +44,13 @@ public class ResumePersistenceService {
      * @return 如果存在返回已有的简历实体，否则返回空
      */
     public Optional<ResumeEntity> findExistingResume(MultipartFile file) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         try {
-            String fileHash = fileHashService.calculateHash(file);
-            Optional<ResumeEntity> existing = resumeRepository.findByFileHashAndUserId(
-                fileHash, UserContext.getCurrentUserIdOrThrow());
+            String contentHash = fileHashService.calculateHash(file);
+            String fileHash = fileHashService.calculateUserScopedHash(contentHash, userId);
+            // Check the old raw hash first so a user's legacy records still deduplicate.
+            Optional<ResumeEntity> existing = resumeRepository.findByFileHashAndUserId(contentHash, userId)
+                .or(() -> resumeRepository.findByFileHashAndUserId(fileHash, userId));
             
             if (existing.isPresent()) {
                 log.info("检测到重复简历: hash={}", fileHash);
@@ -57,6 +60,8 @@ public class ResumePersistenceService {
             }
             
             return existing;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("检查简历重复时出错: {}", e.getMessage());
             return Optional.empty();
@@ -69,11 +74,13 @@ public class ResumePersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public ResumeEntity saveResume(MultipartFile file, String resumeText,
                                    String storageKey, String storageUrl) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         try {
-            String fileHash = fileHashService.calculateHash(file);
+            String contentHash = fileHashService.calculateHash(file);
+            String fileHash = fileHashService.calculateUserScopedHash(contentHash, userId);
             
             ResumeEntity resume = new ResumeEntity();
-            resume.setUserId(UserContext.getCurrentUserIdOrThrow());
+            resume.setUserId(userId);
             resume.setFileHash(fileHash);
             resume.setOriginalFilename(file.getOriginalFilename());
             resume.setFileSize(file.getSize());
@@ -86,6 +93,8 @@ public class ResumePersistenceService {
             log.info("简历已保存: id={}, hash={}", saved.getId(), fileHash);
             
             return saved;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("保存简历失败: {}", e.getMessage(), e);
             throw new BusinessException(ErrorCode.RESUME_UPLOAD_FAILED, "保存简历失败");
