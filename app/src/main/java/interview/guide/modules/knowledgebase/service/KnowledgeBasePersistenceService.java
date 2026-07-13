@@ -6,6 +6,7 @@ import interview.guide.modules.dify.model.DifySyncStatus;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,6 +63,7 @@ public class KnowledgeBasePersistenceService {
         try {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
             kb.setFileHash(fileHash);
+            kb.setUserId(UserContext.getCurrentUserIdOrThrow());
             kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(file.getOriginalFilename()));
             kb.setCategory(category != null && !category.trim().isEmpty() ? category.trim() : null);
             kb.setOriginalFilename(file.getOriginalFilename());
@@ -100,9 +102,23 @@ public class KnowledgeBasePersistenceService {
                                                           long fileSize, String contentType,
                                                           String storageKey, String storageUrl,
                                                           String fileHash, String difyDocumentId) {
+        return saveKnowledgeBaseFromDify(name, originalFilename, fileSize, contentType,
+            storageKey, storageUrl, fileHash, difyDocumentId, UserContext.getCurrentUserIdOrThrow());
+    }
+
+    /**
+     * 从 Dify 拉取的文档保存为本地知识库记录（指定 userId，供后台同步使用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeBaseEntity saveKnowledgeBaseFromDify(String name, String originalFilename,
+                                                          long fileSize, String contentType,
+                                                          String storageKey, String storageUrl,
+                                                          String fileHash, String difyDocumentId,
+                                                          Long userId) {
         try {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
             kb.setFileHash(fileHash);
+            kb.setUserId(userId);
             kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(originalFilename));
             kb.setOriginalFilename(originalFilename);
             kb.setFileSize(fileSize);
@@ -128,13 +144,14 @@ public class KnowledgeBasePersistenceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateVectorStatusToPending(Long kbId) {
-        KnowledgeBaseEntity kb = knowledgeBaseRepository.findById(kbId)
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        KnowledgeBaseEntity kb = knowledgeBaseRepository.findByIdAndUserId(kbId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "知识库不存在"));
-        
+
         kb.setVectorStatus(VectorStatus.PENDING);
         kb.setVectorError(null);
         knowledgeBaseRepository.save(kb);
-        
+
         log.info("知识库向量化状态已更新为 PENDING: kbId={}", kbId);
     }
 

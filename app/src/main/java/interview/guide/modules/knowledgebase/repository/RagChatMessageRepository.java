@@ -50,7 +50,8 @@ public interface RagChatMessageRepository extends JpaRepository<RagChatMessageEn
     void deleteBySessionId(Long sessionId);
 
     /**
-     * 统计所有用户消息数（即总提问次数）
+     * 统计指定用户的所有用户消息数（即总提问次数）
      */
-    long countByType(MessageType type);
+    @Query("SELECT COUNT(m) FROM RagChatMessageEntity m WHERE m.type = :type AND m.session.userId = :userId")
+    long countByTypeAndUserId(@Param("type") MessageType type, @Param("userId") Long userId);
 }

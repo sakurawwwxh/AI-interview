@@ -17,6 +17,8 @@ export interface InterviewQuestion {
   userAnswer: string | null;
   score: number | null;
   feedback: string | null;
+  isFollowUp: boolean;
+  parentQuestionIndex: number | null;
 }
 
 export type QuestionType = 

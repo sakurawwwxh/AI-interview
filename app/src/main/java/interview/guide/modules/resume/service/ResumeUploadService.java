@@ -149,7 +149,7 @@ public class ResumeUploadService {
      */
     @Transactional
     public void reanalyze(Long resumeId) {
-        ResumeEntity resume = resumeRepository.findById(resumeId)
+        ResumeEntity resume = persistenceService.findById(resumeId)
             .orElseThrow(() -> new BusinessException(ErrorCode.RESUME_NOT_FOUND, "简历不存在"));
 
         log.info("开始重新分析简历: resumeId={}, filename={}", resumeId, resume.getOriginalFilename());

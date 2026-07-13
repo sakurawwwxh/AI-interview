@@ -14,13 +14,18 @@ import java.util.List;
 @Entity
 @Table(name = "interview_sessions", indexes = {
     @Index(name = "idx_interview_session_resume_created", columnList = "resume_id,created_at"),
-    @Index(name = "idx_interview_session_resume_status_created", columnList = "resume_id,status,created_at")
+    @Index(name = "idx_interview_session_resume_status_created", columnList = "resume_id,status,created_at"),
+    @Index(name = "idx_interview_session_user", columnList = "userId")
 })
 public class InterviewSessionEntity {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    // 所属用户 ID
+    @Column(name = "user_id")
+    private Long userId;
     
     // 会话ID (UUID)
     @Column(nullable = false, unique = true, length = 36)
@@ -108,6 +113,14 @@ public class InterviewSessionEntity {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public Long getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
     
     public String getSessionId() {

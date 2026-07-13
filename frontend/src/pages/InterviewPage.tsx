@@ -41,16 +41,31 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [forceCreateNew, setForceCreateNew] = useState(false);
   const questionStartedAtRef = useRef(performance.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!currentQuestion) return;
     questionStartedAtRef.current = performance.now();
     setElapsedSeconds(0);
-    const timer = window.setInterval(() => {
+    // 启动计时器
+    timerRef.current = window.setInterval(() => {
       setElapsedSeconds(Math.floor((performance.now() - questionStartedAtRef.current) / 1000));
     }, 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = undefined;
+      }
+    };
   }, [currentQuestion?.questionIndex]);
+
+  // 提交期间暂停计时，防止 AI 往返延迟计入下一题
+  useEffect(() => {
+    if (isSubmitting && timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = undefined;
+    }
+  }, [isSubmitting]);
 
   // 检查是否有未完成的面试（组件挂载时和resumeId变化时）
   useEffect(() => {
@@ -208,7 +223,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
           type: 'interviewer',
           content: response.nextQuestion!.question,
           category: response.nextQuestion!.category,
-          questionIndex: response.nextQuestion!.questionIndex
+          questionIndex: response.nextQuestion!.questionIndex,
+          isFollowUp: response.nextQuestion!.isFollowUp,
         }]);
       } else {
         // 面试已完成，评估将在后台进行，跳转到面试记录页

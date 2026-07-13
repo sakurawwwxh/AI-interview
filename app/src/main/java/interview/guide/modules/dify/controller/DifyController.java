@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -33,6 +34,7 @@ public class DifyController {
      * 手动触发同步
      */
     @PostMapping("/sync")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> manualSync() {
         log.info("手动触发 Dify 同步");
         syncService.syncFromDify();
@@ -43,6 +45,7 @@ public class DifyController {
      * 获取同步状态
      */
     @GetMapping("/sync/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<List<DifySyncStatusDTO>> getSyncStatus() {
         return Result.success(syncService.getSyncStatus());
     }
@@ -51,6 +54,7 @@ public class DifyController {
      * 获取同步日志
      */
     @GetMapping("/sync/logs")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<List<DifySyncLogEntity>> getSyncLogs(
             @RequestParam(required = false) Long knowledgeBaseId,
             @RequestParam(defaultValue = "50") int limit) {

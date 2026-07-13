@@ -9,6 +9,7 @@ interface Message {
   content: string;
   category?: string;
   questionIndex?: number;
+  isFollowUp?: boolean;
 }
 
 interface InterviewChatPanelProps {
@@ -45,7 +46,13 @@ export default function InterviewChatPanel({
 
   const progress = useMemo(() => {
     if (!session || !currentQuestion) return 0;
-    return ((currentQuestion.questionIndex + 1) / session.totalQuestions) * 100;
+    // 追问的 questionIndex 可能 >= totalQuestions，进度按已答主问题数计算并封顶 100%
+    const answeredCount = currentQuestion.isFollowUp
+      ? currentQuestion.parentQuestionIndex != null
+        ? currentQuestion.parentQuestionIndex + 1
+        : session.currentQuestionIndex
+      : currentQuestion.questionIndex + 1;
+    return Math.min(100, (answeredCount / session.totalQuestions) * 100);
   }, [session, currentQuestion]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -63,7 +70,7 @@ export default function InterviewChatPanel({
             className="bg-white dark:bg-slate-800 rounded-2xl p-6 mb-4 shadow-sm dark:shadow-slate-900/50 border border-slate-100 dark:border-slate-700">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-            题目 {currentQuestion ? currentQuestion.questionIndex + 1 : 0} / {session.totalQuestions}
+            {currentQuestion?.isFollowUp ? '追问' : `题目 ${currentQuestion ? currentQuestion.questionIndex + 1 : 0} / ${session.totalQuestions}`}
           </span>
             <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
               <span className="inline-flex items-center gap-1"><Clock3 className="h-4 w-4" />{formattedElapsed}</span>
@@ -165,6 +172,12 @@ function MessageBubble({ message }: { message: Message }) {
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">面试官</span>
+            {message.isFollowUp && (
+                <span
+                    className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-xs rounded-full">
+                追问
+              </span>
+            )}
             {message.category && (
                 <span
                     className="px-2 py-0.5 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs rounded-full">

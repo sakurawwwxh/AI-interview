@@ -1,7 +1,11 @@
-import {Link, Outlet, useLocation} from 'react-router-dom';
+import {Link, Outlet, useLocation, useNavigate} from 'react-router-dom';
 import {motion} from 'framer-motion';
-import {BarChart3, ChevronRight, Database, FileStack, MessageSquare, Moon, Sparkles, Sun, Upload, Users,} from 'lucide-react';
+import {BarChart3, ChevronRight, Database, FileStack, LogOut, MessageSquare, Moon, Sparkles, Sun, Upload, UserRound, Users,} from 'lucide-react';
 import {useTheme} from '../hooks/useTheme';
+import {useAuthStore} from '../stores/authStore';
+import {aiUsageApi, type AiUsageDTO} from '../api/aiUsage';
+import {authApi} from '../api/auth';
+import {useEffect, useState} from 'react';
 
 interface NavItem {
   id: string;
@@ -19,8 +23,40 @@ interface NavGroup {
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
     const {theme, toggleTheme} = useTheme();
+  const user = useAuthStore((s) => s.user);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const logout = useAuthStore((s) => s.logout);
+  const [usage, setUsage] = useState<AiUsageDTO | null>(null);
+
+  useEffect(() => {
+    aiUsageApi.getUsage().then(setUsage).catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      if (refreshToken) {
+        await authApi.logout(refreshToken);
+      }
+    } catch {
+      // 忽略登出 API 失败
+    }
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const usagePercent = usage && usage.dailyLimit > 0
+    ? Math.min(100, (usage.dailyTokens / usage.dailyLimit) * 100)
+    : 0;
+  const usageColor = usagePercent >= 100
+    ? 'bg-red-500'
+    : usagePercent >= 80
+      ? 'bg-amber-500'
+      : 'bg-primary-500';
+  const resetHours = usage ? Math.floor(usage.secondsUntilReset / 3600) : 0;
+  const resetMinutes = usage ? Math.floor((usage.secondsUntilReset % 3600) / 60) : 0;
 
   // 按业务模块组织的导航项
   const navGroups: NavGroup[] = [
@@ -40,6 +76,13 @@ export default function Layout() {
       items: [
         { id: 'kb-manage', path: '/knowledgebase', label: '知识库管理', icon: Database, description: '管理知识文档' },
         { id: 'chat', path: '/knowledgebase/chat', label: '问答助手', icon: MessageSquare, description: '基于知识库问答' },
+      ],
+    },
+    {
+      id: 'account',
+      title: '账户',
+      items: [
+        { id: 'profile', path: '/profile', label: '个人中心', icon: UserRound, description: '账号、用量与成长档案' },
       ],
     },
   ];
@@ -151,12 +194,45 @@ export default function Layout() {
         </nav>
 
         {/* 底部信息 */}
-              <div className="p-4 border-t border-slate-100 dark:border-slate-700">
-                  <div
-                      className="px-3 py-2 bg-gradient-to-r from-primary-50 to-indigo-50 dark:from-primary-900/30 dark:to-slate-800 rounded-xl">
-                      <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">AI 面试助手 v1.0</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Powered by AI</p>
-          </div>
+              <div className="p-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                  {/* Token 用量 */}
+                  {usage && (
+                    <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">📊 Token 用量</span>
+                        <span className="text-xs text-slate-400">{resetHours}h {resetMinutes}m 后重置</span>
+                      </div>
+                      <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${usageColor} rounded-full transition-all`}
+                          style={{ width: `${usagePercent}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {usage.dailyTokens.toLocaleString()} / {usage.dailyLimit.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-slate-400">{Math.round(usagePercent)}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 用户信息 + 登出 */}
+                  <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-primary-50 to-indigo-50 dark:from-primary-900/30 dark:to-slate-800 rounded-xl">
+                    <div className="min-w-0">
+                      <p className="text-xs text-primary-600 dark:text-primary-400 font-medium truncate">
+                        👤 {user?.username || '用户'}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">AI 面试助手 v1.0</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors flex-shrink-0"
+                      title="登出"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
         </div>
       </aside>
 

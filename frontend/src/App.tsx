@@ -1,16 +1,21 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import { useAuthStore } from './stores/authStore';
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { historyApi } from './api/history';
 import type { UploadKnowledgeBaseResponse } from './api/knowledgebase';
 
 // Lazy load components
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const UploadPage = lazy(() => import('./pages/UploadPage'));
 const HistoryList = lazy(() => import('./pages/HistoryPage'));
 const ResumeDetailPage = lazy(() => import('./pages/ResumeDetailPage'));
 const Interview = lazy(() => import('./pages/InterviewPage'));
 const InterviewHistoryPage = lazy(() => import('./pages/InterviewHistoryPage'));
 const InterviewStatisticsPage = lazy(() => import('./pages/InterviewStatisticsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
@@ -137,11 +142,29 @@ function InterviewWrapper() {
 }
 
 function App() {
+  // 初始化时从 localStorage 恢复登录态
+  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
   return (
     <BrowserRouter>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/" element={<Layout />}>
+          {/* 公开路由（不套 Layout） */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* 受保护路由（套 Layout + ProtectedRoute） */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
             {/* 默认重定向到上传页面 */}
             <Route index element={<Navigate to="/upload" replace />} />
 
@@ -158,6 +181,8 @@ function App() {
             <Route path="interviews" element={<InterviewHistoryWrapper />} />
 
             <Route path="interview-statistics" element={<InterviewStatisticsPage />} />
+
+            <Route path="profile" element={<ProfilePage />} />
 
             {/* 模拟面试 */}
             <Route path="interview/:resumeId" element={<InterviewWrapper />} />

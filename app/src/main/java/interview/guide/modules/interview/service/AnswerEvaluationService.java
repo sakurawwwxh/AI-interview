@@ -110,8 +110,12 @@ public class AnswerEvaluationService {
                 ? resumeText.substring(0, 500) + "..." 
                 : resumeText;
 
+            // 在评估入口查一次可用知识库 ID，避免每批重复查库
+            List<Long> knowledgeBaseIds = evidenceService.getAvailableKnowledgeBaseIds();
+
             // 分批评估，避免单次上下文过大导致 token 超限
-            List<BatchEvaluationResult> batchResults = evaluateInBatches(sessionId, resumeSummary, questions);
+            List<BatchEvaluationResult> batchResults = evaluateInBatches(
+                sessionId, resumeSummary, questions, knowledgeBaseIds);
 
             List<QuestionEvaluationDTO> mergedEvaluations = mergeQuestionEvaluations(batchResults);
             String fallbackOverallFeedback = mergeOverallFeedback(batchResults);
@@ -164,13 +168,15 @@ public class AnswerEvaluationService {
     private List<BatchEvaluationResult> evaluateInBatches(
         String sessionId,
         String resumeSummary,
-        List<InterviewQuestionDTO> questions
+        List<InterviewQuestionDTO> questions,
+        List<Long> knowledgeBaseIds
     ) {
         List<BatchEvaluationResult> results = new ArrayList<>();
         for (int start = 0; start < questions.size(); start += evaluationBatchSize) {
             int end = Math.min(start + evaluationBatchSize, questions.size());
             List<InterviewQuestionDTO> batchQuestions = questions.subList(start, end);
-            EvaluationReportDTO report = evaluateBatch(sessionId, resumeSummary, batchQuestions, start, end);
+            EvaluationReportDTO report = evaluateBatch(
+                sessionId, resumeSummary, batchQuestions, start, end, knowledgeBaseIds);
             results.add(new BatchEvaluationResult(start, end, report));
         }
         return results;
@@ -181,10 +187,11 @@ public class AnswerEvaluationService {
         String resumeSummary,
         List<InterviewQuestionDTO> batchQuestions,
         int start,
-        int end
+        int end,
+        List<Long> knowledgeBaseIds
     ) {
         String qaRecords = buildQARecords(batchQuestions);
-        String ragEvidence = evidenceService.buildEvidence(batchQuestions);
+        String ragEvidence = evidenceService.buildEvidence(batchQuestions, knowledgeBaseIds);
         String systemPrompt = systemPromptTemplate.render();
 
         Map<String, Object> variables = new HashMap<>();

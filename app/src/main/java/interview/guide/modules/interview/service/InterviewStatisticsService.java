@@ -5,8 +5,10 @@ import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.model.InterviewStatisticsDTO;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -19,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 从已保存的面试报告聚合个人能力、趋势和薄弱项，不触发额外 AI 调用。
@@ -27,6 +30,9 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class InterviewStatisticsService {
+
+    /** 统计最多拉取最近 100 个会话，避免全表扫描 */
+    private static final int MAX_STATISTICS_SESSIONS = 100;
 
     private static final Map<InterviewQuestionDTO.QuestionType, String> CATEGORY_LABELS = new EnumMap<>(InterviewQuestionDTO.QuestionType.class);
 
@@ -39,6 +45,10 @@ public class InterviewStatisticsService {
         CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.REDIS, "Redis");
         CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.SPRING, "Spring");
         CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.SPRING_BOOT, "Spring Boot");
+        CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.FRONTEND, "前端");
+        CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.DISTRIBUTED_SYSTEM, "分布式系统");
+        CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.ARCHITECTURE, "架构设计");
+        CATEGORY_LABELS.put(InterviewQuestionDTO.QuestionType.SOFT_SKILLS, "软技能");
     }
 
     private final InterviewSessionRepository sessionRepository;
@@ -46,7 +56,21 @@ public class InterviewStatisticsService {
 
     @Transactional(readOnly = true)
     public InterviewStatisticsDTO getStatistics() {
-        List<InterviewSessionEntity> sessions = sessionRepository.findEvaluatedWithAnswers();
+        Long userId = UserContext.getCurrentUserId();
+        if (userId == null) {
+            return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
+        }
+        List<Long> sessionIds = sessionRepository.findEvaluatedIdsByUserId(
+            userId, PageRequest.of(0, MAX_STATISTICS_SESSIONS));
+        if (sessionIds.isEmpty()) {
+            return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
+        }
+        Map<Long, Integer> orderById = java.util.stream.IntStream.range(0, sessionIds.size())
+            .boxed()
+            .collect(Collectors.toMap(sessionIds::get, index -> index));
+        List<InterviewSessionEntity> sessions = new ArrayList<>(
+            sessionRepository.findEvaluatedWithAnswersByIdIn(sessionIds));
+        sessions.sort(Comparator.comparing(session -> orderById.getOrDefault(session.getId(), Integer.MAX_VALUE)));
         if (sessions.isEmpty()) {
             return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
         }
@@ -94,7 +118,10 @@ public class InterviewStatisticsService {
             .filter(Objects::nonNull)
             .toList());
         int latestScore = trend.getLast().score();
-        Integer scoreChange = trend.size() < 2 ? null : latestScore - trend.getFirst().score();
+        // scoreChange = 最新一次 - 上一次（更符合"最近变化"直觉）
+        Integer scoreChange = trend.size() < 2
+            ? null
+            : latestScore - trend.get(trend.size() - 2).score();
 
         return new InterviewStatisticsDTO(
             sessions.size(), averageScore, latestScore, scoreChange, abilityScores, trend, weaknesses

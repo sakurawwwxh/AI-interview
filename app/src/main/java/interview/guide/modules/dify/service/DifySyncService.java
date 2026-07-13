@@ -240,13 +240,13 @@ public class DifySyncService {
             return;
         }
 
-        // 2. 计算内容哈希并去重
+        // 2. 计算内容哈希并去重（Dify 同步是后台任务，检查所有用户）
         byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
         String fileHash = fileHashService.calculateHash(contentBytes);
-        if (knowledgeBaseRepository.findByFileHash(fileHash).isPresent()) {
-            log.info("文档内容已存在（哈希重复），跳过创建: hash={}", fileHash);
+        if (knowledgeBaseRepository.findByDifyDocumentId(difyDocId).isPresent()) {
+            log.info("文档已存在（Dify docId 重复），跳过创建: difyDocId={}", difyDocId);
             saveSyncLog(null, difyDocId, DifySyncDirection.FROM_DIFY,
-                DifySyncAction.CREATE, DifySyncStatus.SUCCESS, "内容哈希重复，跳过创建");
+                DifySyncAction.CREATE, DifySyncStatus.SUCCESS, "Dify docId 重复，跳过创建");
             return;
         }
 
@@ -258,10 +258,10 @@ public class DifySyncService {
         String storageKey = storageService.uploadBytes(contentBytes, filename, "text/markdown", "knowledgebases");
         String storageUrl = storageService.getFileUrl(storageKey);
 
-        // 4. 落库（直接标记 Dify 已同步，避免回环）
+        // 4. 落库（直接标记 Dify 已同步，避免回环）-- 后台同步无用户上下文，归到系统用户
         KnowledgeBaseEntity savedKb = persistenceService.saveKnowledgeBaseFromDify(
             remoteDoc.getName(), filename, (long) contentBytes.length,
-            "text/markdown", storageKey, storageUrl, fileHash, difyDocId);
+            "text/markdown", storageKey, storageUrl, fileHash, difyDocId, 1L);
 
         // 5. 复用 Dify 分段直接向量化（不重新分块）
         List<String> segmentContents = segments.stream()

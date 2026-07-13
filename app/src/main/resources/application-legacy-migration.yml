@@ -1,0 +1,10 @@
+spring:
+  main:
+    web-application-type: none
+  task:
+    scheduling:
+      enabled: false
+
+app:
+  legacy-migration:
+    apply: false

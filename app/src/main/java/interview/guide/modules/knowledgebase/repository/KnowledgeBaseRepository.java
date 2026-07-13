@@ -13,15 +13,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 知识库Repository
+ * 知识库 Repository（按用户隔离）
  */
 @Repository
 public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEntity, Long> {
 
     /**
-     * 根据文件哈希查找知识库（用于去重）
+     * 根据文件哈希和用户 ID 查找知识库（用于去重）
      */
-    Optional<KnowledgeBaseEntity> findByFileHash(String fileHash);
+    Optional<KnowledgeBaseEntity> findByFileHashAndUserId(String fileHash, Long userId);
 
     /**
      * 根据 Dify 文档 ID 查找知识库
@@ -29,91 +29,96 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
     Optional<KnowledgeBaseEntity> findByDifyDocumentId(String difyDocumentId);
 
     /**
-     * 检查文件哈希是否存在
+     * 检查文件哈希在指定用户下是否存在
      */
-    boolean existsByFileHash(String fileHash);
+    boolean existsByFileHashAndUserId(String fileHash, Long userId);
 
     /**
-     * 按上传时间倒序查找所有知识库
+     * 按上传时间倒序查找用户的所有知识库
      */
-    List<KnowledgeBaseEntity> findAllByOrderByUploadedAtDesc();
+    List<KnowledgeBaseEntity> findAllByUserIdOrderByUploadedAtDesc(Long userId);
 
     /**
-     * 获取所有不同的分类
+     * 获取用户所有不同的分类
      */
-    @Query("SELECT DISTINCT k.category FROM KnowledgeBaseEntity k WHERE k.category IS NOT NULL ORDER BY k.category")
-    List<String> findAllCategories();
+    @Query("SELECT DISTINCT k.category FROM KnowledgeBaseEntity k WHERE k.userId = :userId AND k.category IS NOT NULL ORDER BY k.category")
+    List<String> findAllCategoriesByUserId(@Param("userId") Long userId);
 
     /**
-     * 根据分类查找知识库
+     * 根据分类和用户 ID 查找知识库
      */
-    List<KnowledgeBaseEntity> findByCategoryOrderByUploadedAtDesc(String category);
+    List<KnowledgeBaseEntity> findByUserIdAndCategoryOrderByUploadedAtDesc(Long userId, String category);
 
     /**
-     * 查找未分类的知识库
+     * 查找用户未分类的知识库
      */
-    List<KnowledgeBaseEntity> findByCategoryIsNullOrderByUploadedAtDesc();
+    List<KnowledgeBaseEntity> findByUserIdAndCategoryIsNullOrderByUploadedAtDesc(Long userId);
 
     /**
-     * 按名称或文件名模糊搜索（不区分大小写）
+     * 按名称或文件名模糊搜索（按用户隔离）
      */
-    @Query("SELECT k FROM KnowledgeBaseEntity k WHERE LOWER(k.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(k.originalFilename) LIKE LOWER(CONCAT('%', :keyword, '%')) ORDER BY k.uploadedAt DESC")
-    List<KnowledgeBaseEntity> searchByKeyword(@Param("keyword") String keyword);
+    @Query("SELECT k FROM KnowledgeBaseEntity k WHERE k.userId = :userId AND (LOWER(k.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(k.originalFilename) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY k.uploadedAt DESC")
+    List<KnowledgeBaseEntity> searchByKeywordAndUserId(@Param("keyword") String keyword, @Param("userId") Long userId);
 
     /**
-     * 按文件大小排序
+     * 按文件大小排序（按用户）
      */
-    List<KnowledgeBaseEntity> findAllByOrderByFileSizeDesc();
+    List<KnowledgeBaseEntity> findAllByUserIdOrderByFileSizeDesc(Long userId);
 
     /**
-     * 按访问次数排序
+     * 按访问次数排序（按用户）
      */
-    List<KnowledgeBaseEntity> findAllByOrderByAccessCountDesc();
+    List<KnowledgeBaseEntity> findAllByUserIdOrderByAccessCountDesc(Long userId);
 
     /**
-     * 按提问次数排序
+     * 按提问次数排序（按用户）
      */
-    List<KnowledgeBaseEntity> findAllByOrderByQuestionCountDesc();
+    List<KnowledgeBaseEntity> findAllByUserIdOrderByQuestionCountDesc(Long userId);
+
+    /**
+     * 按 ID 和用户 ID 查找（鉴权）
+     */
+    Optional<KnowledgeBaseEntity> findByIdAndUserId(Long id, Long userId);
+
+    List<KnowledgeBaseEntity> findAllByIdInAndUserId(List<Long> ids, Long userId);
 
     // ==================== 批量更新 ====================
 
     /**
      * 批量增加知识库提问计数
-     * @param ids 知识库ID列表
-     * @return 更新的行数
      */
     @Modifying
     @Query("UPDATE KnowledgeBaseEntity k SET k.questionCount = k.questionCount + 1 WHERE k.id IN :ids")
     int incrementQuestionCountBatch(@Param("ids") List<Long> ids);
 
-    // ==================== 统计查询 ====================
+    // ==================== 统计查询（按用户） ====================
 
     /**
-     * 统计总提问次数
+     * 统计用户总提问次数
      */
-    @Query("SELECT COALESCE(SUM(k.questionCount), 0) FROM KnowledgeBaseEntity k")
-    long sumQuestionCount();
+    @Query("SELECT COALESCE(SUM(k.questionCount), 0) FROM KnowledgeBaseEntity k WHERE k.userId = :userId")
+    long sumQuestionCountByUserId(@Param("userId") Long userId);
 
     /**
-     * 统计总访问次数
+     * 统计用户总访问次数
      */
-    @Query("SELECT COALESCE(SUM(k.accessCount), 0) FROM KnowledgeBaseEntity k")
-    long sumAccessCount();
+    @Query("SELECT COALESCE(SUM(k.accessCount), 0) FROM KnowledgeBaseEntity k WHERE k.userId = :userId")
+    long sumAccessCountByUserId(@Param("userId") Long userId);
 
     /**
-     * 按向量化状态统计数量
+     * 按向量化状态和用户统计数量
      */
-    long countByVectorStatus(VectorStatus vectorStatus);
+    long countByVectorStatusAndUserId(VectorStatus vectorStatus, Long userId);
 
     /**
-     * 按向量化状态查找知识库（按上传时间倒序）
+     * 按向量化状态和用户查找知识库（按上传时间倒序）
      */
-    List<KnowledgeBaseEntity> findByVectorStatusOrderByUploadedAtDesc(VectorStatus vectorStatus);
+    List<KnowledgeBaseEntity> findByVectorStatusAndUserIdOrderByUploadedAtDesc(VectorStatus vectorStatus, Long userId);
 
-    // ==================== Dify 同步相关查询 ====================
+    // ==================== Dify 同步相关查询（全局，不按用户） ====================
 
     /**
-     * 根据 Dify 同步状态查找知识库
+     * 根据 Dify 同步状态查找知识库（后台同步用）
      */
     List<KnowledgeBaseEntity> findByDifySyncStatus(DifySyncStatus difySyncStatus);
 
@@ -122,4 +127,3 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      */
     long countByDifySyncStatus(DifySyncStatus difySyncStatus);
 }
-
