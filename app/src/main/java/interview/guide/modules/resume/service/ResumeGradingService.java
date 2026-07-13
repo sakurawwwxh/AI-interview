@@ -6,9 +6,9 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse.ScoreDetail;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse.Suggestion;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,7 +30,7 @@ public class ResumeGradingService {
     
     private static final Logger log = LoggerFactory.getLogger(ResumeGradingService.class);
     
-    private final ChatClient chatClient;
+    private final UserAiChatClientFactory chatClientFactory;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<ResumeAnalysisResponseDTO> outputConverter;
@@ -61,11 +61,11 @@ public class ResumeGradingService {
     ) {}
     
     public ResumeGradingService(
-            ChatClient.Builder chatClientBuilder,
+            UserAiChatClientFactory chatClientFactory,
             StructuredOutputInvoker structuredOutputInvoker,
             @Value("classpath:prompts/resume-analysis-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/resume-analysis-user.st") Resource userPromptResource) throws IOException {
-        this.chatClient = chatClientBuilder.build();
+        this.chatClientFactory = chatClientFactory;
         this.structuredOutputInvoker = structuredOutputInvoker;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
@@ -97,7 +97,8 @@ public class ResumeGradingService {
             ResumeAnalysisResponseDTO dto;
             try {
                 dto = structuredOutputInvoker.invoke(
-                    chatClient,
+                    chatClientFactory.forCurrentUser(),
+                    chatClientFactory.fallbackForCurrentUser(),
                     systemPromptWithFormat,
                     userPrompt,
                     outputConverter,

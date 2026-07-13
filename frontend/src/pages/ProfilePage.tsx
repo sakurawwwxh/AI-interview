@@ -6,6 +6,7 @@ import { authApi } from '../api/auth';
 import { getErrorMessage } from '../api/request';
 import { practiceApi, type PracticeSummary } from '../api/practice';
 import { growthApi, type GrowthPlan } from '../api/growth';
+import { userAiConfigApi, type UserAiConfig } from '../api/userAiConfig';
 import { useAuthStore } from '../stores/authStore';
 
 function formatResetTime(seconds: number) {
@@ -23,6 +24,15 @@ export default function ProfilePage() {
   const [loadingUsage, setLoadingUsage] = useState(true);
   const [practiceSummary, setPracticeSummary] = useState<PracticeSummary | null>(null);
   const [growthPlan, setGrowthPlan] = useState<GrowthPlan | null>(null);
+  const [aiConfig, setAiConfig] = useState<UserAiConfig | null>(null);
+  const [aiProvider, setAiProvider] = useState('DashScope');
+  const [aiBaseUrl, setAiBaseUrl] = useState('https://dashscope.aliyuncs.com/compatible-mode');
+  const [aiModel, setAiModel] = useState('qwen-plus');
+  const [aiKey, setAiKey] = useState('');
+  const [aiFallback, setAiFallback] = useState(true);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [testingAi, setTestingAi] = useState(false);
+  const [savingAi, setSavingAi] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -51,6 +61,8 @@ export default function ProfilePage() {
   useEffect(() => {
     growthApi.getPlan().then(setGrowthPlan).catch(() => setGrowthPlan(null));
   }, []);
+
+  useEffect(() => { userAiConfigApi.get().then(config => { setAiConfig(config); if (config) { setAiProvider(config.provider); setAiBaseUrl(config.baseUrl); setAiModel(config.model); setAiFallback(config.fallbackToPlatform); } }).catch(() => {}); }, []);
 
   const usagePercent = usage && usage.dailyLimit > 0
     ? Math.min(100, Math.round((usage.dailyTokens / usage.dailyLimit) * 100))
@@ -91,6 +103,11 @@ export default function ProfilePage() {
     }
   };
 
+  const aiPayload = () => ({ provider: aiProvider, baseUrl: aiBaseUrl.trim(), model: aiModel.trim(), apiKey: aiKey.trim(), fallbackToPlatform: aiFallback });
+  const testAi = async () => { if (!aiKey.trim()) { setAiMessage('请输入密钥后再测试连接'); return; } setTestingAi(true); setAiMessage(null); try { await userAiConfigApi.test(aiPayload()); setAiMessage('连接成功，模型可用'); } catch (error) { setAiMessage(getErrorMessage(error)); } finally { setTestingAi(false); } };
+  const saveAi = async () => { if (!aiKey.trim()) { setAiMessage('为保护密钥，更新配置时请重新输入密钥'); return; } setSavingAi(true); setAiMessage(null); try { const saved = await userAiConfigApi.save(aiPayload()); setAiConfig(saved); setAiKey(''); setAiMessage('已加密保存，将优先使用你的模型'); } catch (error) { setAiMessage(getErrorMessage(error)); } finally { setSavingAi(false); } };
+  const deleteAi = async () => { await userAiConfigApi.remove(); setAiConfig(null); setAiKey(''); setAiMessage('已移除个人模型配置，将使用平台默认模型'); };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
@@ -124,6 +141,13 @@ export default function ProfilePage() {
       </div>
 
       {growthPlan && <section className="rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-50 to-indigo-50 p-6 dark:border-primary-900/50 dark:from-primary-950/30 dark:to-indigo-950/20"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-primary-600">本周训练计划</p><h2 className="mt-1 text-xl font-bold text-slate-800 dark:text-white">{growthPlan.headline}</h2><p className="mt-1 text-sm text-slate-500">{growthPlan.targetRole ? `目标岗位：${growthPlan.targetRole}` : '设置目标岗位后，可获得更有针对性的训练。'}</p></div><Link to="/practice" className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white">进入复练</Link></div><div className="mt-5 grid gap-3 md:grid-cols-3">{growthPlan.actions.map((action, index) => <Link key={`${action.title}-${index}`} to={action.link} className="rounded-xl bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 dark:bg-slate-800/90"><div className="flex items-center justify-between gap-2"><span className={`text-xs font-semibold ${action.priority === 'HIGH' ? 'text-red-500' : 'text-amber-600'}`}>{action.priority === 'HIGH' ? '优先处理' : '建议完成'}</span>{action.score != null && <span className="text-sm font-bold text-primary-600">{action.score} 分</span>}</div><h3 className="mt-2 font-semibold text-slate-800 dark:text-white">{index + 1}. {action.title}</h3><p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p></Link>)}</div></section>}
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-800 dark:text-white">我的 AI 模型</h2><p className="mt-1 text-sm text-slate-500">支持 DashScope、DeepSeek、OpenAI、OpenRouter、智谱及本地 Ollama 等 OpenAI 兼容接口；密钥仅加密保存，之后不会回显。</p></div>{aiConfig && <button onClick={deleteAi} className="text-sm text-red-500">移除配置</button>}</div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3"><input value={aiProvider} onChange={event => setAiProvider(event.target.value)} maxLength={40} placeholder="提供商，例如 DeepSeek" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><input value={aiModel} onChange={event => setAiModel(event.target.value)} maxLength={160} placeholder="模型，例如 deepseek-chat" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><input value={aiBaseUrl} onChange={event => setAiBaseUrl(event.target.value)} maxLength={500} placeholder="OpenAI 兼容 Base URL" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /></div>
+        <div className="mt-3 flex flex-wrap items-center gap-3"><input type="password" value={aiKey} onChange={event => setAiKey(event.target.value)} autoComplete="off" placeholder={aiConfig ? `已保存 ${aiConfig.apiKeyMasked}；输入新密钥以更新` : '输入你的 API Key'} className="min-w-72 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" checked={aiFallback} onChange={event => setAiFallback(event.target.checked)} />失败时回退平台模型</label></div>
+        {aiMessage && <p className={`mt-3 text-sm ${aiMessage.includes('成功') || aiMessage.includes('保存') ? 'text-emerald-600' : 'text-red-500'}`}>{aiMessage}</p>}<div className="mt-4 flex gap-3"><button disabled={testingAi} onClick={testAi} className="rounded-xl border border-primary-300 px-4 py-2 text-sm font-semibold text-primary-600 disabled:opacity-60">{testingAi ? '测试中…' : '测试连接'}</button><button disabled={savingAi} onClick={saveAi} className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{savingAi ? '保存中…' : '加密保存并启用'}</button></div>
+      </section>
 
       <div className="grid gap-6 md:grid-cols-3">
         <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary-100 p-2.5 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300"><Gauge className="h-5 w-5" /></div><div><h2 className="font-semibold text-slate-800 dark:text-white">今日 AI 用量</h2><p className="text-sm text-slate-500 dark:text-slate-400">按账号独立统计</p></div></div>{loadingUsage ? <div className="flex h-28 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary-500" /></div> : usage ? <div className="mt-6"><div className="flex items-end justify-between gap-4"><span className="text-3xl font-bold text-slate-800 dark:text-white">{usagePercent}%</span><span className="text-sm text-slate-500 dark:text-slate-400">{usage.dailyTokens.toLocaleString()} / {usage.dailyLimit.toLocaleString()} tokens</span></div><div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><div className={`h-full rounded-full ${usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 80 ? 'bg-amber-500' : 'bg-primary-500'}`} style={{ width: `${usagePercent}%` }} /></div><p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{formatResetTime(usage.secondsUntilReset)} · 今日 {usage.dailyRequestCount} 次请求</p></div> : <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">暂时无法读取用量数据。</p>}</section>

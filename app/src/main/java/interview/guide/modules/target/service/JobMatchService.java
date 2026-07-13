@@ -7,8 +7,8 @@ import interview.guide.modules.resume.service.ResumePersistenceService;
 import interview.guide.modules.target.model.JobMatchDTO;
 import interview.guide.modules.target.model.JobTargetEntity;
 import interview.guide.modules.target.model.ResumeOptimizationSuggestion;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,7 @@ import java.util.List;
 @Slf4j
 @Service
 public class JobMatchService {
-    private final ChatClient chatClient;
+    private final UserAiChatClientFactory chatClientFactory;
     private final StructuredOutputInvoker invoker;
     private final ResumePersistenceService resumeService;
     private final JobTargetService targetService;
@@ -34,9 +34,9 @@ public class JobMatchService {
         String optimizedResumeText
     ) {}
 
-    public JobMatchService(ChatClient.Builder builder, StructuredOutputInvoker invoker,
+    public JobMatchService(UserAiChatClientFactory chatClientFactory, StructuredOutputInvoker invoker,
                            ResumePersistenceService resumeService, JobTargetService targetService) {
-        this.chatClient = builder.build();
+        this.chatClientFactory = chatClientFactory;
         this.invoker = invoker;
         this.resumeService = resumeService;
         this.targetService = targetService;
@@ -54,7 +54,7 @@ public class JobMatchService {
         String prompt = "岗位：" + target.getTitle() + "\n公司："
             + (target.getCompany() == null ? "未填写" : target.getCompany())
             + "\nJD：\n" + target.getJobDescription() + "\n\n简历：\n" + resume;
-        MatchResponse result = invoker.invoke(chatClient, system, prompt, converter,
+        MatchResponse result = invoker.invoke(chatClientFactory.forCurrentUser(), chatClientFactory.fallbackForCurrentUser(), system, prompt, converter,
             ErrorCode.AI_SERVICE_ERROR, "岗位匹配分析失败：", "岗位匹配分析", log);
         String optimized = result.optimizedResumeText() == null || result.optimizedResumeText().isBlank()
             ? resume : result.optimizedResumeText().trim();

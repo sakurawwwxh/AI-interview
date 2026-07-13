@@ -135,9 +135,17 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
             }
         }
 
-        String resumeText = session.getResume().getResumeText();
-        InterviewReportDTO report = evaluationService.evaluateInterview(sessionId, resumeText, questions);
-        persistenceService.saveReport(sessionId, payload.userId(), report);
+        var securityContext = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var previousAuthentication = securityContext.getAuthentication();
+        securityContext.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+            payload.userId(), "async-evaluation", java.util.List.of()));
+        try {
+            String resumeText = session.getResume().getResumeText();
+            InterviewReportDTO report = evaluationService.evaluateInterview(sessionId, resumeText, questions);
+            persistenceService.saveReport(sessionId, payload.userId(), report);
+        } finally {
+            securityContext.setAuthentication(previousAuthentication);
+        }
     }
 
     @Override
