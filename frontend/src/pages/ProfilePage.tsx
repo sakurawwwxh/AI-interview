@@ -9,6 +9,18 @@ import { growthApi, type GrowthPlan } from '../api/growth';
 import { userAiConfigApi, type UserAiConfig } from '../api/userAiConfig';
 import { useAuthStore } from '../stores/authStore';
 
+const OPENAI_CHAT_PROTOCOL = 'OPENAI_CHAT_COMPLETIONS';
+
+const AI_PROVIDER_TEMPLATES = [
+  { name: 'DashScope（阿里云百炼）', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', modelHint: '例如 qwen-plus' },
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', modelHint: '例如 deepseek-chat' },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', modelHint: '例如 gpt-4.1-mini' },
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', modelHint: '例如 openai/gpt-4.1-mini' },
+  { name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', modelHint: '例如 glm-4-flash' },
+  { name: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1', modelHint: '例如 Qwen/Qwen3-8B' },
+  { name: 'Ollama（本地）', baseUrl: 'http://localhost:11434/v1', modelHint: '例如 qwen3:8b' },
+] as const;
+
 function formatResetTime(seconds: number) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -25,9 +37,10 @@ export default function ProfilePage() {
   const [practiceSummary, setPracticeSummary] = useState<PracticeSummary | null>(null);
   const [growthPlan, setGrowthPlan] = useState<GrowthPlan | null>(null);
   const [aiConfig, setAiConfig] = useState<UserAiConfig | null>(null);
-  const [aiProvider, setAiProvider] = useState('DashScope');
-  const [aiBaseUrl, setAiBaseUrl] = useState('https://dashscope.aliyuncs.com/compatible-mode');
-  const [aiModel, setAiModel] = useState('qwen-plus');
+  const [aiProvider, setAiProvider] = useState<string>(AI_PROVIDER_TEMPLATES[0].name);
+  const [aiBaseUrl, setAiBaseUrl] = useState<string>(AI_PROVIDER_TEMPLATES[0].baseUrl);
+  const [aiModel, setAiModel] = useState('');
+  const [aiProtocol, setAiProtocol] = useState(OPENAI_CHAT_PROTOCOL);
   const [aiKey, setAiKey] = useState('');
   const [aiFallback, setAiFallback] = useState(true);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
@@ -104,6 +117,21 @@ export default function ProfilePage() {
   };
 
   const aiPayload = () => ({ provider: aiProvider, baseUrl: aiBaseUrl.trim(), model: aiModel.trim(), apiKey: aiKey.trim(), fallbackToPlatform: aiFallback });
+  const currentProviderTemplate = AI_PROVIDER_TEMPLATES.find((item) => item.name === aiProvider);
+  const selectAiProvider = (provider: string) => {
+    if (provider === 'CUSTOM') {
+      setAiProvider('自定义 OpenAI 兼容服务');
+      setAiBaseUrl('');
+      setAiModel('');
+      return;
+    }
+    const template = AI_PROVIDER_TEMPLATES.find((item) => item.name === provider);
+    if (!template) return;
+    setAiProvider(template.name);
+    setAiBaseUrl(template.baseUrl);
+    setAiModel('');
+    setAiProtocol(OPENAI_CHAT_PROTOCOL);
+  };
   const testAi = async () => { if (!aiKey.trim()) { setAiMessage('请输入密钥后再测试连接'); return; } setTestingAi(true); setAiMessage(null); try { await userAiConfigApi.test(aiPayload()); setAiMessage('连接成功，模型可用'); } catch (error) { setAiMessage(getErrorMessage(error)); } finally { setTestingAi(false); } };
   const saveAi = async () => { if (!aiKey.trim()) { setAiMessage('为保护密钥，更新配置时请重新输入密钥'); return; } setSavingAi(true); setAiMessage(null); try { const saved = await userAiConfigApi.save(aiPayload()); setAiConfig(saved); setAiKey(''); setAiMessage('已加密保存，将优先使用你的模型'); } catch (error) { setAiMessage(getErrorMessage(error)); } finally { setSavingAi(false); } };
   const deleteAi = async () => { await userAiConfigApi.remove(); setAiConfig(null); setAiKey(''); setAiMessage('已移除个人模型配置，将使用平台默认模型'); };
@@ -143,8 +171,8 @@ export default function ProfilePage() {
       {growthPlan && <section className="rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-50 to-indigo-50 p-6 dark:border-primary-900/50 dark:from-primary-950/30 dark:to-indigo-950/20"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-primary-600">本周训练计划</p><h2 className="mt-1 text-xl font-bold text-slate-800 dark:text-white">{growthPlan.headline}</h2><p className="mt-1 text-sm text-slate-500">{growthPlan.targetRole ? `目标岗位：${growthPlan.targetRole}` : '设置目标岗位后，可获得更有针对性的训练。'}</p></div><Link to="/practice" className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white">进入复练</Link></div><div className="mt-5 grid gap-3 md:grid-cols-3">{growthPlan.actions.map((action, index) => <Link key={`${action.title}-${index}`} to={action.link} className="rounded-xl bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 dark:bg-slate-800/90"><div className="flex items-center justify-between gap-2"><span className={`text-xs font-semibold ${action.priority === 'HIGH' ? 'text-red-500' : 'text-amber-600'}`}>{action.priority === 'HIGH' ? '优先处理' : '建议完成'}</span>{action.score != null && <span className="text-sm font-bold text-primary-600">{action.score} 分</span>}</div><h3 className="mt-2 font-semibold text-slate-800 dark:text-white">{index + 1}. {action.title}</h3><p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p></Link>)}</div></section>}
 
       <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-800 dark:text-white">我的 AI 模型</h2><p className="mt-1 text-sm text-slate-500">支持 DashScope、DeepSeek、OpenAI、OpenRouter、智谱及本地 Ollama 等 OpenAI 兼容接口；密钥仅加密保存，之后不会回显。</p></div>{aiConfig && <button onClick={deleteAi} className="text-sm text-red-500">移除配置</button>}</div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3"><input value={aiProvider} onChange={event => setAiProvider(event.target.value)} maxLength={40} placeholder="提供商，例如 DeepSeek" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><input value={aiModel} onChange={event => setAiModel(event.target.value)} maxLength={160} placeholder="模型，例如 deepseek-chat" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><input value={aiBaseUrl} onChange={event => setAiBaseUrl(event.target.value)} maxLength={500} placeholder="OpenAI 兼容 Base URL" className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold text-slate-800 dark:text-white">我的 AI 模型</h2><p className="mt-1 text-sm text-slate-500">选择厂商后会自动填入兼容地址；模型名称和 API Key 由你填写，密钥仅加密保存且不会回显。</p></div>{aiConfig && <button onClick={deleteAi} className="text-sm text-red-500">移除配置</button>}</div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2"><label className="text-sm text-slate-600 dark:text-slate-300">厂商<select value={AI_PROVIDER_TEMPLATES.some((item) => item.name === aiProvider) ? aiProvider : 'CUSTOM'} onChange={event => selectAiProvider(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900"><option value="CUSTOM">自定义 OpenAI 兼容服务</option>{AI_PROVIDER_TEMPLATES.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><label className="text-sm text-slate-600 dark:text-slate-300">消息协议<select value={aiProtocol} onChange={event => setAiProtocol(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900"><option value={OPENAI_CHAT_PROTOCOL}>OpenAI 兼容 · Chat Completions</option><option disabled value="ANTHROPIC_MESSAGES">Anthropic · Messages（暂未接入）</option><option disabled value="GEMINI_GENERATE_CONTENT">Gemini · generateContent（暂未接入）</option></select></label><label className="text-sm text-slate-600 dark:text-slate-300">模型名称<input required value={aiModel} onChange={event => setAiModel(event.target.value)} maxLength={160} placeholder={currentProviderTemplate?.modelHint ?? '例如 your-model-name'} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /></label><label className="text-sm text-slate-600 dark:text-slate-300">Base URL<input required value={aiBaseUrl} onChange={event => setAiBaseUrl(event.target.value)} maxLength={500} placeholder="OpenAI 兼容 Base URL" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /></label></div>
         <div className="mt-3 flex flex-wrap items-center gap-3"><input type="password" value={aiKey} onChange={event => setAiKey(event.target.value)} autoComplete="off" placeholder={aiConfig ? `已保存 ${aiConfig.apiKeyMasked}；输入新密钥以更新` : '输入你的 API Key'} className="min-w-72 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-900" /><label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" checked={aiFallback} onChange={event => setAiFallback(event.target.checked)} />失败时回退平台模型</label></div>
         {aiMessage && <p className={`mt-3 text-sm ${aiMessage.includes('成功') || aiMessage.includes('保存') ? 'text-emerald-600' : 'text-red-500'}`}>{aiMessage}</p>}<div className="mt-4 flex gap-3"><button disabled={testingAi} onClick={testAi} className="rounded-xl border border-primary-300 px-4 py-2 text-sm font-semibold text-primary-600 disabled:opacity-60">{testingAi ? '测试中…' : '测试连接'}</button><button disabled={savingAi} onClick={saveAi} className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{savingAi ? '保存中…' : '加密保存并启用'}</button></div>
       </section>
