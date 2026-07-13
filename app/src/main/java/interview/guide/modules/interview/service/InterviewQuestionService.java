@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * 面试问题生成服务
@@ -36,20 +35,14 @@ public class InterviewQuestionService {
     private final ChatClient chatClient;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
+    private final PromptTemplate followUpSystemPromptTemplate;
     private final BeanOutputConverter<QuestionListDTO> outputConverter;
     private final BeanOutputConverter<FollowUpDecisionDTO> followUpOutputConverter;
     private final StructuredOutputInvoker structuredOutputInvoker;
     private final int followUpCount;
     
-    // 问题类型权重分配（按优先级）
-    private static final double PROJECT_RATIO = 0.20;      // 20% 项目经历
-    private static final double MYSQL_RATIO = 0.20;        // 20% MySQL
-    private static final double REDIS_RATIO = 0.20;        // 20% Redis
-    private static final double JAVA_BASIC_RATIO = 0.10;   // 10% Java基础
-    private static final double JAVA_COLLECTION_RATIO = 0.10; // 10% 集合
-    private static final double JAVA_CONCURRENT_RATIO = 0.10; // 10% 并发
     private static final int MAX_FOLLOW_UP_COUNT = 2;
-    
+
     // 中间DTO用于接收AI响应
     private record QuestionListDTO(
         List<QuestionDTO> questions
@@ -73,11 +66,13 @@ public class InterviewQuestionService {
             StructuredOutputInvoker structuredOutputInvoker,
             @Value("classpath:prompts/interview-question-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/interview-question-user.st") Resource userPromptResource,
+            @Value("classpath:prompts/interview-followup-system.st") Resource followUpSystemPromptResource,
             @Value("${app.interview.follow-up-count:1}") int followUpCount) throws IOException {
         this.chatClient = chatClientBuilder.build();
         this.structuredOutputInvoker = structuredOutputInvoker;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.followUpSystemPromptTemplate = new PromptTemplate(followUpSystemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(QuestionListDTO.class);
         this.followUpOutputConverter = new BeanOutputConverter<>(FollowUpDecisionDTO.class);
         this.followUpCount = Math.max(0, Math.min(followUpCount, MAX_FOLLOW_UP_COUNT));
@@ -158,8 +153,11 @@ public class InterviewQuestionService {
             
             return questions;
             
+        } catch (BusinessException e) {
+            // 业务异常（如 AI 调用明确失败）应向上传播，不降级为默认题库
+            throw e;
         } catch (Exception e) {
-            log.error("生成面试问题失败: {}", e.getMessage(), e);
+            log.error("生成面试问题失败，降级为默认题库: {}", e.getMessage(), e);
             // 返回默认问题集
             return generateDefaultQuestions(questionCount, normalizedTemplate.followUpCount());
         }
@@ -171,29 +169,6 @@ public class InterviewQuestionService {
     public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount) {
         return generateQuestions(resumeText, questionCount, null);
     }
-    
-    /**
-     * 计算各类型问题分布
-     */
-    private QuestionDistribution calculateDistribution(int total) {
-        int project = Math.max(1, (int) Math.round(total * PROJECT_RATIO));
-        int mysql = Math.max(1, (int) Math.round(total * MYSQL_RATIO));
-        int redis = Math.max(1, (int) Math.round(total * REDIS_RATIO));
-        int javaBasic = Math.max(1, (int) Math.round(total * JAVA_BASIC_RATIO));
-        int javaCollection = (int) Math.round(total * JAVA_COLLECTION_RATIO);
-        int javaConcurrent = (int) Math.round(total * JAVA_CONCURRENT_RATIO);
-        int spring = total - project - mysql - redis - javaBasic - javaCollection - javaConcurrent;
-        
-        // 确保至少有1个
-        spring = Math.max(0, spring);
-        
-        return new QuestionDistribution(project, mysql, redis, javaBasic, javaCollection, javaConcurrent, spring);
-    }
-    
-    private record QuestionDistribution(
-        int project, int mysql, int redis, 
-        int javaBasic, int javaCollection, int javaConcurrent, int spring
-    ) {}
     
     /**
      * 转换DTO为业务对象
@@ -211,7 +186,6 @@ public class InterviewQuestionService {
                 continue;
             }
             QuestionType type = parseQuestionType(q.type());
-            int mainQuestionIndex = index;
             questions.add(InterviewQuestionDTO.create(index++, q.question(), type, q.category(), false, null));
 
         }
@@ -263,17 +237,6 @@ public class InterviewQuestionService {
         }
         
         return questions;
-    }
-
-    private List<String> sanitizeFollowUps(List<String> followUps, int followUpLimit) {
-        if (followUpLimit == 0 || followUps == null || followUps.isEmpty()) {
-            return List.of();
-        }
-        return followUps.stream()
-            .filter(item -> item != null && !item.isBlank())
-            .map(String::trim)
-            .limit(followUpLimit)
-            .collect(Collectors.toList());
     }
 
     private String buildFollowUpCategory(String category, int order) {
@@ -343,9 +306,7 @@ public class InterviewQuestionService {
         if (maximumFollowUpCount <= existingFollowUpCount || answer == null || answer.isBlank()) {
             return Optional.empty();
         }
-        String systemPrompt = "你是一位技术面试官。基于候选人的刚刚回答，判断是否有必要追问以验证其真实理解。" +
-            "只有回答存在可深挖的技术细节、模糊点或风险时才追问；否则不要追问。" +
-            "追问必须简洁、只问一个具体点，并保持与原题相同的技术方向。\n\n" + followUpOutputConverter.getFormat();
+        String systemPrompt = followUpSystemPromptTemplate.render() + "\n\n" + followUpOutputConverter.getFormat();
         String userPrompt = "原题：" + question.question() + "\n题型：" + question.type() +
             "\n候选人回答：" + answer + "\n已有追问数：" + existingFollowUpCount +
             "，最多追问数：" + maximumFollowUpCount;
@@ -379,12 +340,5 @@ public class InterviewQuestionService {
             log.warn("动态追问决策失败，将继续下一题: {}", e.getMessage());
             return Optional.empty();
         }
-    }
-
-    private String buildDefaultFollowUp(String mainQuestion, int order) {
-        if (order == 1) {
-            return "基于“" + mainQuestion + "”，请结合你亲自做过的一个真实场景展开说明。";
-        }
-        return "基于“" + mainQuestion + "”，如果线上出现异常，你会如何定位并给出修复方案？";
     }
 }

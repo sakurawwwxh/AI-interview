@@ -1,6 +1,8 @@
 package interview.guide.common.exception;
 
 import interview.guide.common.result.Result;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -127,6 +129,26 @@ public class GlobalExceptionHandler {
         return Result.error(ErrorCode.AI_SERVICE_ERROR, "AI服务调用失败，请稍后重试");
     }
     
+    /**
+     * 处理 JWT 过期异常
+     */
+    @ExceptionHandler(ExpiredJwtException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleExpiredJwtException(ExpiredJwtException e) {
+        log.debug("JWT 过期: {}", e.getMessage());
+        return Result.error(ErrorCode.TOKEN_EXPIRED);
+    }
+
+    /**
+     * 处理 JWT 无效异常
+     */
+    @ExceptionHandler(JwtException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleJwtException(JwtException e) {
+        log.debug("JWT 无效: {}", e.getMessage());
+        return Result.error(ErrorCode.TOKEN_INVALID);
+    }
+
     /**
      * 处理其他未知异常
      * 统一返回 HTTP 200，通过业务错误码区分异常类型

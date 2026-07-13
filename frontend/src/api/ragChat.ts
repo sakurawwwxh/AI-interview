@@ -1,4 +1,4 @@
-import { request, getErrorMessage } from './request';
+import { getAuthorizationHeader, request, getErrorMessage } from './request';
 
 const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:8080';
 
@@ -122,7 +122,7 @@ export const ragChatApi = {
         `${API_BASE_URL}/api/rag-chat/sessions/${sessionId}/messages/dify-stream`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthorizationHeader() },
           body: JSON.stringify({ question }),
           signal,
         }
@@ -204,7 +204,7 @@ export const ragChatApi = {
         `${API_BASE_URL}/api/rag-chat/sessions/${sessionId}/messages/stream`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthorizationHeader() },
           body: JSON.stringify({ question }),
           signal, // 支持 AbortController 中止
         }
@@ -328,7 +328,7 @@ export const ragChatApi = {
         `${API_BASE_URL}/api/dify/chat/stream`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthorizationHeader() },
           body: JSON.stringify({ query: question, conversationId: '' }),
           signal,
         }

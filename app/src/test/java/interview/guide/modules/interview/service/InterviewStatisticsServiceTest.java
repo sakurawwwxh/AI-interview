@@ -5,7 +5,12 @@ import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.model.InterviewStatisticsDTO;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
@@ -13,10 +18,25 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class InterviewStatisticsServiceTest {
+
+    @BeforeEach
+    void setUpSecurityContext() {
+        // 模拟已登录用户（userId=1L）
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(1L, "testuser", List.of()));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void aggregatesScoresTrendAndWeaknessesFromEvaluatedSessions() throws Exception {
@@ -28,7 +48,10 @@ class InterviewStatisticsServiceTest {
         InterviewSessionEntity second = session("session-2", 84, LocalDateTime.of(2026, 7, 2, 10, 0), objectMapper,
             question(0, InterviewQuestionDTO.QuestionType.JAVA_BASIC), answer(0, 90),
             question(1, InterviewQuestionDTO.QuestionType.REDIS), answer(1, 50));
-        when(repository.findEvaluatedWithAnswers()).thenReturn(List.of(first, second));
+        first.setId(1L);
+        second.setId(2L);
+        when(repository.findEvaluatedIdsByUserId(any(Long.class), any(Pageable.class))).thenReturn(List.of(1L, 2L));
+        when(repository.findEvaluatedWithAnswersByIdIn(List.of(1L, 2L))).thenReturn(List.of(second, first));
 
         InterviewStatisticsDTO statistics = new InterviewStatisticsService(repository, objectMapper).getStatistics();
 
@@ -39,12 +62,13 @@ class InterviewStatisticsServiceTest {
         assertEquals(2, statistics.abilityScores().size());
         assertEquals("Redis", statistics.weaknesses().getFirst().category());
         assertEquals(50, statistics.weaknesses().getFirst().averageScore());
+        verify(repository).findEvaluatedIdsByUserId(eq(1L), any(Pageable.class));
     }
 
     @Test
     void returnsAnEmptyDashboardWhenNoSessionHasBeenEvaluated() {
         InterviewSessionRepository repository = mock(InterviewSessionRepository.class);
-        when(repository.findEvaluatedWithAnswers()).thenReturn(List.of());
+        when(repository.findEvaluatedIdsByUserId(any(Long.class), any(Pageable.class))).thenReturn(List.of());
 
         InterviewStatisticsDTO statistics = new InterviewStatisticsService(repository, new ObjectMapper()).getStatistics();
 

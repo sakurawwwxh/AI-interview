@@ -47,6 +47,7 @@ public class InterviewSessionCache {
      */
     @Data
     public static class CachedSession implements Serializable {
+        private Long userId;
         private String sessionId;
         private String resumeText;
         private Long resumeId;
@@ -57,9 +58,10 @@ public class InterviewSessionCache {
         public CachedSession() {
         }
 
-        public CachedSession(String sessionId, String resumeText, Long resumeId,
+        public CachedSession(Long userId, String sessionId, String resumeText, Long resumeId,
                             List<InterviewQuestionDTO> questions, int currentIndex,
                             SessionStatus status, ObjectMapper objectMapper) {
+            this.userId = userId;
             this.sessionId = sessionId;
             this.resumeText = resumeText;
             this.resumeId = resumeId;
@@ -84,12 +86,12 @@ public class InterviewSessionCache {
     /**
      * 保存会话到缓存
      */
-    public void saveSession(String sessionId, String resumeText, Long resumeId,
+    public void saveSession(Long userId, String sessionId, String resumeText, Long resumeId,
                            List<InterviewQuestionDTO> questions, int currentIndex,
                            SessionStatus status) {
         String key = buildSessionKey(sessionId);
         CachedSession cachedSession = new CachedSession(
-            sessionId, resumeText, resumeId, questions, currentIndex, status, objectMapper
+            userId, sessionId, resumeText, resumeId, questions, currentIndex, status, objectMapper
         );
 
         redisService.set(key, cachedSession, SESSION_TTL);

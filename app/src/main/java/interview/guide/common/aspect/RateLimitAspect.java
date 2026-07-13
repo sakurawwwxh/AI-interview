@@ -269,35 +269,10 @@ public class RateLimitAspect {
 
     /**
      * 获取当前用户 ID
-     * 从请求属性或 Session 中获取
-     * TODO: 需要根据实际项目的认证框架进行实现，本项目未显示用户管理
+     * 从 SecurityContext（JWT 认证后写入）获取，不信任外部 X-User-Id 头
      */
     private String getCurrentUserId() {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) {
-            return "anonymous";
-        }
-
-        HttpServletRequest request = attributes.getRequest();
-
-        // 方式1: 从请求属性中获取（推荐）
-        Object userId = request.getAttribute("userId");
-        if (userId != null) {
-            return userId.toString();
-        }
-
-        // 方式2: 从请求头中获取
-        userId = request.getHeader("X-User-Id");
-        if (userId != null) {
-            return userId.toString();
-        }
-
-        // 方式3: 从 Session 中获取（如果使用 Session）
-        // userId = request.getSession().getAttribute("userId");
-
-        // 方式4: 从 JWT Token 中解析（如果使用 JWT）
-        // 需要集成具体的 JWT 工具类
-
-        return "anonymous";
+        Long userId = interview.guide.modules.user.security.UserContext.getCurrentUserId();
+        return userId != null ? userId.toString() : "anonymous";
     }
 }

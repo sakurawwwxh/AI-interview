@@ -5,6 +5,7 @@ import interview.guide.modules.dify.service.DifySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
  * 定时从 Dify 拉取变更
  */
 @Component
+@Profile("!legacy-migration")
 @Slf4j
 @RequiredArgsConstructor
 public class DifySyncScheduler {

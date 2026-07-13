@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "resumes", indexes = {
-    @Index(name = "idx_resume_hash", columnList = "fileHash", unique = true)
+    @Index(name = "idx_resume_user_hash", columnList = "userId, fileHash", unique = true)
 })
 public class ResumeEntity {
     
@@ -19,8 +19,12 @@ public class ResumeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    // 文件内容的SHA-256哈希值，用于去重
-    @Column(nullable = false, unique = true, length = 64)
+    // 所属用户 ID
+    @Column(name = "user_id")
+    private Long userId;
+    
+    // 文件内容的SHA-256哈希值，用于去重（按用户隔离）
+    @Column(nullable = false, length = 64)
     private String fileHash;
     
     // 原始文件名
@@ -78,6 +82,14 @@ public class ResumeEntity {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public Long getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
     
     public String getFileHash() {

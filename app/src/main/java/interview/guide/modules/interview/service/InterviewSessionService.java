@@ -5,9 +5,11 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.redis.InterviewSessionCache;
 import interview.guide.infrastructure.redis.InterviewSessionCache.CachedSession;
+import interview.guide.infrastructure.redis.RedisService;
 import interview.guide.modules.interview.listener.EvaluateStreamProducer;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class InterviewSessionService {
     private final InterviewSessionCache sessionCache;
     private final ObjectMapper objectMapper;
     private final EvaluateStreamProducer evaluateStreamProducer;
+    private final RedisService redisService;
 
     /**
      * 创建新的面试会话
@@ -41,6 +44,7 @@ public class InterviewSessionService {
      * 前端应该先调用 findUnfinishedSession 检查，或者使用 forceCreate 参数强制创建
      */
     public InterviewSessionDTO createSession(CreateInterviewRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 如果指定了resumeId且未强制创建，检查是否有未完成的会话
         if (request.resumeId() != null && !Boolean.TRUE.equals(request.forceCreate())) {
             Optional<InterviewSessionDTO> unfinishedOpt = findUnfinishedSession(request.resumeId());
@@ -75,6 +79,7 @@ public class InterviewSessionService {
 
         // 保存到 Redis 缓存
         sessionCache.saveSession(
+            userId,
             sessionId,
             request.resumeText(),
             request.resumeId(),
@@ -109,7 +114,7 @@ public class InterviewSessionService {
     public InterviewSessionDTO getSession(String sessionId) {
         // 1. 尝试从 Redis 缓存获取
         Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-        if (cachedOpt.isPresent()) {
+        if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             return toDTO(cachedOpt.get());
         }
 
@@ -132,7 +137,7 @@ public class InterviewSessionService {
             if (cachedSessionIdOpt.isPresent()) {
                 String sessionId = cachedSessionIdOpt.get();
                 Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-                if (cachedOpt.isPresent()) {
+                if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
                     log.debug("从 Redis 缓存找到未完成会话: resumeId={}, sessionId={}", resumeId, sessionId);
                     return Optional.of(toDTO(cachedOpt.get()));
                 }
@@ -168,7 +173,8 @@ public class InterviewSessionService {
      */
     private CachedSession restoreSessionFromDatabase(String sessionId) {
         try {
-            Optional<InterviewSessionEntity> entityOpt = persistenceService.findBySessionId(sessionId);
+            // 缓存未命中走 DB 恢复时鉴权：仅返回属于当前登录用户的会话
+            Optional<InterviewSessionEntity> entityOpt = persistenceService.findBySessionIdForCurrentUser(sessionId);
             return entityOpt.map(this::restoreSessionFromEntity).orElse(null);
         } catch (Exception e) {
             log.error("从数据库恢复会话失败: {}", e.getMessage(), e);
@@ -201,6 +207,7 @@ public class InterviewSessionService {
 
             // 保存到 Redis 缓存
             sessionCache.saveSession(
+                entity.getUserId(),
                 entity.getSessionId(),
                 entity.getResume().getResumeText(),
                 entity.getResume().getId(),
@@ -279,6 +286,21 @@ public class InterviewSessionService {
      * 如果是最后一题，自动触发异步评估
      */
     public SubmitAnswerResponse submitAnswer(SubmitAnswerRequest request) {
+        // 分布式锁防止同一会话并发提交导致 Redis 状态覆盖
+        String lockKey = "interview:session:lock:" + request.sessionId();
+        try {
+            return redisService.executeWithLock(lockKey, 3, 10, java.util.concurrent.TimeUnit.SECONDS,
+                () -> doSubmitAnswer(request));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("获取锁失败")) {
+                throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND,
+                    "操作过于频繁，请稍后重试");
+            }
+            throw e;
+        }
+    }
+
+    private SubmitAnswerResponse doSubmitAnswer(SubmitAnswerRequest request) {
         CachedSession session = getOrRestoreSession(request.sessionId());
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -324,6 +346,11 @@ public class InterviewSessionService {
                 newStatus == SessionStatus.COMPLETED
                     ? InterviewSessionEntity.SessionStatus.COMPLETED
                     : InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+
+            // 动态追问生成后回写 questionsJson，保证异步评估能读到追问
+            if (dynamicFollowUp.isPresent()) {
+                persistenceService.updateQuestionsJson(request.sessionId(), questions);
+            }
 
             // 如果是最后一题，设置评估状态为 PENDING 并触发异步评估
             if (!hasNextQuestion) {
@@ -469,7 +496,7 @@ public class InterviewSessionService {
     private CachedSession getOrRestoreSession(String sessionId) {
         // 1. 尝试从 Redis 缓存获取
         Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-        if (cachedOpt.isPresent()) {
+        if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             // 刷新 TTL
             sessionCache.refreshSessionTTL(sessionId);
             return cachedOpt.get();
@@ -482,6 +509,11 @@ public class InterviewSessionService {
         }
 
         return restoredSession;
+    }
+
+    private boolean belongsToCurrentUser(CachedSession session) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return userId.equals(session.getUserId());
     }
 
     /**
