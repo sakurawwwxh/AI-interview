@@ -1,20 +1,24 @@
 # Input Data
 
-请根据以下候选人简历内容生成 {questionCount} 个主问题。追问会在候选人作答后动态生成，本次不要预先生成追问。
+Generate exactly {questionCount} main interview questions from the candidate resume. Do not pre-generate follow-up questions; follow-ups are created dynamically after an answer.
 
-## 本次题型分配
+## Question plan
 {questionPlan}
 
-## 本次难度分布
+## Difficulty distribution
 {difficultyDistribution}
 
-## 候选人简历
----简历内容开始---
-{resumeText}
----简历内容结束---
+## Target role and job description
+{targetJob}
+Prioritize the role responsibilities, required skills, and resume evidence relevant to this JD. Use other resume information only as supplementary assessment.
 
-## 历史提问记录
-以下问题已经出现过。除非从不同维度深挖同一主题，否则请避免重复：
----历史提问开始---
+## Candidate resume
+--- resume starts ---
+{resumeText}
+--- resume ends ---
+
+## Previous questions
+Avoid repeating the following questions unless exploring a clearly different dimension.
+--- history starts ---
 {historicalQuestions}
----历史提问结束---
+--- history ends ---

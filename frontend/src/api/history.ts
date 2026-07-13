@@ -88,6 +88,16 @@ export interface InterviewDetail extends InterviewItem {
   answers: AnswerItem[];
 }
 
+export interface ResumeVersion {
+  id: number | null;
+  versionNumber: number;
+  title: string;
+  content: string;
+  source: string;
+  createdAt: string;
+  current: boolean;
+}
+
 export interface InterviewCategoryStatistic {
   category: string;
   averageScore: number;
@@ -187,5 +197,17 @@ export const historyApi = {
    */
   async reanalyze(id: number): Promise<void> {
     return request.post(`/api/resumes/${id}/reanalyze`);
+  },
+
+  async getVersions(id: number): Promise<ResumeVersion[]> {
+    return request.get<ResumeVersion[]>(`/api/resumes/${id}/versions`);
+  },
+
+  async updateContent(id: number, title: string, content: string): Promise<ResumeVersion> {
+    return request.put<ResumeVersion>(`/api/resumes/${id}/content`, { title, content });
+  },
+
+  async restoreVersion(id: number, versionId: number): Promise<ResumeVersion> {
+    return request.post<ResumeVersion>(`/api/resumes/${id}/versions/${versionId}/restore`);
   },
 };

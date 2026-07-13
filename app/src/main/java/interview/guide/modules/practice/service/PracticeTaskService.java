@@ -58,9 +58,10 @@ public class PracticeTaskService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PracticeDTO.TaskPage listTasks(PracticeTaskStatus status, String category, int page, int size) {
         Long userId = UserContext.getCurrentUserIdOrThrow();
+        releaseDueReviews(userId);
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
             Sort.by(Sort.Direction.DESC, "createdAt"));
         String normalizedCategory = category == null || category.isBlank() ? null : category.trim();
@@ -87,7 +88,7 @@ public class PracticeTaskService {
         return new PracticeDTO.TaskDetail(task.getId(), task.getStatus(), task.getQuestion(), task.getCategory(),
             task.getOriginalAnswer(), valueOrZero(task.getOriginalScore()), task.getOriginalFeedback(),
             task.getReferenceAnswer(), parseKeyPoints(task.getKeyPointsJson()), task.getLastScore(), improvement(task),
-            valueOrZero(task.getAttemptCount()), attempts);
+            valueOrZero(task.getAttemptCount()), task.getNextReviewAt(), task.getReviewIntervalDays(), attempts);
     }
 
     @Transactional
@@ -110,9 +111,14 @@ public class PracticeTaskService {
         if (evaluation.score() >= PRACTICE_THRESHOLD) {
             task.setStatus(PracticeTaskStatus.COMPLETED);
             task.setCompletedAt(LocalDateTime.now());
+            int interval = reviewIntervalFor(evaluation.score());
+            task.setReviewIntervalDays(interval);
+            task.setNextReviewAt(LocalDateTime.now().plusDays(interval));
         } else {
             task.setStatus(PracticeTaskStatus.TODO);
             task.setCompletedAt(null);
+            task.setReviewIntervalDays(0);
+            task.setNextReviewAt(LocalDateTime.now());
         }
         taskRepository.save(task);
         return new PracticeDTO.SubmitAttemptResponse(toAttemptItem(attempt), task.getStatus(), improvement(task));
@@ -132,9 +138,10 @@ public class PracticeTaskService {
         return toTaskItem(taskRepository.save(task));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PracticeDTO.Summary getSummary() {
         Long userId = UserContext.getCurrentUserIdOrThrow();
+        releaseDueReviews(userId);
         LocalDateTime weekStart = LocalDateTime.now().with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
             .toLocalDate().atStartOfDay();
         Double average = taskRepository.averageImprovementByUserId(userId, PracticeTaskStatus.COMPLETED);
@@ -156,7 +163,7 @@ public class PracticeTaskService {
     private PracticeDTO.TaskItem toTaskItem(PracticeTaskEntity task) {
         return new PracticeDTO.TaskItem(task.getId(), task.getStatus(), task.getQuestion(), task.getCategory(),
             valueOrZero(task.getOriginalScore()), task.getLastScore(), improvement(task), valueOrZero(task.getAttemptCount()),
-            task.getCreatedAt(), task.getLastPracticedAt());
+            task.getCreatedAt(), task.getLastPracticedAt(), task.getNextReviewAt(), task.getReviewIntervalDays());
     }
 
     private PracticeDTO.AttemptItem toAttemptItem(PracticeAttemptEntity attempt) {
@@ -171,6 +178,22 @@ public class PracticeTaskService {
 
     private int valueOrZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private int reviewIntervalFor(int score) {
+        if (score < 75) return 1;
+        if (score < 90) return 3;
+        return 7;
+    }
+
+    private void releaseDueReviews(Long userId) {
+        List<PracticeTaskEntity> due = taskRepository.findByUserIdAndStatusAndNextReviewAtLessThanEqual(
+            userId, PracticeTaskStatus.COMPLETED, LocalDateTime.now());
+        for (PracticeTaskEntity task : due) {
+            task.setStatus(PracticeTaskStatus.TODO);
+            task.setCompletedAt(null);
+        }
+        if (!due.isEmpty()) taskRepository.saveAll(due);
     }
 
     private List<String> parseKeyPoints(String json) {

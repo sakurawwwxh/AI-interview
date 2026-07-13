@@ -22,6 +22,7 @@ const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
+const JobTargetsPage = lazy(() => import('./pages/JobTargetsPage'));
 
 // Loading component
 const Loading = () => (
@@ -191,6 +192,7 @@ function App() {
 
             <Route path="practice" element={<PracticeCenterPage />} />
             <Route path="practice/:taskId" element={<PracticeSessionPage />} />
+            <Route path="job-targets" element={<JobTargetsPage />} />
 
             {/* 模拟面试 */}
             <Route path="interview/:resumeId" element={<InterviewWrapper />} />

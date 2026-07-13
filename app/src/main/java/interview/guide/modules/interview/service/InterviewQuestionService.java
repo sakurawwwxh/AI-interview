@@ -96,6 +96,15 @@ public class InterviewQuestionService {
             int questionCount,
             List<String> historicalQuestions,
             InterviewTemplateConfig template) {
+        return generateQuestions(resumeText, questionCount, historicalQuestions, template, null);
+    }
+
+    public List<InterviewQuestionDTO> generateQuestions(
+            String resumeText,
+            int questionCount,
+            List<String> historicalQuestions,
+            InterviewTemplateConfig template,
+            String targetJob) {
         log.info("开始生成面试问题，简历长度: {}, 问题数量: {}, 历史问题数: {}", 
             resumeText.length(), questionCount, historicalQuestions != null ? historicalQuestions.size() : 0);
         
@@ -113,6 +122,8 @@ public class InterviewQuestionService {
             variables.put("difficultyDistribution", difficultyText(normalizedTemplate.difficultyDistribution()));
             variables.put("followUpCount", normalizedTemplate.followUpCount());
             variables.put("resumeText", resumeText);
+            variables.put("targetJob", targetJob == null || targetJob.isBlank()
+                ? "未指定岗位目标；请基于简历进行综合面试。" : targetJob);
             
             // 添加历史问题
             if (historicalQuestions != null && !historicalQuestions.isEmpty()) {

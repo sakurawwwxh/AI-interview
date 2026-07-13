@@ -66,6 +66,8 @@ public class PracticeTaskEntity {
     private LocalDateTime lastPracticedAt;
     private LocalDateTime completedAt;
     private LocalDateTime ignoredAt;
+    private LocalDateTime nextReviewAt;
+    private Integer reviewIntervalDays;
 
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PracticeAttemptEntity> attempts = new ArrayList<>();
@@ -110,6 +112,10 @@ public class PracticeTaskEntity {
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
     public LocalDateTime getIgnoredAt() { return ignoredAt; }
     public void setIgnoredAt(LocalDateTime ignoredAt) { this.ignoredAt = ignoredAt; }
+    public LocalDateTime getNextReviewAt() { return nextReviewAt; }
+    public void setNextReviewAt(LocalDateTime nextReviewAt) { this.nextReviewAt = nextReviewAt; }
+    public Integer getReviewIntervalDays() { return reviewIntervalDays; }
+    public void setReviewIntervalDays(Integer reviewIntervalDays) { this.reviewIntervalDays = reviewIntervalDays; }
     public List<PracticeAttemptEntity> getAttempts() { return attempts; }
     public void addAttempt(PracticeAttemptEntity attempt) { attempts.add(attempt); attempt.setTask(this); }
 }

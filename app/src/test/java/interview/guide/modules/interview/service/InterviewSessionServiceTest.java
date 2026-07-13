@@ -10,6 +10,7 @@ import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.SubmitAnswerRequest;
 import interview.guide.modules.interview.model.SubmitAnswerResponse;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
+import interview.guide.modules.target.service.JobTargetService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,10 +37,11 @@ class InterviewSessionServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final EvaluateStreamProducer evaluateStreamProducer = mock(EvaluateStreamProducer.class);
     private final RedisService redisService = mock(RedisService.class);
+    private final JobTargetService jobTargetService = mock(JobTargetService.class);
 
     private final InterviewSessionService service = new InterviewSessionService(
         questionService, evaluationService, persistenceService,
-        sessionCache, objectMapper, evaluateStreamProducer, redisService);
+        sessionCache, objectMapper, evaluateStreamProducer, redisService, jobTargetService);
 
     private static final String SESSION_ID = "test-session-123";
     private static final String LOCK_KEY = "interview:session:lock:" + SESSION_ID;

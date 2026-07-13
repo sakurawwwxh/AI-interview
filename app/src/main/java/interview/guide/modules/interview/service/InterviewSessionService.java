@@ -10,6 +10,7 @@ import interview.guide.modules.interview.listener.EvaluateStreamProducer;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
 import interview.guide.modules.user.security.UserContext;
+import interview.guide.modules.target.service.JobTargetService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class InterviewSessionService {
     private final ObjectMapper objectMapper;
     private final EvaluateStreamProducer evaluateStreamProducer;
     private final RedisService redisService;
+    private final JobTargetService jobTargetService;
 
     /**
      * 创建新的面试会话
@@ -70,11 +72,17 @@ public class InterviewSessionService {
         }
 
         // 生成面试问题
+        String targetJob = null;
+        if (request.jobTargetId() != null) {
+            var target = jobTargetService.getOwned(request.jobTargetId());
+            targetJob = "岗位：" + target.getTitle() + "\nJD：\n" + target.getJobDescription();
+        }
         List<InterviewQuestionDTO> questions = questionService.generateQuestions(
             request.resumeText(),
             request.questionCount(),
             historicalQuestions,
-            template
+            template,
+            targetJob
         );
 
         // 保存到 Redis 缓存

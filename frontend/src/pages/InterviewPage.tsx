@@ -7,6 +7,7 @@ import InterviewChatPanel from '../components/InterviewChatPanel';
 import type {InterviewQuestion, InterviewSession} from '../types/interview';
 import type {InterviewTemplateConfig} from '../types/interview';
 import {interviewTemplates} from '../constants/interviewTemplates';
+import {jobTargetApi, type JobTarget} from '../api/jobTarget';
 
 type InterviewStage = 'config' | 'interview';
 
@@ -39,6 +40,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [unfinishedSession, setUnfinishedSession] = useState<InterviewSession | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [forceCreateNew, setForceCreateNew] = useState(false);
+  const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
+  const [jobTargetId, setJobTargetId] = useState<number | undefined>();
   const questionStartedAtRef = useRef(performance.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
@@ -74,6 +77,13 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId]);
+
+  useEffect(() => {
+    jobTargetApi.list().then(items => {
+      setJobTargets(items);
+      setJobTargetId(items.find(item => item.active)?.id);
+    }).catch(() => {});
+  }, []);
 
   const checkUnfinishedSession = async () => {
     if (!resumeId) return;
@@ -171,6 +181,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         resumeId,
         forceCreate: forceCreateNew,
         template,
+        jobTargetId,
       });
 
             // 重置强制创建标志
@@ -297,6 +308,9 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         resumeText={resumeText}
         onBack={onBack}
         error={error}
+        jobTargets={jobTargets}
+        jobTargetId={jobTargetId}
+        onJobTargetChange={setJobTargetId}
       />
     );
   };
