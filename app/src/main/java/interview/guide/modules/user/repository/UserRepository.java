@@ -1,6 +1,9 @@
 package interview.guide.modules.user.repository;
 
 import interview.guide.modules.user.model.UserEntity;
+import interview.guide.modules.user.model.UserRole;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -19,4 +22,8 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     boolean existsByEmail(String email);
 
     boolean existsByEmailAndIdNot(String email, Long id);
+
+    Page<UserEntity> findByUsernameContainingIgnoreCase(String keyword, Pageable pageable);
+
+    long countByRole(UserRole role);
 }

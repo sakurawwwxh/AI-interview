@@ -18,6 +18,7 @@ const InterviewStatisticsPage = lazy(() => import('./pages/InterviewStatisticsPa
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const PracticeCenterPage = lazy(() => import('./pages/PracticeCenterPage'));
 const PracticeSessionPage = lazy(() => import('./pages/PracticeSessionPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
@@ -185,6 +186,8 @@ function App() {
             <Route path="interview-statistics" element={<InterviewStatisticsPage />} />
 
             <Route path="profile" element={<ProfilePage />} />
+
+            <Route path="admin/users" element={<AdminUsersPage />} />
 
             <Route path="practice" element={<PracticeCenterPage />} />
             <Route path="practice/:taskId" element={<PracticeSessionPage />} />
