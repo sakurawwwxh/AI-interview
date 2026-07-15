@@ -1,0 +1,64 @@
+# Production-only safeguards. Local development continues to use application.yml unchanged.
+spring:
+  config:
+    activate:
+      on-profile: production
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          address: "${REDIS_ADDRESS}"
+          database: ${REDIS_DATABASE:0}
+  ai:
+    openai:
+      api-key: ${DASHSCOPE_API_KEY}
+
+server:
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+  storage:
+    endpoint: ${APP_STORAGE_ENDPOINT}
+    access-key: ${APP_STORAGE_ACCESS_KEY}
+    secret-key: ${APP_STORAGE_SECRET_KEY}
+    bucket: ${APP_STORAGE_BUCKET}
+    region: ${APP_STORAGE_REGION:us-east-1}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    environment: production
