@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, CheckCircle2, Sparkles, UserPlus } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Sparkles, UserPlus } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../stores/authStore';
 
@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const login = useAuthStore((s) => s.login);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ export default function RegisterPage() {
   };
 
   const fieldClass =
-    'w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15';
+    'w-full min-h-11 rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15';
 
   return (
     <main className="auth-mesh relative min-h-screen overflow-hidden px-4 py-8 text-white sm:px-6 lg:px-8">
@@ -107,17 +108,43 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label htmlFor="register-password" className="mb-1.5 block text-sm font-medium text-slate-200">密码</label>
-                <input id="register-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="6–32 个字符" className={fieldClass} disabled={loading} minLength={6} maxLength={32} required />
+                <div className="relative">
+                  <input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="6–32 个字符"
+                    className={`${fieldClass} pr-12`}
+                    disabled={loading}
+                    minLength={6}
+                    maxLength={32}
+                    required
+                    aria-describedby="register-password-hint"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-1.5 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+                    aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+                  </button>
+                </div>
+                <p id="register-password-hint" className="mt-1.5 text-xs text-slate-500">长度 6–32 个字符</p>
               </div>
               <div>
                 <label htmlFor="register-email" className="mb-1.5 block text-sm font-medium text-slate-200">邮箱</label>
                 <input id="register-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="请输入邮箱" className={fieldClass} disabled={loading} required />
               </div>
-              {error && <div role="alert" className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">{error}</div>}
+              {error && <div role="alert" aria-live="assertive" className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">{error}</div>}
               <motion.button
                 type="submit"
                 disabled={loading || !username.trim() || !password.trim() || !email.trim()}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-700 px-4 py-3.5 font-semibold text-white shadow-lg shadow-teal-700/30 transition hover:from-teal-400 hover:via-teal-500 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-busy={loading}
+                className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-700 px-4 py-3.5 font-semibold text-white shadow-lg shadow-teal-700/30 transition duration-200 hover:from-teal-400 hover:via-teal-500 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
               >

@@ -14,8 +14,9 @@
   --shell-panel: #fffcf7;
   --shell-border: rgb(28 36 34 / 0.1);
   --shell-text: #141a18;
-  --shell-muted: #5c6864;
-  --shell-subtle: #8a9591;
+  /* 次要文案加深，提升浅色模式对比度（≥3:1 / 正文区更清晰） */
+  --shell-muted: #4a5652;
+  --shell-subtle: #6b7873;
   --shell-hover: rgb(20 40 36 / 0.045);
   --shell-active: rgb(13 148 136 / 0.1);
   --accent: #0f766e;
@@ -70,10 +71,15 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   html,
   body,
   #root {
     min-height: 100%;
+    min-height: 100dvh;
     margin: 0;
   }
 
@@ -81,9 +87,30 @@
     background: var(--shell-bg);
     color: var(--shell-text);
     font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
     font-feature-settings: "ss01" on, "kern" on;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* 减少移动端 300ms 点击延迟 */
+    touch-action: manipulation;
+  }
+
+  /* 可点击元素统一指针，避免「看起来可点但光标是箭头」 */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
   }
 
   /* 纸张颗粒 + 微弱斜向纸纹 */
@@ -135,9 +162,35 @@
     font-optical-sizing: auto;
   }
 
-  /* 焦点可见性 */
+  /* 键盘焦点环：不因 outline-none 静默消失 */
+  :focus {
+    outline: none;
+  }
+
   :focus-visible {
-    outline: 2px solid rgb(20 184 166 / 0.55);
+    outline: 2px solid rgb(20 184 166 / 0.65);
+    outline-offset: 2px;
+  }
+
+  /* 跳过导航：仅键盘聚焦时出现 */
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -100%;
+    z-index: 100;
+    border-radius: 0.75rem;
+    background: #0f766e;
+    color: #fff;
+    padding: 0.65rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: var(--surface-float);
+    transition: top 0.15s ease;
+  }
+
+  .skip-link:focus {
+    top: 1rem;
+    outline: 2px solid #5eead4;
     outline-offset: 2px;
   }
 }
@@ -190,11 +243,16 @@
   }
 
   .ui-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-800/20 transition hover:from-teal-400 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-400/40 disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-800/20 transition duration-200 hover:from-teal-400 hover:to-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:cursor-not-allowed disabled:opacity-55;
   }
 
   .ui-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)];
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)];
+  }
+
+  /* 图标按钮最小触控 44×44 */
+  .ui-icon-btn {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40;
   }
 
   .ui-input {
@@ -240,6 +298,19 @@
 }
 
 @layer utilities {
+  /* 仅读屏可见 */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -308,10 +379,22 @@
   }
 }
 
-/* 减少动效偏好 */
+/* 减少动效偏好：尊重系统设置 */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .reveal-up,
   .reveal-fade {
-    animation: none;
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

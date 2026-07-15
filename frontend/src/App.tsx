@@ -25,10 +25,11 @@ const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePa
 const JobTargetsPage = lazy(() => import('./pages/JobTargetsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 
-// Loading component
+// 路由懒加载占位：可被读屏识别
 const Loading = () => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <div className="w-10 h-10 border-3 border-slate-200 border-t-primary-500 rounded-full animate-spin" />
+  <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite" aria-busy="true">
+    <div className="h-10 w-10 animate-spin rounded-full border-3 border-slate-200 border-t-primary-500" aria-hidden />
+    <span className="sr-only">页面加载中</span>
   </div>
 );
 
