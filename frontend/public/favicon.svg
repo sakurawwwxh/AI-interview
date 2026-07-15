@@ -1,20 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- 背景圆形 -->
-  <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
-
-  <!-- 人物图标 -->
-  <circle cx="16" cy="11" r="4" fill="white"/>
-  <path d="M9 23c0-3.866 3.134-7 7-7s7 3.134 7 7" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-
-  <!-- AI 星星装饰 -->
-  <path d="M24 6l0.5 1.5L26 8l-1.5 0.5L24 10l-0.5-1.5L22 8l1.5-0.5L24 6z" fill="#fbbf24"/>
-  <path d="M7 8l0.3 0.9L8 9.2l-0.7 0.3L7 10.4l-0.3-0.9L6 9.2l0.7-0.3L7 8z" fill="#fbbf24"/>
-
-  <!-- 渐变定义 -->
+  <rect width="32" height="32" rx="9" fill="url(#bg)"/>
+  <!-- 抽象麦克风 / 信号波 -->
+  <rect x="13.5" y="7" width="5" height="11" rx="2.5" fill="white"/>
+  <path d="M10 15.5a6 6 0 0 0 12 0" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M16 21.5v3.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M12.5 25h7" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="24.5" cy="8.5" r="2" fill="#5eead4" opacity="0.95"/>
   <defs>
-    <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
+    <linearGradient id="bg" x1="4" y1="2" x2="28" y2="30">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#134e4a"/>
     </linearGradient>
   </defs>
 </svg>

@@ -42,27 +42,34 @@ export default function RegisterPage() {
 
   return (
     <main className="auth-mesh relative min-h-screen overflow-hidden px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)', backgroundSize: '22px 22px' }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{ backgroundImage: 'repeating-linear-gradient(-18deg, transparent, transparent 40px, rgba(94,234,212,0.5) 40px, rgba(94,234,212,0.5) 41px)' }}
+      />
       <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
         <section className="hidden lg:block">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
-            <div className="inline-flex items-center gap-2 rounded-full border border-teal-300/20 bg-teal-400/10 px-3.5 py-1.5 text-sm font-medium text-teal-100">
-              <Sparkles className="h-4 w-4" />
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-teal-300/25 bg-teal-400/10 px-3.5 py-1.5 text-sm font-medium text-teal-100">
+              <Sparkles className="h-4 w-4 text-amber-200" />
               从准备到进步的训练空间
             </div>
-            <h1 className="mt-7 max-w-xl text-5xl font-bold leading-[1.1] tracking-tight">
+            <h1 className="font-display mt-8 max-w-xl text-[3.25rem] font-semibold leading-[1.08] tracking-[-0.03em]">
               从第一份简历开始，
-              <span className="mt-1 block text-gradient-accent">让准备更有方向。</span>
+              <span className="mt-2 block text-gradient-accent">让准备更有方向。</span>
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-8 text-slate-300/95">
               创建账号后，就可以把目标岗位、模拟面试和能力提升放在同一个成长档案里。
             </p>
-            <div className="mt-10 rounded-3xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-md">
-              <p className="text-sm font-semibold text-white">注册后即可开始</p>
+            <div className="mt-10 rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 backdrop-blur-md">
+              <p className="text-sm font-semibold tracking-tight text-white">注册后即可开始</p>
               <ol className="mt-5 space-y-4 text-sm text-slate-300">
                 {['上传简历并获得 AI 分析', '开始与目标岗位匹配的模拟面试', '通过错题复练持续提升'].map((text, i) => (
                   <li key={text} className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-400/15 text-xs font-bold text-teal-100">
+                    <span className="font-display flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-400/15 text-xs font-bold text-teal-100">
                       {i + 1}
                     </span>
                     {text}
@@ -70,7 +77,7 @@ export default function RegisterPage() {
                 ))}
               </ol>
             </div>
-            <ul className="mt-8 space-y-3 text-sm text-slate-300">
+            <ul className="mt-8 space-y-3.5 text-sm text-slate-300">
               {accountHighlights.map((item) => (
                 <li key={item} className="flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-300" />
@@ -81,14 +88,16 @@ export default function RegisterPage() {
           </motion.div>
         </section>
 
-        <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.06 }} className="w-full">
-          <div className="glass-card p-6 sm:p-8">
+        <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }} className="w-full">
+          <div className="glass-card relative overflow-hidden p-6 sm:p-8">
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-teal-300/50 to-transparent" />
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-teal-700 shadow-lg shadow-teal-500/30">
+              <div className="relative mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 via-teal-600 to-teal-900 shadow-lg shadow-teal-500/30">
                 <UserPlus className="h-7 w-7 text-white" />
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-[#0c1412]" />
               </div>
-              <p className="text-sm font-medium text-teal-200/90">开始你的训练</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">创建面试训练账号</h2>
+              <p className="text-sm font-medium tracking-wide text-teal-200/90">开始你的训练</p>
+              <h2 className="font-display mt-1.5 text-2xl font-semibold tracking-tight text-white">创建面试训练账号</h2>
               <p className="mt-2 text-sm text-slate-400">填写基础信息，马上开始准备</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -108,7 +117,7 @@ export default function RegisterPage() {
               <motion.button
                 type="submit"
                 disabled={loading || !username.trim() || !password.trim() || !email.trim()}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 px-4 py-3 font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:from-teal-400 hover:to-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-700 px-4 py-3.5 font-semibold text-white shadow-lg shadow-teal-700/30 transition hover:from-teal-400 hover:via-teal-500 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
               >

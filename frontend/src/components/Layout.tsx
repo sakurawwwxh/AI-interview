@@ -77,17 +77,15 @@ export default function Layout() {
 
   return (
     <div className="relative min-h-screen bg-[var(--shell-bg)] text-[var(--shell-text)] transition-colors duration-300">
-      {/* 氛围光晕 */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-0 overflow-hidden"
-      >
-        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl dark:bg-teal-400/8" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-400/8 blur-3xl dark:bg-cyan-500/6" />
+      {/* 双色氛围：青绿信号 + 琥珀暖光 */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
+        <div className="absolute -left-28 -top-16 h-80 w-80 rounded-full bg-teal-500/[0.09] blur-3xl dark:bg-teal-400/[0.07]" />
+        <div className="absolute -bottom-20 right-0 h-96 w-96 rounded-full bg-amber-500/[0.06] blur-3xl dark:bg-amber-400/[0.04]" />
+        <div className="absolute left-1/3 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-cyan-400/[0.04] blur-3xl dark:bg-cyan-400/[0.03]" />
       </div>
 
       <div
-        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] transition-opacity lg:hidden ${mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        className={`fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[3px] transition-opacity lg:hidden ${mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         onClick={() => setMobileNavOpen(false)}
         aria-hidden="true"
       />
@@ -101,15 +99,20 @@ export default function Layout() {
         <Menu className="h-5 w-5" />
       </button>
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[17.5rem] flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)]/95 shadow-[var(--surface-elevated)] backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex h-[4.75rem] items-center justify-between border-b border-[var(--shell-border)] px-5">
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[17.5rem] flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)]/92 shadow-[var(--surface-elevated)] backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* 品牌区：卷首式 */}
+        <div className="relative flex h-[5rem] items-center justify-between border-b border-[var(--shell-border)] px-5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-teal-500/30 to-transparent" />
           <Link to="/" className="group flex items-center gap-3" onClick={() => setMobileNavOpen(false)}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-teal-700 text-white shadow-lg shadow-teal-600/25 transition group-hover:scale-[1.03]">
-              <BrainCircuit className="h-4 w-4" />
+            <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 via-teal-600 to-teal-900 text-white shadow-lg shadow-teal-700/30 transition group-hover:scale-[1.04] group-hover:shadow-teal-600/40">
+              <BrainCircuit className="h-4.5 w-4.5 h-[1.1rem] w-[1.1rem]" />
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-[var(--shell-panel)]" />
             </span>
             <div className="leading-tight">
-              <span className="block text-sm font-semibold tracking-tight">面试训练</span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--shell-subtle)]">Studio</span>
+              <span className="font-display block text-[15px] font-semibold tracking-tight">面试训练</span>
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--shell-subtle)]">
+                Studio
+              </span>
             </div>
           </Link>
           <button type="button" onClick={() => setMobileNavOpen(false)} className="rounded-lg p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] lg:hidden" aria-label="关闭导航">
@@ -120,8 +123,10 @@ export default function Layout() {
         <nav className="flex-1 overflow-y-auto px-3 py-5 scrollbar-thin">
           {navGroups.map((group, index) => (
             <section key={group.id} className={index === 0 ? '' : 'mt-6 border-t border-[var(--shell-border)] pt-5'}>
-              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtle)]">{group.title}</p>
-              <div className="space-y-1">
+              <p className="px-3 pb-2.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--shell-subtle)]">
+                {group.title}
+              </p>
+              <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const active = isActive(item.path);
                   return (
@@ -129,16 +134,16 @@ export default function Layout() {
                       key={item.id}
                       to={item.path}
                       onClick={() => setMobileNavOpen(false)}
-                      className={`group relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm transition ${
+                      className={`group relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] transition ${
                         active
                           ? 'bg-[var(--shell-active)] font-medium text-[var(--shell-text)] shadow-sm'
                           : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
                       }`}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-teal-500" />
+                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-teal-400 to-teal-700" />
                       )}
-                      <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-teal-600 dark:text-teal-400' : 'text-[var(--shell-subtle)] group-hover:text-[var(--shell-text)]'}`} />
+                      <item.icon className={`h-4 w-4 shrink-0 transition ${active ? 'text-teal-600 dark:text-teal-400' : 'text-[var(--shell-subtle)] group-hover:text-[var(--shell-text)]'}`} />
                       <span>{item.label}</span>
                     </Link>
                   );
@@ -150,21 +155,21 @@ export default function Layout() {
 
         <div className="border-t border-[var(--shell-border)] px-4 py-4">
           {usage && (
-            <div className="mb-4 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-hover)]/60 px-3 py-2.5">
-              <div className="mb-1.5 flex items-center justify-between text-[11px] text-[var(--shell-muted)]">
-                <span>今日 AI 用量</span>
-                <span className="tabular-nums font-medium text-[var(--shell-text)]">{usagePercent}%</span>
+            <div className="mb-4 rounded-2xl border border-[var(--shell-border)] bg-[var(--shell-hover)]/70 px-3.5 py-3">
+              <div className="mb-2 flex items-center justify-between text-[11px] text-[var(--shell-muted)]">
+                <span className="tracking-wide">今日 AI 用量</span>
+                <span className="tabular-nums font-semibold text-[var(--shell-text)]">{usagePercent}%</span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[var(--shell-border)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-teal-600 via-teal-400 to-amber-400 transition-all duration-700"
                   style={{ width: `${usagePercent}%` }}
                 />
               </div>
             </div>
           )}
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/10 text-xs font-bold text-teal-700 ring-1 ring-teal-500/20 dark:text-teal-300">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-500/25 to-amber-500/10 font-display text-sm font-bold text-teal-800 ring-1 ring-teal-500/25 dark:text-teal-200">
               {(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}
             </span>
             <Link to="/profile" className="min-w-0 flex-1" onClick={() => setMobileNavOpen(false)}>
@@ -192,12 +197,12 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="relative min-h-screen min-w-0 px-4 pb-12 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-10 lg:pb-16 lg:pt-10 xl:px-14">
+      <main className="relative min-h-screen min-w-0 px-4 pb-14 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-10 lg:pb-16 lg:pt-10 xl:px-14">
         <motion.div
           key={location.pathname}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         >
           <Outlet />
         </motion.div>

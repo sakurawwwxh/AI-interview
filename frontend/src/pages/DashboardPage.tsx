@@ -29,12 +29,18 @@ export default function DashboardPage() {
   const hasPractice = (practiceSummary?.todoCount ?? 0) > 0;
   const greeting = user?.displayName || user?.username || '同学';
   const muted = 'text-[var(--shell-muted)]';
+  const todayLabel = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
 
   return (
     <div className="mx-auto max-w-[1280px]">
-      <header className="ui-panel flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className={`flex flex-wrap items-center gap-2 text-sm ${muted}`}>
-          <span className="rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-medium text-teal-700 dark:text-teal-300">今日</span>
+      {/* 卷首栏 */}
+      <header className="ui-panel reveal-up flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className={`flex flex-wrap items-center gap-2.5 text-sm ${muted}`}>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-teal-800 dark:text-teal-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
+            {todayLabel}
+          </span>
+          <span className="text-[var(--shell-subtle)]">·</span>
           <span>目标岗位</span>
           <span className="font-semibold text-[var(--shell-text)]">{growthPlan?.targetRole || '尚未设置'}</span>
           <span className="hidden text-[var(--shell-subtle)] sm:inline">·</span>
@@ -46,31 +52,39 @@ export default function DashboardPage() {
       </header>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="ui-panel overflow-hidden px-6 py-10 sm:px-10">
-          <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">今日训练</p>
-          <h1 className="mt-4 max-w-3xl text-[2.15rem] font-semibold leading-[1.15] tracking-[-0.04em] text-[var(--shell-text)] sm:text-5xl">
+        {/* 主刊：今日一件事 */}
+        <section className="ui-panel-signal reveal-up delay-1 overflow-hidden px-6 py-10 sm:px-10">
+          <p className="page-kicker">今日训练 · Briefing</p>
+          <h1 className="page-title mt-4 max-w-3xl">
             今天，专注准备
-            <span className="bg-gradient-to-r from-teal-600 to-cyan-500 bg-clip-text text-transparent dark:from-teal-300 dark:to-cyan-300">一件事。</span>
+            <span className="text-gradient-ink"> 一件事。</span>
           </h1>
           <p className={`mt-5 max-w-2xl text-[15px] leading-7 ${muted}`}>
             不必一次做完所有准备。让目标岗位、每一次回答和每一次复盘，形成清晰的前进路径。
           </p>
 
-          <div className="mt-10 overflow-hidden rounded-2xl border border-[var(--shell-border)]">
-            {steps.map((step) => (
+          <div className="mt-10 overflow-hidden rounded-2xl border border-[var(--shell-border)] bg-[var(--shell-hover)]/30">
+            {steps.map((step, index) => (
               <Link
                 key={step.order}
                 to={step.link}
                 className={`group grid grid-cols-[3.5rem_minmax(0,1fr)_auto] gap-3 border-b border-[var(--shell-border)] px-4 py-5 transition last:border-b-0 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:gap-6 sm:px-6 ${
-                  step.status === 'current' ? 'bg-teal-500/[0.06]' : 'hover:bg-[var(--shell-hover)]'
+                  step.status === 'current'
+                    ? 'bg-teal-500/[0.07] dark:bg-teal-400/[0.06]'
+                    : 'hover:bg-[var(--shell-hover)]'
                 }`}
+                style={{ animationDelay: `${120 + index * 50}ms` }}
               >
-                <span className={`pt-0.5 text-sm font-semibold tabular-nums ${step.status === 'current' ? 'text-teal-600 dark:text-teal-400' : 'text-[var(--shell-subtle)]'}`}>
+                <span
+                  className={`font-display pt-0.5 text-base font-semibold tabular-nums tracking-tight ${
+                    step.status === 'current' ? 'text-teal-700 dark:text-teal-400' : 'text-[var(--shell-subtle)]'
+                  }`}
+                >
                   {step.order}
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-semibold text-[var(--shell-text)]">{step.title}</h2>
+                    <h2 className="text-base font-semibold tracking-tight text-[var(--shell-text)]">{step.title}</h2>
                     {step.status === 'done' && <Check className="h-4 w-4 text-emerald-500" />}
                     {step.status === 'current' && <CircleDotDashed className="h-4 w-4 text-teal-500" />}
                   </div>
@@ -91,11 +105,13 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* 侧栏：教练随笔 */}
         <aside className="flex flex-col gap-4">
-          <div className="ui-panel relative overflow-hidden p-6">
-            <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-teal-400/15 blur-2xl" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--shell-subtle)]">AI 教练随笔</p>
-            <blockquote className="mt-4 text-xl font-semibold leading-9 tracking-[-0.02em] text-[var(--shell-text)]">
+          <div className="ui-panel reveal-up delay-2 relative overflow-hidden p-6">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-teal-400/15 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-8 left-8 h-24 w-24 rounded-full bg-amber-400/10 blur-2xl" />
+            <p className="page-kicker">AI 教练随笔</p>
+            <blockquote className="font-display mt-4 text-[1.35rem] font-semibold leading-9 tracking-[-0.02em] text-[var(--shell-text)]">
               {growthPlan?.headline || '先把一个答案讲清楚，再去追求更多答案。'}
             </blockquote>
             <p className={`mt-4 text-sm leading-7 ${muted}`}>
@@ -103,8 +119,8 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="ui-panel p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--shell-subtle)]">本次聚焦</p>
+          <div className="ui-panel reveal-up delay-3 p-6">
+            <p className="page-kicker">本次聚焦</p>
             <div className="mt-4 flex items-start gap-3">
               <span className="mt-0.5 rounded-xl border border-teal-500/20 bg-teal-500/10 p-2.5 text-teal-700 dark:text-teal-300">
                 <Target className="h-4 w-4" />
@@ -124,7 +140,7 @@ export default function DashboardPage() {
 
           <Link
             to={hasPractice ? '/practice' : '/job-targets'}
-            className="group flex items-center justify-between rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-cyan-500/5 px-5 py-4 transition hover:border-teal-500/40 hover:from-teal-500/15"
+            className="group reveal-up delay-4 flex items-center justify-between rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-500/12 via-teal-500/6 to-amber-500/5 px-5 py-4 transition hover:border-teal-500/40 hover:from-teal-500/18"
           >
             <span className="flex items-center gap-3 text-sm font-semibold text-[var(--shell-text)]">
               <Sparkles className="h-4 w-4 text-teal-600 dark:text-teal-400" />
@@ -133,7 +149,7 @@ export default function DashboardPage() {
             <ArrowRight className="h-4 w-4 text-[var(--shell-subtle)] transition group-hover:translate-x-1 group-hover:text-teal-500" />
           </Link>
 
-          <Link to="/job-targets" className={`flex items-center gap-2 px-1 text-xs transition hover:text-[var(--shell-text)] ${muted}`}>
+          <Link to="/job-targets" className={`reveal-up delay-5 flex items-center gap-2 px-1 text-xs transition hover:text-[var(--shell-text)] ${muted}`}>
             <BriefcaseBusiness className="h-3.5 w-3.5" /> 查看岗位匹配
           </Link>
         </aside>
