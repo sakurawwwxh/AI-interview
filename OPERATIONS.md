@@ -36,3 +36,22 @@ GitHub Actions 工作流会在 push 和 pull request 时执行：
 
 - `mvn -B -ntp -pl app test`
 - `pnpm install --frozen-lockfile && pnpm run build`
+
+## Dify 同步与代理
+
+访问 Dify Cloud（`https://api.dify.ai`）时，本机若开启 Clash 等 **Fake-IP** 代理，Java 默认不走系统代理，可能出现解析到 `198.18.x.x` 后连接超时。
+
+在 `application.yml` 中可配置：
+
+```yaml
+dify:
+  sync:
+    enabled: true
+  proxy:
+    enabled: true
+    host: 127.0.0.1
+    port: 7890   # 以代理软件「HTTP 代理端口」为准，常见 7890 但可改
+    connect-timeout-ms: 15000
+```
+
+确认代理客户端已开启「允许来自局域网的连接 / Allow LAN」，并核对 HTTP 端口。自建 Dify 时改 `dify.api-url` 为内网地址，通常无需代理。
