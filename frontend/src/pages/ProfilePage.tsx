@@ -201,23 +201,36 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
-      <section className="relative border-y border-white/[0.08] px-0 py-8 text-white">
-        <div className="hidden" />
-        <div className="hidden" />
+      {/* 欢迎区：浅/深色均使用语义色，避免写死 text-white */}
+      <section className="ui-panel relative overflow-hidden px-5 py-7 sm:px-7">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-teal-400/15 blur-3xl dark:bg-teal-400/10" aria-hidden />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20">
-              <UserRound className="h-8 w-8" />
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-800 text-white shadow-lg shadow-teal-700/20 ring-1 ring-teal-500/20">
+              <UserRound className="h-8 w-8" aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-primary-200">账户与成长</p>
-              <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">你好，{user?.displayName || user?.username || '同学'}</h1>
-              <p className="mt-2 text-sm text-slate-300">在这里管理账户、AI 模型与本周训练节奏。</p>
+              <p className="page-kicker text-teal-700 dark:text-teal-300">账户与成长</p>
+              <h1 className="font-display mt-1 truncate text-2xl font-semibold tracking-tight text-[var(--shell-text)] sm:text-3xl">
+                你好，{user?.displayName || user?.username || '同学'}
+              </h1>
+              <p className="mt-2 text-sm text-[var(--shell-muted)]">
+                在这里管理账户、AI 模型与本周训练节奏。
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-sm text-slate-100 ring-1 ring-white/15"><ShieldCheck className="h-4 w-4 text-emerald-300" />{roleLabel}</span>
-            <Link to="/interview-statistics" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-primary-50">成长档案<ArrowRight className="h-4 w-4" /></Link>
+            <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--shell-border)] bg-[var(--shell-hover)] px-3 py-2 text-sm text-[var(--shell-text)]">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              {roleLabel}
+            </span>
+            <Link
+              to="/interview-statistics"
+              className="ui-btn-primary"
+            >
+              成长档案
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
         </div>
       </section>
