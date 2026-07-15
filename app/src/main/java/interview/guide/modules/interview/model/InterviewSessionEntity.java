@@ -93,6 +93,12 @@ public class InterviewSessionEntity {
     // 评估错误信息
     @Column(length = 500)
     private String evaluateError;
+
+    /**
+     * 评估进度 0-100（异步评估过程中更新，便于前端展示百分比）
+     */
+    @Column(name = "evaluate_progress")
+    private Integer evaluateProgress;
     
     public enum SessionStatus {
         CREATED,      // 会话已创建
@@ -257,6 +263,14 @@ public class InterviewSessionEntity {
 
     public void setEvaluateError(String evaluateError) {
         this.evaluateError = evaluateError;
+    }
+
+    public Integer getEvaluateProgress() {
+        return evaluateProgress;
+    }
+
+    public void setEvaluateProgress(Integer evaluateProgress) {
+        this.evaluateProgress = evaluateProgress;
     }
 
     public void addAnswer(InterviewAnswerEntity answer) {

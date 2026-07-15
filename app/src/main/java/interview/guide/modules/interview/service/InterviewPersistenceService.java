@@ -112,8 +112,27 @@ public class InterviewPersistenceService {
         } else {
             session.setEvaluateError(null);
         }
+        // 状态切换时同步进度：等待=0，处理中至少 5，完成=100
+        if (status == AsyncTaskStatus.PENDING) {
+            session.setEvaluateProgress(0);
+        } else if (status == AsyncTaskStatus.PROCESSING && session.getEvaluateProgress() == null) {
+            session.setEvaluateProgress(5);
+        } else if (status == AsyncTaskStatus.COMPLETED) {
+            session.setEvaluateProgress(100);
+        }
         sessionRepository.save(session);
         log.debug("评估状态已更新: sessionId={}, status={}", sessionId, status);
+    }
+
+    /**
+     * 仅更新评估进度（异步消费者可直接调用，按 sessionId 定位）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEvaluateProgress(String sessionId, int progress) {
+        sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
+            session.setEvaluateProgress(Math.min(100, Math.max(0, progress)));
+            sessionRepository.save(session);
+        });
     }
     
     /**

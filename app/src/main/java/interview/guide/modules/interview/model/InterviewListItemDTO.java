@@ -14,6 +14,8 @@ public record InterviewListItemDTO(
     String status,
     String evaluateStatus,
     String evaluateError,
+    /** 评估进度 0-100，未开始可为 null */
+    Integer evaluateProgress,
     Integer overallScore,
     String overallFeedback,
     LocalDateTime createdAt,

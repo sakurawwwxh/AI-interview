@@ -9,6 +9,7 @@ import type {InterviewQuestion, InterviewSession} from '../types/interview';
 import type {InterviewTemplateConfig} from '../types/interview';
 import {interviewTemplates} from '../constants/interviewTemplates';
 import {jobTargetApi, type JobTarget} from '../api/jobTarget';
+import {recommendTemplate} from '../utils/templateRecommend';
 
 type InterviewStage = 'config' | 'interview' | 'submitted';
 
@@ -46,10 +47,13 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
   const [jobTargetId, setJobTargetId] = useState<number | undefined>();
   const [usingDefaultQuestions, setUsingDefaultQuestions] = useState(false);
+  const [templateRecommendReason, setTemplateRecommendReason] = useState<string | null>(null);
   const questionStartedAtRef = useRef(performance.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
   const autoNavigateRef = useRef<number | undefined>(undefined);
+  /** 用户是否手动改过模板；改过后不再因切换岗位自动覆盖 */
+  const userPickedTemplateRef = useRef(false);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -110,9 +114,72 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   useEffect(() => {
     jobTargetApi.list().then(items => {
       setJobTargets(items);
-      setJobTargetId(items.find(item => item.active)?.id);
+      const active = items.find(item => item.active);
+      if (active) {
+        setJobTargetId(active.id);
+        // 初始带出当前岗位时自动推荐一次模板
+        const rec = recommendTemplate(active.jobDescription, interviewTemplates);
+        if (rec) {
+          setTemplate(rec.template);
+          setTemplateRecommendReason(rec.reason);
+        }
+      }
     }).catch(() => {});
   }, []);
+
+  /** 根据当前岗位 JD 推荐并应用模板 */
+  const applyTemplateRecommendation = (targetId?: number, force = false) => {
+    const target = jobTargets.find((j) => j.id === (targetId ?? jobTargetId));
+    if (!target?.jobDescription?.trim()) {
+      setTemplateRecommendReason(null);
+      return;
+    }
+    if (!force && userPickedTemplateRef.current) {
+      return;
+    }
+    const rec = recommendTemplate(target.jobDescription, interviewTemplates);
+    if (rec) {
+      setTemplate(rec.template);
+      setTemplateRecommendReason(rec.reason);
+      userPickedTemplateRef.current = false;
+    }
+  };
+
+  const handleJobTargetChange = (id?: number) => {
+    setJobTargetId(id);
+    if (!id) {
+      setTemplateRecommendReason(null);
+      return;
+    }
+    // 切换岗位时自动推荐（用户未手动改模板时）
+    userPickedTemplateRef.current = false;
+    // jobTargets 已在 state，下一轮渲染前先用当前列表算
+    const target = jobTargets.find((j) => j.id === id);
+    if (target?.jobDescription) {
+      const rec = recommendTemplate(target.jobDescription, interviewTemplates);
+      if (rec) {
+        setTemplate(rec.template);
+        setTemplateRecommendReason(rec.reason);
+      }
+    }
+  };
+
+  const handleTemplateChange = (next: InterviewTemplateConfig) => {
+    userPickedTemplateRef.current = true;
+    setTemplate(next);
+    // 手动选择时保留推荐文案仅当仍是推荐模板
+    if (templateRecommendReason && next.id !== template.id) {
+      const target = jobTargets.find((j) => j.id === jobTargetId);
+      if (target) {
+        const rec = recommendTemplate(target.jobDescription, interviewTemplates);
+        if (rec && rec.template.id === next.id) {
+          setTemplateRecommendReason(rec.reason);
+        } else {
+          setTemplateRecommendReason(null);
+        }
+      }
+    }
+  };
 
   const checkUnfinishedSession = async () => {
     if (!resumeId) return;
@@ -328,7 +395,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         questionCount={questionCount}
         onQuestionCountChange={setQuestionCount}
         template={template}
-        onTemplateChange={setTemplate}
+        onTemplateChange={handleTemplateChange}
         onStart={startInterview}
         isCreating={isCreating}
         checkingUnfinished={checkingUnfinished}
@@ -340,7 +407,9 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         error={error}
         jobTargets={jobTargets}
         jobTargetId={jobTargetId}
-        onJobTargetChange={setJobTargetId}
+        onJobTargetChange={handleJobTargetChange}
+        templateRecommendReason={templateRecommendReason}
+        onRecommendTemplate={() => applyTemplateRecommendation(jobTargetId, true)}
       />
     );
   };
