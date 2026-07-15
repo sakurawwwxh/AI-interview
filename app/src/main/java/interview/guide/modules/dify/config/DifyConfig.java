@@ -37,8 +37,12 @@ public class DifyConfig {
 
     @Data
     public static class SyncConfig {
-        /** 是否启用同步 */
-        private boolean enabled = true;
+        /**
+         * 是否启用与 Dify 的双向同步。
+         * 默认关闭：本地若访问不了 api.dify.ai（代理/DNS 伪 IP 等）会周期性超时刷屏。
+         * 需要云端知识库同步时，在 application.yml 设置 dify.sync.enabled=true。
+         */
+        private boolean enabled = false;
 
         /** 同步间隔（毫秒），默认600000毫秒（10分钟） */
         private long interval = 600000;
