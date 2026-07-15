@@ -1,6 +1,8 @@
 <div align="center">
 
-**智能 AI 面试官平台** - 基于大语言模型的简历分析和模拟面试系统
+**智能 AI 面试官平台**
+
+基于大语言模型的简历分析、模拟面试、知识库 RAG 与专项复练系统
 
 [![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-green?logo=springboot)](https://spring.io/projects/spring-boot)
@@ -13,218 +15,293 @@
 
 ## 项目介绍
 
-AI-Interview 是一个集成了简历分析、模拟面试和知识库管理的智能面试辅助平台。系统利用大语言模型（LLM）和向量数据库技术，为求职者和 HR 提供智能化的简历评估和面试练习服务。
+AI-Interview（本仓库 `interview-guide`）是一个面向求职训练的智能面试辅助平台。系统以 Spring Boot + Spring AI 为后端，React + Vite 为前端，结合 PostgreSQL（pgvector）、Redis Stream 与 S3 兼容存储，覆盖从简历解析、岗位对标、模拟面试到错题复练的完整闭环。
 
-## 核心功能
+## 核心能力
 
-- 简历智能解析与多维度分析报告
-- 基于简历的个性化模拟面试
-- 智能追问，还原真实面试场景
-- PDF 简历分析报告导出
-- 知识库 RAG 问答系统
-- PDF 模拟面试评估报告导出
+| 模块 | 能力 |
+| --- | --- |
+| **简历** | 多格式解析、异步 AI 分析、版本管理、PDF 报告导出 |
+| **岗位目标** | 维护 JD、简历匹配、优化建议、一键按岗位开模拟面试 |
+| **模拟面试** | 模板出题、JD 加权、智能追问、答案暂存、分批评估、进度展示、失败重试 |
+| **能力统计** | 多场面试聚合、能力雷达/趋势、薄弱项引导复练 |
+| **错题复练** | 低分题自动入库、专项练习与提升记录 |
+| **知识库 / RAG** | 文档向量化、SSE 流式问答；可选同步 Dify |
+| **账户体系** | 注册登录、JWT、管理员用户管理、个人 BYOK 模型配置 |
+| **成长中心** | Dashboard 今日训练、成长行动计划 |
 
 ## 系统架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    Frontend (React)                  │
-│               http://localhost:5173                 │
+│              Frontend (React + Vite)                 │
+│                 http://localhost:5173                │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTP/REST + SSE
 ┌──────────────────────▼──────────────────────────────┐
-│                   Backend (Spring Boot)              │
-│                  http://localhost:8080               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
-│  │   Resume    │  │  Interview  │  │ Knowledge   │  │
-│  │   Module    │  │   Module    │  │    Base     │  │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  │
-│         │                │                │           │
-│  ┌──────▼────────────────▼────────────────▼──────┐  │
-│  │              AI Service (Spring AI)            │  │
-│  │              阿里云 DashScope Qwen              │  │
-│  └─────────────────────────────────────────────────┘  │
+│            Backend (Spring Boot 4 / Java 21)         │
+│                 http://localhost:8080                │
+│  resume · interview · practice · knowledgebase       │
+│  target · growth · user · userai · dify              │
+│  ┌───────────────────────────────────────────────┐  │
+│  │     Spring AI（DashScope 兼容 OpenAI 协议）    │  │
+│  └───────────────────────────────────────────────┘  │
 └──────┬──────────────┬───────────────┬────────────────┘
        │              │               │
 ┌──────▼─────┐ ┌──────▼─────┐ ┌──────▼─────┐
-│ PostgreSQL │ │    Redis    │ │  S3 Storage │
-│  + pgvector│ │   Stream    │ │   (MinIO)   │
+│ PostgreSQL │ │    Redis    │ │ S3 / MinIO  │
+│  + pgvector│ │  Stream     │ │  对象存储   │
 └────────────┘ └────────────┘ └────────────┘
 ```
 
 ## 技术栈
 
-### 后端技术
+### 后端
 
-| 技术                  | 版本  | 说明                      |
-| --------------------- | ----- | ------------------------- |
-| Spring Boot           | 4.0   | 应用框架                  |
-| Java                  | 21    | 开发语言                  |
-| Spring AI             | 2.0   | AI 集成框架               |
-| PostgreSQL + pgvector | 14+   | 关系数据库 + 向量存储     |
-| Redis                 | 6+    | 缓存 + 消息队列（Stream） |
-| Apache Tika           | 2.9.2 | 文档解析                  |
-| iText 8               | 8.0.5 | PDF 导出                  |
-| MapStruct             | 1.6.3 | 对象映射                  |
-| Gradle                | 8.14  | 构建工具                  |
+| 技术 | 版本 | 说明 |
+| --- | --- | --- |
+| Java | 21 | 语言（虚拟线程） |
+| Spring Boot | 4.0 | Web / Security / Validation / Actuator |
+| Spring AI | 2.x | Chat / Embedding / pgvector |
+| PostgreSQL + pgvector | 14+ | 业务库 + 向量检索 |
+| Redis + Redisson | 6+ | 缓存、会话、Stream 异步任务 |
+| Apache Tika | 2.9 | 文档解析 |
+| iText | 8.x | PDF 导出 |
+| MapStruct | 1.6 | 对象映射 |
+| JWT (jjwt) | 0.12 | 鉴权 |
+| Maven | 3.9+ | 构建 |
 
-### 前端技术
+### 前端
 
-| 技术          | 版本  | 说明     |
-| ------------- | ----- | -------- |
-| React         | 18.3  | UI 框架  |
-| TypeScript    | 5.6   | 开发语言 |
-| Vite          | 5.4   | 构建工具 |
-| Tailwind CSS  | 4.1   | 样式框架 |
-| React Router  | 7.11  | 路由管理 |
-| Framer Motion | 12.23 | 动画库   |
-| Recharts      | 3.6   | 图表库   |
-| Lucide React  | 0.468 | 图标库   |
+| 技术 | 版本 | 说明 |
+| --- | --- | --- |
+| React | 18.3 | UI |
+| TypeScript | 5.6 | 类型 |
+| Vite | 5.4 | 构建 |
+| Tailwind CSS | 4.1 | 样式 |
+| React Router | 7.x | 路由 |
+| Zustand | 5.x | 登录态 |
+| Recharts / Framer Motion | - | 图表与动效 |
+| pnpm | 10.x | 包管理 |
 
 ## 项目结构
 
-```
+```text
 interview-guide/
-├── app/                              # 后端应用
+├── app/                          # 后端（Spring Boot）
 │   └── src/main/java/interview/guide/
-│       ├── common/                   # 通用模块 (配置、异常、响应)
-│       ├── infrastructure/           # 基础设施 (文件、Redis、存储、PDF导出)
-│       └── modules/                  # 业务模块 (resume/interview/knowledgebase)
-├── frontend/                         # 前端应用
+│       ├── common/               # 配置、异常、限流、异步 Stream 模板
+│       ├── infrastructure/       # 文件、Redis、导出、健康检查、可观测性
+│       └── modules/
+│           ├── resume/           # 简历上传分析
+│           ├── interview/        # 模拟面试与评估
+│           ├── practice/         # 错题复练
+│           ├── knowledgebase/    # 知识库与 RAG
+│           ├── target/           # 岗位目标与匹配
+│           ├── growth/           # 成长计划
+│           ├── user/             # 认证与管理员
+│           ├── userai/           # 个人 AI Key（BYOK）
+│           └── dify/             # Dify 同步与对话（可选）
+├── frontend/                     # 前端（React + Vite）
 │   └── src/
-│       ├── api/                      # API 接口
-│       ├── components/               # 公共组件
-│       ├── pages/                    # 页面组件
-│       ├── types/                    # 类型定义
-│       └── utils/                    # 工具函数
-├── .env.example                      # 环境变量模板
-└── docker-compose.yml                # Docker 编排
+│       ├── api/                  # 接口封装
+│       ├── components/           # 公共组件
+│       ├── pages/                # 页面（Dashboard / 面试 / 复练 / 知识库…）
+│       ├── stores/               # 状态
+│       └── utils/                # 草稿、模板推荐等工具
+├── docker/                       # 数据库初始化等
+├── docker-compose.yml            # 一键编排
+├── OPERATIONS.md                 # 生产运维说明
+├── .env.example                  # 环境变量示例
+└── pom.xml                       # Maven 父工程
 ```
 
-## 功能详情
+## 功能说明
 
-### 简历管理模块
+### 简历
 
-- **多格式解析**：支持 PDF、DOCX、DOC、TXT 等多种简历格式
-- **异步处理流**：基于 Redis Stream 实现异步简历分析，支持实时查看处理进度（待分析/分析中/已完成/失败）
-- **稳定性保障**：内置分析失败自动重试机制（最多 3 次）与基于内容哈希的重复检测
-- **分析报告导出**：支持将 AI 分析结果一键导出为结构化的 PDF 简历分析报告
+- 支持 PDF / DOCX / DOC / TXT 等格式解析与内容清洗  
+- Redis Stream 异步分析，列表可见 PENDING / PROCESSING / COMPLETED / FAILED  
+- 失败可重试；内容哈希去重  
+- 支持简历文本版本保存与恢复  
+- AI 分析报告可导出 PDF  
 
-### 模拟面试模块
+### 岗位与匹配
 
-- **个性化出题**：基于简历内容智能生成针对性的面试题目，支持实时问答交互
-- **智能追问流**：支持配置多轮智能追问（默认 1 条），构建模拟真实场景的线性问答流
-- **分批评估机制**：采用分批评估策略（默认每批 8 条），规避大模型 Token 溢出风险
-- **智能汇总建议**：对分批评估结果进行二次汇总，提供多维度的改进建议
-- **报告一键导出**：支持异步生成并导出详细的 PDF 模拟面试评估报告
+- 维护多份目标岗位 JD，可设「当前岗位」  
+- 对指定简历做 JD 匹配（得分、匹配技能、缺口、优化建议）  
+- 可应用优化稿为新版本；支持「用该岗位开始模拟面试」  
 
-### 知识库管理模块
+### 模拟面试
 
-- **文档智能处理**：支持 PDF、DOCX、Markdown 等多种格式文档的自动上传、分块与异步向量化
-- **RAG 检索增强**：集成向量数据库，通过检索增强生成（RAG）提升 AI 问答的准确性
-- **流式响应交互**：基于 SSE 技术实现打字机式流式响应
-- **智能问答对话**：支持基于知识库内容的智能问答，并提供直观的知识库统计信息
+- 面试模板（后端综合 / 前端 / 全栈 / 项目深挖等）+ 题目数量配置  
+- 有 JD 时按关键词加权题型；AI 失败可降级默认题库并提示  
+- 动态追问；答题本地草稿 + 服务端暂存，刷新可恢复  
+- 交卷后异步评估：进度百分比、失败一键重试  
+- 单批评估可跳过二次 summary 以缩短等待  
+- 面试记录独立列表接口，避免简历详情 N+1  
+- 评估报告可导出 PDF  
+
+### 复练与成长
+
+- 低分题自动进入复练中心  
+- 能力统计：场次趋势、类别均分、薄弱项跳转复练  
+- Dashboard 汇总今日训练与成长行动  
+
+### 知识库
+
+- 文档上传、分块、异步向量化（pgvector）  
+- RAG 问答 SSE 流式输出  
+- 可选对接 Dify（同步文档 / 对话）  
+
+### 账户与运维
+
+- JWT Access + Refresh，Refresh 可吊销  
+- 管理员用户管理；个人可配置 BYOK 模型  
+- Actuator 健康检查 / Prometheus（详见 [OPERATIONS.md](OPERATIONS.md)）  
+- GitHub Actions：后端测试 + 前端构建  
 
 ## 环境要求
 
-| 依赖          | 版本 | 说明                  |
-| ------------- | ---- | --------------------- |
-| JDK           | 21+  | 必需                  |
-| Node.js       | 18+  | 必需                  |
-| PostgreSQL    | 14+  | 必需 (需 pgvector 扩展)|
-| Redis         | 6+   | 必需                  |
-| S3 兼容存储   | -    | 必需                  |
+| 依赖 | 版本 | 说明 |
+| --- | --- | --- |
+| JDK | 21+ | 后端 |
+| Maven | 3.9+ | 后端构建 |
+| Node.js | 18+ | 前端（建议 20/22） |
+| pnpm | 10+ | 前端包管理 |
+| PostgreSQL | 14+（建议 16） | 需安装 `vector` 扩展 |
+| Redis | 6+ | 缓存与 Stream |
+| S3 兼容存储 | - | 如 MinIO |
 
 ## 快速开始
 
-### 1. 克隆项目
+### 1. 克隆
 
 ```bash
 git clone https://github.com/sakurawwwxh/AI-interview.git
 cd AI-interview
 ```
 
-### 2. 配置数据库
+### 2. 启动基础设施（推荐）
+
+```bash
+docker compose up -d postgres redis minio
+```
+
+首次初始化会创建库并启用 pgvector（见 `docker/postgres/init.sql`）。数据库默认名：`interview_guide`。
+
+若不用 Docker，请自行准备 PostgreSQL / Redis / S3，并在库中执行：
 
 ```sql
-CREATE DATABASE Ai_interview;
-CREATE EXTENSION vector;
+CREATE DATABASE interview_guide;
+-- 连接到该库后
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-### 3. 配置环境变量
+### 3. 配置后端
+
+本地默认读取 `app/src/main/resources/application.yml`（该文件默认被 `.gitignore` 忽略，避免提交密钥）。
+
+请至少配置：
+
+- 数据源：PostgreSQL 地址 / 库名 / 账号密码  
+- Redis：Redisson 地址  
+- 对象存储：endpoint / access-key / secret-key / bucket  
+- AI：`spring.ai.openai.*`（DashScope 兼容模式与 API Key）  
+- JWT：`app.jwt.secret`（长度需满足签名要求）  
+
+可选环境变量可参考仓库根目录 `.env.example`（如 Dify 相关）。
+
+生产环境请使用 Profile `production`，见 [OPERATIONS.md](OPERATIONS.md)。
+
+### 4. 启动后端
+
+在仓库根目录：
 
 ```bash
-cp .env.example .env
-# 编辑 .env，填入以下配置：
-# AI_BAILIAN_API_KEY=your_api_key
+mvn -pl app spring-boot:run
 ```
 
-### 4. 启动服务
+或：
 
-**后端：**
 ```bash
-./gradlew bootRun
+mvn -pl app -DskipTests package
+java -jar app/target/app-0.0.1-SNAPSHOT.jar
 ```
 
-**前端：**
+默认端口：`http://localhost:8080`
+
+### 5. 启动前端
+
 ```bash
 cd frontend
 pnpm install
 pnpm dev
 ```
 
-访问 `http://localhost:5173`
+访问：`http://localhost:5173`
 
-### 配置说明
-
-编辑 `app/src/main/resources/application.yml`：
-
-| 配置项              | 说明                    | 默认值                      |
-| ------------------- | ---------------------- | -------------------------- |
-| `POSTGRES_HOST`     | PostgreSQL 地址        | localhost                   |
-| `POSTGRES_PORT`     | PostgreSQL 端口        | 5432                       |
-| `POSTGRES_DB`        | 数据库名              | Ai_interview            |
-| `POSTGRES_PASSWORD`  | 数据库密码            | 123456                     |
-| `REDIS_HOST`         | Redis 地址            | localhost                   |
-| `APP_STORAGE_ENDPOINT`| S3 存储地址           | http://localhost:9000     |
-| `CORS_ALLOWED_ORIGINS`| 允许的跨域来源       | localhost:5173,5174,80     |
-
-> 首次启动设置 `ddl-auto: create`，表创建完成后改为 `update`
-
-## Docker 部署
+### 6. 全量 Docker 部署
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
-启动后服务地址：
+| 服务 | 地址 | 说明 |
+| --- | --- | --- |
+| 前端 | http://localhost | Nginx 入口 |
+| 后端 API | http://localhost:8080 | REST / SSE |
+| MinIO 控制台 | http://localhost:9001 | 默认见 compose 配置 |
+| PostgreSQL | localhost:5432 | 库名 `interview_guide` |
+| Redis | localhost:6379 | - |
 
-| 服务             | 地址                          | 说明         |
-| ---------------- | ----------------------------- | ------------ |
-| 前端应用         | http://localhost              | 用户访问入口  |
-| 后端 API         | http://localhost:8080         | Swagger 文档 |
-| MinIO 控制台     | http://localhost:9001         | minioadmin   |
-| PostgreSQL       | localhost:5432                | postgres     |
-| Redis            | localhost:6379                | -            |
+## 开发与质量
 
-## 使用场景
+```bash
+# 后端测试
+mvn -B -ntp -pl app test
 
-| 用户角色        | 使用场景                               |
-| --------------- | -------------------------------------- |
-| **求职者**      | 上传简历获取分析建议，进行模拟面试练习 |
-| **HR/招聘人员** | 批量分析简历，评估候选人能力           |
-| **培训机构**    | 提供面试培训服务，管理知识库资源       |
+# 前端类型检查 + 生产构建
+cd frontend && pnpm install && pnpm run build
+```
 
-## 安全说明
+CI 在 push / PR 时自动执行上述检查（`.github/workflows/ci.yml`）。
 
-- 敏感配置（数据库密码、API Key、存储密钥）通过环境变量注入，不要提交到代码仓库
-- 生产部署务必修改默认密码和 API Key
-- `.gitignore` 已配置忽略敏感文件
+## 主要页面
+
+| 路径 | 说明 |
+| --- | --- |
+| `/` | 训练 Dashboard |
+| `/upload` | 上传简历 |
+| `/history` | 简历库 / 详情 |
+| `/interview/:resumeId` | 模拟面试 |
+| `/interviews` | 面试记录 |
+| `/interview-statistics` | 能力统计 |
+| `/practice` | 复练中心 |
+| `/job-targets` | 岗位目标 |
+| `/knowledgebase` | 知识库管理 / 问答 |
+| `/profile` | 个人中心与 AI 配置 |
+| `/admin/users` | 用户管理（管理员） |
+
+## 安全提示
+
+- 不要将含真实 API Key、数据库口令的 `application.yml` 提交到公开仓库  
+- 生产务必使用强 JWT Secret，并限制 Actuator 暴露范围  
+- 对象存储密钥与 CORS 按环境隔离配置  
+
+## 相关文档
+
+- [OPERATIONS.md](OPERATIONS.md) — 生产 Profile、健康检查、指标与质量门禁  
+- [docs/dify-deployment-guide.md](docs/dify-deployment-guide.md) — Dify 部署相关（若启用）  
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 与 Pull Request。建议：
+
+1. 从最新 `master` 拉 `feature/<主题>` 分支  
+2. 保持提交信息清晰（`feat:` / `fix:` / `docs:` 等）  
+3. 确保本地测试与前端 build 通过后再开 PR  
 
 ## 许可证
 
-[AGPL-3.0 License](LICENSE) - 只要通过网络提供服务，就必须向用户公开修改后的源码
+[AGPL-3.0 License](LICENSE) — 若通过网络提供本软件的修改版本服务，需向用户公开对应源码。
