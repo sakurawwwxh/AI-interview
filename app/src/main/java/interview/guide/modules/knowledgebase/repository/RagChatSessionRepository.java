@@ -16,6 +16,8 @@ import java.util.Optional;
 @Repository
 public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEntity, Long> {
 
+    Optional<RagChatSessionEntity> findByIdAndUserId(Long id, Long userId);
+
     /**
      * 按更新时间倒序获取所有活跃会话
      */
@@ -27,10 +29,15 @@ public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEn
     List<RagChatSessionEntity> findAllByOrderByUpdatedAtDesc();
 
     /**
-     * 获取所有会话（按置顶状态和更新时间排序：置顶的在前，然后按更新时间倒序）
+     * 获取用户所有会话（按置顶状态和更新时间排序：置顶的在前，然后按更新时间倒序）
      */
-    @Query("SELECT s FROM RagChatSessionEntity s ORDER BY s.isPinned DESC, s.updatedAt DESC")
-    List<RagChatSessionEntity> findAllOrderByPinnedAndUpdatedAtDesc();
+    @Query("SELECT s FROM RagChatSessionEntity s WHERE s.userId = :userId ORDER BY s.isPinned DESC, s.updatedAt DESC")
+    List<RagChatSessionEntity> findAllByUserIdOrderByPinnedAndUpdatedAtDesc(@Param("userId") Long userId);
+
+    /**
+     * 查找所有未归属用户的 RAG 聊天会话（旧数据迁移用）
+     */
+    List<RagChatSessionEntity> findAllByUserIdIsNull();
 
     /**
      * 根据知识库ID查找相关会话
@@ -48,6 +55,9 @@ public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEn
     /**
      * 获取会话（带知识库，不带消息）
      */
-    @Query("SELECT s FROM RagChatSessionEntity s LEFT JOIN FETCH s.knowledgeBases WHERE s.id = :id")
-    Optional<RagChatSessionEntity> findByIdWithKnowledgeBases(@Param("id") Long id);
+    @Query("SELECT s FROM RagChatSessionEntity s LEFT JOIN FETCH s.knowledgeBases WHERE s.id = :id AND s.userId = :userId")
+    Optional<RagChatSessionEntity> findByIdWithKnowledgeBasesAndUserId(
+        @Param("id") Long id,
+        @Param("userId") Long userId
+    );
 }

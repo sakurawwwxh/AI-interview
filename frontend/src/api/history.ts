@@ -44,6 +44,8 @@ export interface InterviewItem {
   status: string;
   evaluateStatus?: EvaluateStatus;
   evaluateError?: string;
+  /** 评估进度 0-100 */
+  evaluateProgress?: number | null;
   overallScore: number | null;
   overallFeedback: string | null;
   createdAt: string;
@@ -52,6 +54,14 @@ export interface InterviewItem {
   strengths?: string[];
   improvements?: string[];
   referenceAnswers?: unknown[];
+}
+
+/** 面试记录列表项（含简历摘要，一次接口返回） */
+export interface InterviewHistoryItem extends InterviewItem {
+  resumeId: number;
+  resumeFilename: string;
+  /** 评估进度 0-100 */
+  evaluateProgress?: number | null;
 }
 
 export interface AnswerItem {
@@ -64,6 +74,7 @@ export interface AnswerItem {
   referenceAnswer?: string;
   keyPoints?: string[];
   answeredAt: string;
+  answerDurationSeconds?: number | null;
 }
 
 export interface ResumeDetail {
@@ -87,6 +98,38 @@ export interface InterviewDetail extends InterviewItem {
   answers: AnswerItem[];
 }
 
+export interface ResumeVersion {
+  id: number | null;
+  versionNumber: number;
+  title: string;
+  content: string;
+  source: string;
+  createdAt: string;
+  current: boolean;
+}
+
+export interface InterviewCategoryStatistic {
+  category: string;
+  averageScore: number;
+  questionCount: number;
+}
+
+export interface InterviewTrendPoint {
+  sessionId: string;
+  completedAt: string;
+  score: number;
+}
+
+export interface InterviewStatistics {
+  completedInterviewCount: number;
+  averageScore: number;
+  latestScore: number | null;
+  scoreChange: number | null;
+  abilityScores: InterviewCategoryStatistic[];
+  scoreTrend: InterviewTrendPoint[];
+  weaknesses: InterviewCategoryStatistic[];
+}
+
 export const historyApi = {
   /**
    * 获取所有简历列表
@@ -107,6 +150,20 @@ export const historyApi = {
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
     return request.get<InterviewDetail>(`/api/interview/sessions/${sessionId}/details`);
+  },
+
+  /**
+   * 当前用户全部面试记录（含关联简历，避免 N+1）
+   */
+  async getInterviewHistory(): Promise<InterviewHistoryItem[]> {
+    return request.get<InterviewHistoryItem[]>('/api/interview/history');
+  },
+
+  /**
+   * 获取已评分面试的跨会话统计。
+   */
+  async getInterviewStatistics(): Promise<InterviewStatistics> {
+    return request.get<InterviewStatistics>('/api/interview/statistics');
   },
 
   /**
@@ -157,5 +214,17 @@ export const historyApi = {
    */
   async reanalyze(id: number): Promise<void> {
     return request.post(`/api/resumes/${id}/reanalyze`);
+  },
+
+  async getVersions(id: number): Promise<ResumeVersion[]> {
+    return request.get<ResumeVersion[]>(`/api/resumes/${id}/versions`);
+  },
+
+  async updateContent(id: number, title: string, content: string): Promise<ResumeVersion> {
+    return request.put<ResumeVersion>(`/api/resumes/${id}/content`, { title, content });
+  },
+
+  async restoreVersion(id: number, versionId: number): Promise<ResumeVersion> {
+    return request.post<ResumeVersion>(`/api/resumes/${id}/versions/${versionId}/restore`);
   },
 };

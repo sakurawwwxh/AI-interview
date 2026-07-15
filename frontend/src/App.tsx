@@ -1,18 +1,29 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import { useAuthStore } from './stores/authStore';
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { historyApi } from './api/history';
 import type { UploadKnowledgeBaseResponse } from './api/knowledgebase';
 
 // Lazy load components
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const UploadPage = lazy(() => import('./pages/UploadPage'));
 const HistoryList = lazy(() => import('./pages/HistoryPage'));
 const ResumeDetailPage = lazy(() => import('./pages/ResumeDetailPage'));
 const Interview = lazy(() => import('./pages/InterviewPage'));
 const InterviewHistoryPage = lazy(() => import('./pages/InterviewHistoryPage'));
+const InterviewStatisticsPage = lazy(() => import('./pages/InterviewStatisticsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const PracticeCenterPage = lazy(() => import('./pages/PracticeCenterPage'));
+const PracticeSessionPage = lazy(() => import('./pages/PracticeSessionPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
+const JobTargetsPage = lazy(() => import('./pages/JobTargetsPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 
 // Loading component
 const Loading = () => (
@@ -57,8 +68,8 @@ function ResumeDetailWrapper() {
     navigate('/history');
   };
 
-  const handleStartInterview = (resumeText: string, resumeId: number) => {
-    navigate(`/interview/${resumeId}`, { state: { resumeText } });
+  const handleStartInterview = (resumeText: string, resumeId: number, jobTargetId?: number) => {
+    navigate(`/interview/${resumeId}`, { state: { resumeText, jobTargetId } });
   };
 
   return (
@@ -75,12 +86,14 @@ function InterviewWrapper() {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as { resumeText?: string; jobTargetId?: number } | null;
   const [resumeText, setResumeText] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const initialJobTargetId = locationState?.jobTargetId;
 
   useEffect(() => {
     // 优先从location state获取resumeText
-    const stateText = (location.state as { resumeText?: string })?.resumeText;
+    const stateText = locationState?.resumeText;
     if (stateText) {
       setResumeText(stateText);
       setLoading(false);
@@ -98,7 +111,7 @@ function InterviewWrapper() {
     } else {
       setLoading(false);
     }
-  }, [resumeId, location.state]);
+  }, [resumeId, locationState?.resumeText]);
 
   if (!resumeId) {
     return <Navigate to="/history" replace />;
@@ -109,9 +122,9 @@ function InterviewWrapper() {
     navigate(`/history/${resumeId}`, { replace: false });
   };
 
-  const handleInterviewComplete = () => {
-    // 面试完成后跳转到面试记录页
-    navigate('/interviews');
+  const handleInterviewComplete = (sessionId?: string) => {
+    // 面试完成后跳转到面试记录页，并高亮刚交卷的会话
+    navigate('/interviews', { state: { highlightSessionId: sessionId } });
   };
 
   if (loading) {
@@ -129,6 +142,7 @@ function InterviewWrapper() {
     <Interview
       resumeText={resumeText}
       resumeId={parseInt(resumeId, 10)}
+      initialJobTargetId={initialJobTargetId}
       onBack={handleBack}
       onInterviewComplete={handleInterviewComplete}
     />
@@ -136,13 +150,31 @@ function InterviewWrapper() {
 }
 
 function App() {
+  // 初始化时从 localStorage 恢复登录态
+  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
   return (
     <BrowserRouter>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/" element={<Layout />}>
+          {/* 公开路由（不套 Layout） */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* 受保护路由（套 Layout + ProtectedRoute） */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
             {/* 默认重定向到上传页面 */}
-            <Route index element={<Navigate to="/upload" replace />} />
+            <Route index element={<DashboardPage />} />
 
             {/* 上传页面 */}
             <Route path="upload" element={<UploadPageWrapper />} />
@@ -155,6 +187,16 @@ function App() {
 
             {/* 面试记录列表 */}
             <Route path="interviews" element={<InterviewHistoryWrapper />} />
+
+            <Route path="interview-statistics" element={<InterviewStatisticsPage />} />
+
+            <Route path="profile" element={<ProfilePage />} />
+
+            <Route path="admin/users" element={<AdminUsersPage />} />
+
+            <Route path="practice" element={<PracticeCenterPage />} />
+            <Route path="practice/:taskId" element={<PracticeSessionPage />} />
+            <Route path="job-targets" element={<JobTargetsPage />} />
 
             {/* 模拟面试 */}
             <Route path="interview/:resumeId" element={<InterviewWrapper />} />
@@ -177,6 +219,8 @@ function App() {
 // 面试记录页面包装器
 function InterviewHistoryWrapper() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightSessionId = (location.state as { highlightSessionId?: string } | null)?.highlightSessionId;
 
   const handleBack = () => {
     navigate('/upload');
@@ -201,7 +245,13 @@ function InterviewHistoryWrapper() {
     }
   };
 
-  return <InterviewHistoryPage onBack={handleBack} onViewInterview={handleViewInterview} />;
+  return (
+    <InterviewHistoryPage
+      onBack={handleBack}
+      onViewInterview={handleViewInterview}
+      highlightSessionId={highlightSessionId}
+    />
+  );
 }
 
 // 知识库管理页面包装器

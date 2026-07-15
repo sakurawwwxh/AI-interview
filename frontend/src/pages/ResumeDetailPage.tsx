@@ -1,17 +1,19 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useLocation} from 'react-router-dom';
 import {AnimatePresence, motion} from 'framer-motion';
-import {historyApi, InterviewDetail, ResumeDetail} from '../api/history';
+import {historyApi, InterviewDetail, ResumeDetail, ResumeVersion} from '../api/history';
+import {jobTargetApi, JobMatch, JobTarget} from '../api/jobTarget';
 import AnalysisPanel from '../components/AnalysisPanel';
 import InterviewPanel from '../components/InterviewPanel';
 import InterviewDetailPanel from '../components/InterviewDetailPanel';
 import {formatDateOnly} from '../utils/date';
-import {CheckSquare, ChevronLeft, Clock, Download, MessageSquare, Mic} from 'lucide-react';
+import {CheckSquare, ChevronLeft, Clock, Download, FilePenLine, MessageSquare, Mic, Target} from 'lucide-react';
 
 interface ResumeDetailPageProps {
   resumeId: number;
   onBack: () => void;
-  onStartInterview: (resumeText: string, resumeId: number) => void;
+  /** 可选 jobTargetId：从 JD 匹配结果一键开面时带入 */
+  onStartInterview: (resumeText: string, resumeId: number, jobTargetId?: number) => void;
 }
 
 type TabType = 'analysis' | 'interview';
@@ -28,6 +30,15 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
   const [selectedInterview, setSelectedInterview] = useState<InterviewDetail | null>(null);
   const [loadingInterview, setLoadingInterview] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('手动优化');
+  const [draftContent, setDraftContent] = useState('');
+  const [versions, setVersions] = useState<ResumeVersion[]>([]);
+  const [savingContent, setSavingContent] = useState(false);
+  const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
+  const [jobTargetId, setJobTargetId] = useState<number | undefined>();
+  const [jobMatch, setJobMatch] = useState<JobMatch | null>(null);
+  const [matching, setMatching] = useState(false);
 
   // 静默加载数据（用于轮询）
   const loadResumeDetailSilent = useCallback(async () => {
@@ -54,6 +65,11 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
   useEffect(() => {
     loadResumeDetail();
   }, [loadResumeDetail]);
+
+  useEffect(() => {
+    historyApi.getVersions(resumeId).then(setVersions).catch(() => {});
+    jobTargetApi.list().then(items => { setJobTargets(items); setJobTargetId(items.find(item => item.active)?.id); }).catch(() => {});
+  }, [resumeId]);
 
   // 轮询：当分析状态为待处理时，每5秒刷新一次
   // 待处理判断：显式的 PENDING/PROCESSING 状态，或状态未定义且无分析结果
@@ -84,6 +100,30 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
     } finally {
       setReanalyzing(false);
     }
+  };
+
+  const handleSaveContent = async () => {
+    if (!draftContent.trim()) return;
+    setSavingContent(true);
+    try {
+      await historyApi.updateContent(resumeId, draftTitle || '手动优化', draftContent);
+      setEditing(false);
+      await Promise.all([loadResumeDetail(), historyApi.getVersions(resumeId).then(setVersions)]);
+    } catch (err) { alert(err instanceof Error ? err.message : '保存简历版本失败'); } finally { setSavingContent(false); }
+  };
+
+  const handleMatch = async () => {
+    if (!jobTargetId) return;
+    setMatching(true);
+    try { setJobMatch(await jobTargetApi.match(jobTargetId, resumeId)); } catch (err) { alert(err instanceof Error ? err.message : 'JD 匹配失败'); } finally { setMatching(false); }
+  };
+
+  const handleApplyOptimization = () => {
+    if (!jobMatch?.optimizedResumeText) return;
+    const target = jobTargets.find(item => item.id === jobTargetId);
+    setDraftTitle(`${target?.title || 'JD'} 优化版`);
+    setDraftContent(jobMatch.optimizedResumeText);
+    setEditing(true);
   };
 
   // 检查是否需要自动打开面试详情
@@ -282,6 +322,61 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
           )}
         </div>
       </div>
+
+      {detailView !== 'interviewDetail' && (
+        <section className="mb-6 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
+            <div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold text-slate-900 dark:text-white flex gap-2 items-center"><FilePenLine className="w-4 h-4 text-primary-500" />简历编辑与版本</h3><p className="mt-1 text-xs text-slate-500">保存时会新建版本，原始上传内容始终保留。</p></div><button onClick={() => { setDraftContent(resume.resumeText); setEditing(!editing); }} className="text-sm text-primary-600">{editing ? '收起编辑' : '编辑简历'}</button></div>
+            {editing && <div className="mt-4 space-y-3"><input value={draftTitle} maxLength={120} onChange={e => setDraftTitle(e.target.value)} className="w-full px-3 py-2 border rounded-lg dark:bg-slate-900 dark:border-slate-600" placeholder="版本名称" /><textarea value={draftContent} onChange={e => setDraftContent(e.target.value)} className="w-full min-h-56 p-3 border rounded-lg dark:bg-slate-900 dark:border-slate-600" /><button disabled={savingContent} onClick={handleSaveContent} className="px-4 py-2 rounded-lg bg-primary-500 text-white disabled:opacity-60">{savingContent ? '保存中…' : '保存为新版本'}</button></div>}
+            <div className="mt-4 space-y-2 max-h-32 overflow-auto">{versions.map(version => <div key={version.id ?? 'original'} className="text-xs flex justify-between text-slate-500"><span>v{version.versionNumber} · {version.title}{version.current ? '（当前）' : ''}</span>{version.id && !version.current && <button className="text-primary-600" onClick={async () => { await historyApi.restoreVersion(resumeId, version.id!); await Promise.all([loadResumeDetail(), historyApi.getVersions(resumeId).then(setVersions)]); }}>恢复</button>}</div>)}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
+            <h3 className="font-semibold text-slate-900 dark:text-white flex gap-2 items-center"><Target className="w-4 h-4 text-primary-500" />岗位 JD 匹配</h3><div className="mt-3 flex gap-2"><select value={jobTargetId ?? ''} onChange={e => setJobTargetId(e.target.value ? Number(e.target.value) : undefined)} className="flex-1 min-w-0 px-3 py-2 border rounded-lg dark:bg-slate-900 dark:border-slate-600"><option value="">选择岗位目标</option>{jobTargets.map(target => <option key={target.id} value={target.id}>{target.title}</option>)}</select><button disabled={!jobTargetId || matching} onClick={handleMatch} className="px-3 py-2 rounded-lg bg-primary-500 text-white disabled:opacity-60">{matching ? '分析中…' : '开始匹配'}</button></div>
+            {!jobTargets.length && <p className="mt-3 text-xs text-slate-500">先在“目标岗位”中保存一份 JD。</p>}
+            {jobMatch && (
+              <div className="mt-4 text-sm">
+                <div className="font-semibold text-primary-600">匹配度 {jobMatch.score}/100</div>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">{jobMatch.summary}</p>
+                <p className="mt-2 text-emerald-600">匹配：{jobMatch.matchedSkills.join('、') || '暂无'}</p>
+                <p className="mt-1 text-amber-600">待补齐：{jobMatch.missingSkills.join('、') || '暂无'}</p>
+                {jobMatch.optimizationSuggestions.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {jobMatch.optimizationSuggestions.map((item, index) => (
+                      <div key={`${item.section}-${index}`} className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-900">
+                        <b>{item.section}</b>
+                        <span className="ml-2 text-slate-500">{item.issue}</span>
+                        <p className="mt-1 text-slate-600 dark:text-slate-300">{item.recommendation}</p>
+                        {item.proposedText && (
+                          <p className="mt-1 whitespace-pre-wrap text-primary-600">建议文案：{item.proposedText}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={handleApplyOptimization}
+                    className="rounded-lg bg-primary-500 px-3 py-2 text-sm font-medium text-white"
+                  >
+                    应用优化稿到编辑器
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onStartInterview(resume.resumeText, resumeId, jobTargetId)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-100 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                    用该岗位开始模拟面试
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  应用优化稿后仍需保存才会新建版本；开面将带上当前岗位并自动推荐模板。
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* 标签页切换 - 仅在非面试详情时显示 */}
       {detailView !== 'interviewDetail' && (

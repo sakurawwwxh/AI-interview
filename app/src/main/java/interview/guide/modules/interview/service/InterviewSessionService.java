@@ -5,9 +5,12 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.redis.InterviewSessionCache;
 import interview.guide.infrastructure.redis.InterviewSessionCache.CachedSession;
+import interview.guide.infrastructure.redis.RedisService;
 import interview.guide.modules.interview.listener.EvaluateStreamProducer;
 import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
+import interview.guide.modules.user.security.UserContext;
+import interview.guide.modules.target.service.JobTargetService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +37,8 @@ public class InterviewSessionService {
     private final InterviewSessionCache sessionCache;
     private final ObjectMapper objectMapper;
     private final EvaluateStreamProducer evaluateStreamProducer;
+    private final RedisService redisService;
+    private final JobTargetService jobTargetService;
 
     /**
      * 创建新的面试会话
@@ -41,6 +46,7 @@ public class InterviewSessionService {
      * 前端应该先调用 findUnfinishedSession 检查，或者使用 forceCreate 参数强制创建
      */
     public InterviewSessionDTO createSession(CreateInterviewRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 如果指定了resumeId且未强制创建，检查是否有未完成的会话
         if (request.resumeId() != null && !Boolean.TRUE.equals(request.forceCreate())) {
             Optional<InterviewSessionDTO> unfinishedOpt = findUnfinishedSession(request.resumeId());
@@ -52,6 +58,9 @@ public class InterviewSessionService {
         }
 
         String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        InterviewTemplateConfig template = (request.template() == null
+            ? InterviewTemplateConfig.defaultBackend(questionService.getDefaultFollowUpCount())
+            : request.template()).normalize(questionService.getDefaultFollowUpCount());
 
         log.info("创建新面试会话: {}, 题目数量: {}, resumeId: {}",
             sessionId, request.questionCount(), request.resumeId());
@@ -63,14 +72,27 @@ public class InterviewSessionService {
         }
 
         // 生成面试问题
-        List<InterviewQuestionDTO> questions = questionService.generateQuestions(
+        String targetJob = null;
+        if (request.jobTargetId() != null) {
+            var target = jobTargetService.getOwned(request.jobTargetId());
+            targetJob = "岗位：" + target.getTitle() + "\nJD：\n" + target.getJobDescription();
+        }
+        QuestionGenerationResult generation = questionService.generateQuestionsWithSource(
             request.resumeText(),
             request.questionCount(),
-            historicalQuestions
+            historicalQuestions,
+            template,
+            targetJob
         );
+        List<InterviewQuestionDTO> questions = generation.questions();
+        String questionsSource = generation.source();
+        if (InterviewSessionDTO.SOURCE_DEFAULT.equals(questionsSource)) {
+            log.warn("会话 {} 使用默认题库出题", sessionId);
+        }
 
         // 保存到 Redis 缓存
         sessionCache.saveSession(
+            userId,
             sessionId,
             request.resumeText(),
             request.resumeId(),
@@ -83,7 +105,7 @@ public class InterviewSessionService {
         if (request.resumeId() != null) {
             try {
                 persistenceService.saveSession(sessionId, request.resumeId(),
-                    questions.size(), questions);
+                    questions.size(), questions, template);
             } catch (Exception e) {
                 log.warn("保存面试会话到数据库失败: {}", e.getMessage());
             }
@@ -95,7 +117,8 @@ public class InterviewSessionService {
             questions.size(),
             0,
             questions,
-            SessionStatus.CREATED
+            SessionStatus.CREATED,
+            questionsSource
         );
     }
 
@@ -103,9 +126,10 @@ public class InterviewSessionService {
      * 获取会话信息（优先从缓存获取，缓存未命中则从数据库恢复）
      */
     public InterviewSessionDTO getSession(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 1. 尝试从 Redis 缓存获取
-        Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-        if (cachedOpt.isPresent()) {
+        Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
+        if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             return toDTO(cachedOpt.get());
         }
 
@@ -123,12 +147,13 @@ public class InterviewSessionService {
      */
     public Optional<InterviewSessionDTO> findUnfinishedSession(Long resumeId) {
         try {
+            Long userId = UserContext.getCurrentUserIdOrThrow();
             // 1. 先从 Redis 缓存查找
-            Optional<String> cachedSessionIdOpt = sessionCache.findUnfinishedSessionId(resumeId);
+            Optional<String> cachedSessionIdOpt = sessionCache.findUnfinishedSessionId(userId, resumeId);
             if (cachedSessionIdOpt.isPresent()) {
                 String sessionId = cachedSessionIdOpt.get();
-                Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-                if (cachedOpt.isPresent()) {
+                Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
+                if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
                     log.debug("从 Redis 缓存找到未完成会话: resumeId={}, sessionId={}", resumeId, sessionId);
                     return Optional.of(toDTO(cachedOpt.get()));
                 }
@@ -164,7 +189,8 @@ public class InterviewSessionService {
      */
     private CachedSession restoreSessionFromDatabase(String sessionId) {
         try {
-            Optional<InterviewSessionEntity> entityOpt = persistenceService.findBySessionId(sessionId);
+            // 缓存未命中走 DB 恢复时鉴权：仅返回属于当前登录用户的会话
+            Optional<InterviewSessionEntity> entityOpt = persistenceService.findBySessionIdForCurrentUser(sessionId);
             return entityOpt.map(this::restoreSessionFromEntity).orElse(null);
         } catch (Exception e) {
             log.error("从数据库恢复会话失败: {}", e.getMessage(), e);
@@ -197,6 +223,7 @@ public class InterviewSessionService {
 
             // 保存到 Redis 缓存
             sessionCache.saveSession(
+                entity.getUserId(),
                 entity.getSessionId(),
                 entity.getResume().getResumeText(),
                 entity.getResume().getId(),
@@ -209,7 +236,7 @@ public class InterviewSessionService {
                 entity.getSessionId(), entity.getCurrentQuestionIndex(), entity.getStatus());
 
             // 返回缓存的会话
-            return sessionCache.getSession(entity.getSessionId()).orElse(null);
+            return sessionCache.getSession(entity.getUserId(), entity.getSessionId()).orElse(null);
         } catch (Exception e) {
             log.error("恢复会话失败: {}", e.getMessage(), e);
             return null;
@@ -246,6 +273,7 @@ public class InterviewSessionService {
      * 获取当前问题
      */
     public InterviewQuestionDTO getCurrentQuestion(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -256,7 +284,7 @@ public class InterviewSessionService {
         // 更新状态为进行中
         if (session.getStatus() == SessionStatus.CREATED) {
             session.setStatus(SessionStatus.IN_PROGRESS);
-            sessionCache.updateSessionStatus(sessionId, SessionStatus.IN_PROGRESS);
+            sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.IN_PROGRESS);
 
             // 同步到数据库
             try {
@@ -275,6 +303,22 @@ public class InterviewSessionService {
      * 如果是最后一题，自动触发异步评估
      */
     public SubmitAnswerResponse submitAnswer(SubmitAnswerRequest request) {
+        // 分布式锁防止同一会话并发提交导致 Redis 状态覆盖
+        String lockKey = "interview:session:lock:" + request.sessionId();
+        try {
+            return redisService.executeWithLock(lockKey, 3, 10, java.util.concurrent.TimeUnit.SECONDS,
+                () -> doSubmitAnswer(request));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("获取锁失败")) {
+                throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND,
+                    "操作过于频繁，请稍后重试");
+            }
+            throw e;
+        }
+    }
+
+    private SubmitAnswerResponse doSubmitAnswer(SubmitAnswerRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(request.sessionId());
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -288,20 +332,24 @@ public class InterviewSessionService {
         InterviewQuestionDTO answeredQuestion = question.withAnswer(request.answer());
         questions.set(index, answeredQuestion);
 
-        // 移动到下一题
-        int newIndex = index + 1;
+        Optional<InterviewQuestionDTO> dynamicFollowUp = generateDynamicFollowUp(
+            request.sessionId(), questions, question, request.answer()
+        );
+        dynamicFollowUp.ifPresent(questions::add);
 
-        // 检查是否全部完成
-        boolean hasNextQuestion = newIndex < questions.size();
+        int newIndex = dynamicFollowUp
+            .map(InterviewQuestionDTO::questionIndex)
+            .orElseGet(() -> findNextUnansweredQuestionIndex(questions));
+        boolean hasNextQuestion = newIndex >= 0;
         InterviewQuestionDTO nextQuestion = hasNextQuestion ? questions.get(newIndex) : null;
 
         SessionStatus newStatus = hasNextQuestion ? SessionStatus.IN_PROGRESS : SessionStatus.COMPLETED;
 
         // 更新 Redis 缓存
-        sessionCache.updateQuestions(request.sessionId(), questions);
-        sessionCache.updateCurrentIndex(request.sessionId(), newIndex);
+        sessionCache.updateQuestions(userId, request.sessionId(), questions);
+        sessionCache.updateCurrentIndex(userId, request.sessionId(), newIndex);
         if (newStatus == SessionStatus.COMPLETED) {
-            sessionCache.updateSessionStatus(request.sessionId(), SessionStatus.COMPLETED);
+            sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.COMPLETED);
         }
 
         // 保存答案到数据库
@@ -309,7 +357,7 @@ public class InterviewSessionService {
             persistenceService.saveAnswer(
                 request.sessionId(), index,
                 question.question(), question.category(),
-                request.answer(), 0, null  // 分数在报告生成时更新
+                request.answer(), 0, null, request.answerDurationSeconds()  // 分数在报告生成时更新
             );
             persistenceService.updateCurrentQuestionIndex(request.sessionId(), newIndex);
             persistenceService.updateSessionStatus(request.sessionId(),
@@ -317,10 +365,15 @@ public class InterviewSessionService {
                     ? InterviewSessionEntity.SessionStatus.COMPLETED
                     : InterviewSessionEntity.SessionStatus.IN_PROGRESS);
 
+            // 动态追问生成后回写 questionsJson，保证异步评估能读到追问
+            if (dynamicFollowUp.isPresent()) {
+                persistenceService.updateQuestionsJson(request.sessionId(), questions);
+            }
+
             // 如果是最后一题，设置评估状态为 PENDING 并触发异步评估
             if (!hasNextQuestion) {
                 persistenceService.updateEvaluateStatus(request.sessionId(), AsyncTaskStatus.PENDING, null);
-                evaluateStreamProducer.sendEvaluateTask(request.sessionId());
+                evaluateStreamProducer.sendEvaluateTask(userId, request.sessionId());
                 log.info("会话 {} 已完成所有问题，评估任务已入队", request.sessionId());
             }
         } catch (Exception e) {
@@ -338,10 +391,58 @@ public class InterviewSessionService {
         );
     }
 
+    private Optional<InterviewQuestionDTO> generateDynamicFollowUp(
+        String sessionId,
+        List<InterviewQuestionDTO> questions,
+        InterviewQuestionDTO question,
+        String answer
+    ) {
+        InterviewTemplateConfig template = loadTemplate(sessionId);
+        int parentQuestionIndex = question.isFollowUp() && question.parentQuestionIndex() != null
+            ? question.parentQuestionIndex()
+            : question.questionIndex();
+        int existingFollowUpCount = (int) questions.stream()
+            .filter(InterviewQuestionDTO::isFollowUp)
+            .filter(item -> Integer.valueOf(parentQuestionIndex).equals(item.parentQuestionIndex()))
+            .count();
+        return questionService.generateDynamicFollowUp(
+            question,
+            answer,
+            questions.size(),
+            parentQuestionIndex,
+            existingFollowUpCount,
+            template.followUpCount()
+        );
+    }
+
+    private InterviewTemplateConfig loadTemplate(String sessionId) {
+        try {
+            Optional<InterviewSessionEntity> session = persistenceService.findBySessionId(sessionId);
+            if (session.isPresent() && session.get().getTemplateJson() != null) {
+                return objectMapper.readValue(session.get().getTemplateJson(), InterviewTemplateConfig.class)
+                    .normalize(questionService.getDefaultFollowUpCount());
+            }
+        } catch (Exception e) {
+            log.warn("读取面试模板快照失败，将使用默认模板: {}", e.getMessage());
+        }
+        return InterviewTemplateConfig.defaultBackend(questionService.getDefaultFollowUpCount());
+    }
+
+    private int findNextUnansweredQuestionIndex(List<InterviewQuestionDTO> questions) {
+        for (int i = 0; i < questions.size(); i++) {
+            InterviewQuestionDTO question = questions.get(i);
+            if (question.userAnswer() == null || question.userAnswer().isBlank()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     /**
      * 暂存答案（不进入下一题）
      */
     public void saveAnswer(SubmitAnswerRequest request) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(request.sessionId());
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
@@ -356,11 +457,11 @@ public class InterviewSessionService {
         questions.set(index, answeredQuestion);
 
         // 更新 Redis 缓存
-        sessionCache.updateQuestions(request.sessionId(), questions);
+        sessionCache.updateQuestions(userId, request.sessionId(), questions);
 
         // 更新状态为进行中
         if (session.getStatus() == SessionStatus.CREATED) {
-            sessionCache.updateSessionStatus(request.sessionId(), SessionStatus.IN_PROGRESS);
+            sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.IN_PROGRESS);
         }
 
         // 保存答案到数据库（不更新currentIndex）
@@ -368,7 +469,7 @@ public class InterviewSessionService {
             persistenceService.saveAnswer(
                 request.sessionId(), index,
                 question.question(), question.category(),
-                request.answer(), 0, null
+                request.answer(), 0, null, request.answerDurationSeconds()
             );
             persistenceService.updateSessionStatus(request.sessionId(),
                 InterviewSessionEntity.SessionStatus.IN_PROGRESS);
@@ -383,6 +484,7 @@ public class InterviewSessionService {
      * 提前交卷（触发异步评估）
      */
     public void completeInterview(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
 
         if (session.getStatus() == SessionStatus.COMPLETED || session.getStatus() == SessionStatus.EVALUATED) {
@@ -390,7 +492,7 @@ public class InterviewSessionService {
         }
 
         // 更新 Redis 缓存
-        sessionCache.updateSessionStatus(sessionId, SessionStatus.COMPLETED);
+        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
 
         // 更新数据库状态
         try {
@@ -403,20 +505,73 @@ public class InterviewSessionService {
         }
 
         // 发送评估任务到 Redis Stream
-        evaluateStreamProducer.sendEvaluateTask(sessionId);
+        evaluateStreamProducer.sendEvaluateTask(userId, sessionId);
 
         log.info("会话 {} 提前交卷，评估任务已入队", sessionId);
+    }
+
+    /**
+     * 评估失败后一键重试：重置为 PENDING 并重新入队 Stream。
+     * 仅允许 FAILED；进行中/已完成不可重复触发。
+     */
+    public void retryEvaluation(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        InterviewSessionEntity entity = persistenceService.findBySessionIdForCurrentUser(sessionId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+
+        InterviewSessionEntity.SessionStatus status = entity.getStatus();
+        if (status != InterviewSessionEntity.SessionStatus.COMPLETED
+            && status != InterviewSessionEntity.SessionStatus.EVALUATED) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "仅已交卷的面试可重新评估");
+        }
+
+        AsyncTaskStatus evaluateStatus = entity.getEvaluateStatus();
+        if (evaluateStatus == AsyncTaskStatus.PROCESSING || evaluateStatus == AsyncTaskStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "评估正在进行中，请稍后再试");
+        }
+        // 已成功出分则不可重试
+        if (evaluateStatus == AsyncTaskStatus.COMPLETED && entity.getOverallScore() != null) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "评估已完成，无需重试");
+        }
+        // 允许：FAILED；或无 evaluateStatus / 未出分的异常历史数据
+        boolean retryable = evaluateStatus == null
+            || evaluateStatus == AsyncTaskStatus.FAILED
+            || (evaluateStatus == AsyncTaskStatus.COMPLETED && entity.getOverallScore() == null);
+        if (!retryable) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE);
+        }
+
+        try {
+            // 确保会话状态回到 COMPLETED，便于消费者落库报告
+            if (status == InterviewSessionEntity.SessionStatus.EVALUATED
+                && entity.getOverallScore() == null) {
+                persistenceService.updateSessionStatus(sessionId,
+                    InterviewSessionEntity.SessionStatus.COMPLETED);
+            }
+            persistenceService.updateEvaluateStatus(sessionId, AsyncTaskStatus.PENDING, null);
+            sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
+        } catch (Exception e) {
+            log.warn("重置评估状态失败: sessionId={}, error={}", sessionId, e.getMessage());
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_FAILED, "重置评估状态失败，请重试");
+        }
+
+        evaluateStreamProducer.sendEvaluateTask(userId, sessionId);
+        log.info("会话 {} 评估已重新入队", sessionId);
     }
 
     /**
      * 获取或恢复会话（优先从缓存获取）
      */
     private CachedSession getOrRestoreSession(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         // 1. 尝试从 Redis 缓存获取
-        Optional<CachedSession> cachedOpt = sessionCache.getSession(sessionId);
-        if (cachedOpt.isPresent()) {
+        Optional<CachedSession> cachedOpt = sessionCache.getSession(userId, sessionId);
+        if (cachedOpt.isPresent() && belongsToCurrentUser(cachedOpt.get())) {
             // 刷新 TTL
-            sessionCache.refreshSessionTTL(sessionId);
+            sessionCache.refreshSessionTTL(userId, sessionId);
             return cachedOpt.get();
         }
 
@@ -429,10 +584,16 @@ public class InterviewSessionService {
         return restoredSession;
     }
 
+    private boolean belongsToCurrentUser(CachedSession session) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return userId.equals(session.getUserId());
+    }
+
     /**
      * 生成评估报告
      */
     public InterviewReportDTO generateReport(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         CachedSession session = getOrRestoreSession(sessionId);
 
         if (session.getStatus() != SessionStatus.COMPLETED && session.getStatus() != SessionStatus.EVALUATED) {
@@ -450,7 +611,7 @@ public class InterviewSessionService {
         );
 
         // 更新 Redis 缓存状态
-        sessionCache.updateSessionStatus(sessionId, SessionStatus.EVALUATED);
+        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.EVALUATED);
 
         // 保存报告到数据库
         try {

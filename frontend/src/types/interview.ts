@@ -7,6 +7,8 @@ export interface InterviewSession {
   currentQuestionIndex: number;
   questions: InterviewQuestion[];
   status: 'CREATED' | 'IN_PROGRESS' | 'COMPLETED' | 'EVALUATED';
+  /** 出题来源：AI | DEFAULT；历史会话可能为空 */
+  questionsSource?: 'AI' | 'DEFAULT' | string | null;
 }
 
 export interface InterviewQuestion {
@@ -17,6 +19,8 @@ export interface InterviewQuestion {
   userAnswer: string | null;
   score: number | null;
   feedback: string | null;
+  isFollowUp: boolean;
+  parentQuestionIndex: number | null;
 }
 
 export type QuestionType = 
@@ -27,19 +31,45 @@ export type QuestionType =
   | 'MYSQL' 
   | 'REDIS' 
   | 'SPRING' 
-  | 'SPRING_BOOT';
+  | 'SPRING_BOOT'
+  | 'FRONTEND'
+  | 'DISTRIBUTED_SYSTEM'
+  | 'ARCHITECTURE'
+  | 'SOFT_SKILLS';
+
+export interface QuestionTypeWeight {
+  type: QuestionType;
+  weight: number;
+}
+
+export interface DifficultyDistribution {
+  basic: number;
+  advanced: number;
+  expert: number;
+}
+
+export interface InterviewTemplateConfig {
+  id: string;
+  name: string;
+  questionTypes: QuestionTypeWeight[];
+  difficultyDistribution: DifficultyDistribution;
+  followUpCount: number;
+}
 
 export interface CreateInterviewRequest {
   resumeText: string;
   questionCount: number;
   resumeId?: number;
   forceCreate?: boolean;  // 是否强制创建新会话（忽略未完成的会话）
+  template?: InterviewTemplateConfig;
+  jobTargetId?: number;
 }
 
 export interface SubmitAnswerRequest {
   sessionId: string;
   questionIndex: number;
   answer: string;
+  answerDurationSeconds?: number;
 }
 
 export interface SubmitAnswerResponse {

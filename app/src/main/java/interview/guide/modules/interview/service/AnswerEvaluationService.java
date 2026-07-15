@@ -8,9 +8,10 @@ import interview.guide.modules.interview.model.InterviewReportDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO.CategoryScore;
 import interview.guide.modules.interview.model.InterviewReportDTO.QuestionEvaluation;
 import interview.guide.modules.interview.model.InterviewReportDTO.ReferenceAnswer;
+import interview.guide.modules.userai.service.UserAiChatClientFactory;
+import interview.guide.modules.interview.repository.InterviewSessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +37,7 @@ public class AnswerEvaluationService {
     
     private static final Logger log = LoggerFactory.getLogger(AnswerEvaluationService.class);
     
-    private final ChatClient chatClient;
+    private final UserAiChatClientFactory chatClientFactory;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final BeanOutputConverter<EvaluationReportDTO> outputConverter;
@@ -44,6 +45,8 @@ public class AnswerEvaluationService {
     private final PromptTemplate summaryUserPromptTemplate;
     private final BeanOutputConverter<FinalSummaryDTO> summaryOutputConverter;
     private final StructuredOutputInvoker structuredOutputInvoker;
+    private final InterviewEvaluationEvidenceService evidenceService;
+    private final InterviewSessionRepository sessionRepository;
     private final int evaluationBatchSize;
     
     // 中间DTO用于接收AI响应
@@ -74,17 +77,52 @@ public class AnswerEvaluationService {
         List<String> strengths,
         List<String> improvements
     ) {}
+
+    /**
+     * Reuses the interview scoring rubric for one retry answer. The returned score and feedback
+     * intentionally come from the same evaluation path as a normal interview report.
+     */
+    public PracticeAnswerEvaluation evaluatePracticeAnswer(String taskId, String question, String category, String answer) {
+        InterviewQuestionDTO practiceQuestion = InterviewQuestionDTO.create(
+            0,
+            question,
+            InterviewQuestionDTO.QuestionType.PROJECT,
+            category == null || category.isBlank() ? "综合" : category
+        ).withAnswer(answer);
+        EvaluationReportDTO report = evaluateBatch(
+            "practice-" + taskId,
+            "",
+            List.of(practiceQuestion),
+            0,
+            1,
+            evidenceService.getAvailableKnowledgeBaseIds()
+        );
+        QuestionEvaluationDTO evaluation = report.questionEvaluations() == null || report.questionEvaluations().isEmpty()
+            ? null
+            : report.questionEvaluations().getFirst();
+        if (evaluation == null) {
+            return new PracticeAnswerEvaluation(0, "本次复练未生成有效评分，请再次提交。");
+        }
+        return new PracticeAnswerEvaluation(evaluation.score(), evaluation.feedback());
+    }
+
+    public record PracticeAnswerEvaluation(int score, String feedback) {
+    }
     
     public AnswerEvaluationService(
-            ChatClient.Builder chatClientBuilder,
+            UserAiChatClientFactory chatClientFactory,
             StructuredOutputInvoker structuredOutputInvoker,
+            InterviewEvaluationEvidenceService evidenceService,
+            InterviewSessionRepository sessionRepository,
             @Value("classpath:prompts/interview-evaluation-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/interview-evaluation-user.st") Resource userPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-system.st") Resource summarySystemPromptResource,
             @Value("classpath:prompts/interview-evaluation-summary-user.st") Resource summaryUserPromptResource,
             @Value("${app.interview.evaluation.batch-size:8}") int evaluationBatchSize) throws IOException {
-        this.chatClient = chatClientBuilder.build();
+        this.chatClientFactory = chatClientFactory;
         this.structuredOutputInvoker = structuredOutputInvoker;
+        this.evidenceService = evidenceService;
+        this.sessionRepository = sessionRepository;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.outputConverter = new BeanOutputConverter<>(EvaluationReportDTO.class);
@@ -107,22 +145,42 @@ public class AnswerEvaluationService {
                 ? resumeText.substring(0, 500) + "..." 
                 : resumeText;
 
+            // 在评估入口查一次可用知识库 ID，避免每批重复查库
+            List<Long> knowledgeBaseIds = evidenceService.getAvailableKnowledgeBaseIds();
+            reportProgress(sessionId, 8);
+
             // 分批评估，避免单次上下文过大导致 token 超限
-            List<BatchEvaluationResult> batchResults = evaluateInBatches(sessionId, resumeSummary, questions);
+            List<BatchEvaluationResult> batchResults = evaluateInBatches(
+                sessionId, resumeSummary, questions, knowledgeBaseIds);
 
             List<QuestionEvaluationDTO> mergedEvaluations = mergeQuestionEvaluations(batchResults);
             String fallbackOverallFeedback = mergeOverallFeedback(batchResults);
             List<String> fallbackStrengths = mergeListItems(batchResults, true);
             List<String> fallbackImprovements = mergeListItems(batchResults, false);
-            FinalSummaryDTO finalSummary = summarizeBatchResults(
-                sessionId,
-                resumeSummary,
-                questions,
-                mergedEvaluations,
-                fallbackOverallFeedback,
-                fallbackStrengths,
-                fallbackImprovements
-            );
+
+            // 单批评估时跳过二次 summary，直接复用本批综合结论，少一次 LLM 调用
+            FinalSummaryDTO finalSummary;
+            if (batchResults.size() <= 1) {
+                log.info("单批评估，跳过二次汇总: sessionId={}, questionCount={}", sessionId, questions.size());
+                reportProgress(sessionId, 95);
+                finalSummary = new FinalSummaryDTO(
+                    fallbackOverallFeedback,
+                    fallbackStrengths,
+                    fallbackImprovements
+                );
+            } else {
+                reportProgress(sessionId, 88);
+                finalSummary = summarizeBatchResults(
+                    sessionId,
+                    resumeSummary,
+                    questions,
+                    mergedEvaluations,
+                    fallbackOverallFeedback,
+                    fallbackStrengths,
+                    fallbackImprovements
+                );
+            }
+            reportProgress(sessionId, 98);
 
             // 转换为业务对象
             return convertToReport(
@@ -161,16 +219,41 @@ public class AnswerEvaluationService {
     private List<BatchEvaluationResult> evaluateInBatches(
         String sessionId,
         String resumeSummary,
-        List<InterviewQuestionDTO> questions
+        List<InterviewQuestionDTO> questions,
+        List<Long> knowledgeBaseIds
     ) {
         List<BatchEvaluationResult> results = new ArrayList<>();
+        int totalBatches = Math.max(1, (questions.size() + evaluationBatchSize - 1) / evaluationBatchSize);
+        int batchIndex = 0;
         for (int start = 0; start < questions.size(); start += evaluationBatchSize) {
             int end = Math.min(start + evaluationBatchSize, questions.size());
             List<InterviewQuestionDTO> batchQuestions = questions.subList(start, end);
-            EvaluationReportDTO report = evaluateBatch(sessionId, resumeSummary, batchQuestions, start, end);
+            EvaluationReportDTO report = evaluateBatch(
+                sessionId, resumeSummary, batchQuestions, start, end, knowledgeBaseIds);
             results.add(new BatchEvaluationResult(start, end, report));
+            batchIndex++;
+            // 分批评估占总进度约 10%→85%，多批时按批推进
+            int progress = 10 + (int) Math.round(75.0 * batchIndex / totalBatches);
+            reportProgress(sessionId, progress);
         }
         return results;
+    }
+
+    /**
+     * 写入评估进度。练习题等伪 sessionId 跳过；失败仅打 debug 不中断评估。
+     */
+    private void reportProgress(String sessionId, int progress) {
+        if (sessionId == null || sessionId.startsWith("practice-")) {
+            return;
+        }
+        try {
+            sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
+                session.setEvaluateProgress(Math.min(100, Math.max(0, progress)));
+                sessionRepository.save(session);
+            });
+        } catch (Exception e) {
+            log.debug("更新评估进度失败: sessionId={}, progress={}, error={}", sessionId, progress, e.getMessage());
+        }
     }
 
     private EvaluationReportDTO evaluateBatch(
@@ -178,20 +261,24 @@ public class AnswerEvaluationService {
         String resumeSummary,
         List<InterviewQuestionDTO> batchQuestions,
         int start,
-        int end
+        int end,
+        List<Long> knowledgeBaseIds
     ) {
         String qaRecords = buildQARecords(batchQuestions);
+        String ragEvidence = evidenceService.buildEvidence(batchQuestions, knowledgeBaseIds);
         String systemPrompt = systemPromptTemplate.render();
 
         Map<String, Object> variables = new HashMap<>();
         variables.put("resumeText", resumeSummary);
         variables.put("qaRecords", qaRecords);
+        variables.put("ragEvidence", ragEvidence);
         String userPrompt = userPromptTemplate.render(variables);
 
         String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
         try {
             EvaluationReportDTO dto = structuredOutputInvoker.invoke(
-                chatClient,
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
                 systemPromptWithFormat,
                 userPrompt,
                 outputConverter,
@@ -288,7 +375,8 @@ public class AnswerEvaluationService {
 
             String systemPromptWithFormat = summarySystemPrompt + "\n\n" + summaryOutputConverter.getFormat();
             FinalSummaryDTO dto = structuredOutputInvoker.invoke(
-                chatClient,
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
                 systemPromptWithFormat,
                 summaryUserPrompt,
                 summaryOutputConverter,

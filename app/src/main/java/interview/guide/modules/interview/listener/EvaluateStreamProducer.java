@@ -16,7 +16,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-public class EvaluateStreamProducer extends AbstractStreamProducer<String> {
+public class EvaluateStreamProducer extends AbstractStreamProducer<EvaluateStreamProducer.EvaluateTaskPayload> {
 
     private final InterviewSessionRepository sessionRepository;
 
@@ -28,10 +28,11 @@ public class EvaluateStreamProducer extends AbstractStreamProducer<String> {
     /**
      * 发送评估任务到 Redis Stream
      *
+     * @param userId    面试会话所属用户ID
      * @param sessionId 面试会话ID
      */
-    public void sendEvaluateTask(String sessionId) {
-        sendTask(sessionId);
+    public void sendEvaluateTask(Long userId, String sessionId) {
+        sendTask(new EvaluateTaskPayload(userId, sessionId));
     }
 
     @Override
@@ -45,21 +46,22 @@ public class EvaluateStreamProducer extends AbstractStreamProducer<String> {
     }
 
     @Override
-    protected Map<String, String> buildMessage(String sessionId) {
+    protected Map<String, String> buildMessage(EvaluateTaskPayload payload) {
         return Map.of(
-            AsyncTaskStreamConstants.FIELD_SESSION_ID, sessionId,
+            AsyncTaskStreamConstants.FIELD_SESSION_ID, payload.sessionId(),
+            AsyncTaskStreamConstants.FIELD_USER_ID, String.valueOf(payload.userId()),
             AsyncTaskStreamConstants.FIELD_RETRY_COUNT, "0"
         );
     }
 
     @Override
-    protected String payloadIdentifier(String sessionId) {
-        return "sessionId=" + sessionId;
+    protected String payloadIdentifier(EvaluateTaskPayload payload) {
+        return "sessionId=" + payload.sessionId() + ",userId=" + payload.userId();
     }
 
     @Override
-    protected void onSendFailed(String sessionId, String error) {
-        updateEvaluateStatus(sessionId, AsyncTaskStatus.FAILED, truncateError(error));
+    protected void onSendFailed(EvaluateTaskPayload payload, String error) {
+        updateEvaluateStatus(payload.sessionId(), AsyncTaskStatus.FAILED, truncateError(error));
     }
 
     /**
@@ -74,4 +76,7 @@ public class EvaluateStreamProducer extends AbstractStreamProducer<String> {
             sessionRepository.save(session);
         });
     }
+
+    /** 评估任务载荷，携带 userId 以便消费者校验归属。 */
+    public record EvaluateTaskPayload(Long userId, String sessionId) {}
 }

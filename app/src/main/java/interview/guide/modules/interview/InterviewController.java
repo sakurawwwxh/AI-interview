@@ -6,6 +6,7 @@ import interview.guide.modules.interview.model.*;
 import interview.guide.modules.interview.service.InterviewHistoryService;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.interview.service.InterviewSessionService;
+import interview.guide.modules.interview.service.InterviewStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +31,7 @@ public class InterviewController {
     private final InterviewSessionService sessionService;
     private final InterviewHistoryService historyService;
     private final InterviewPersistenceService persistenceService;
+    private final InterviewStatisticsService statisticsService;
     
     /**
      * 创建面试会话
@@ -68,8 +71,10 @@ public class InterviewController {
             @RequestBody Map<String, Object> body) {
         Integer questionIndex = (Integer) body.get("questionIndex");
         String answer = (String) body.get("answer");
+        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
+            ? duration.intValue() : null;
         log.info("提交答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
         SubmitAnswerResponse response = sessionService.submitAnswer(request);
         return Result.success(response);
     }
@@ -102,8 +107,10 @@ public class InterviewController {
             @RequestBody Map<String, Object> body) {
         Integer questionIndex = (Integer) body.get("questionIndex");
         String answer = (String) body.get("answer");
+        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
+            ? duration.intValue() : null;
         log.info("暂存答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer);
+        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
         sessionService.saveAnswer(request);
         return Result.success(null);
     }
@@ -117,6 +124,16 @@ public class InterviewController {
         sessionService.completeInterview(sessionId);
         return Result.success(null);
     }
+
+    /**
+     * 评估失败后重新入队评估
+     */
+    @PostMapping("/api/interview/sessions/{sessionId}/retry-evaluation")
+    public Result<Void> retryEvaluation(@PathVariable String sessionId) {
+        log.info("重新评估: {}", sessionId);
+        sessionService.retryEvaluation(sessionId);
+        return Result.success(null);
+    }
     
     /**
      * 获取面试会话详情
@@ -126,6 +143,22 @@ public class InterviewController {
     public Result<InterviewDetailDTO> getInterviewDetail(@PathVariable String sessionId) {
         InterviewDetailDTO detail = historyService.getInterviewDetail(sessionId);
         return Result.success(detail);
+    }
+
+    /**
+     * 获取本地全部已评分面试的能力统计。
+     */
+    @GetMapping("/api/interview/statistics")
+    public Result<InterviewStatisticsDTO> getInterviewStatistics() {
+        return Result.success(statisticsService.getStatistics());
+    }
+
+    /**
+     * 当前用户全部面试记录列表（含关联简历摘要）
+     */
+    @GetMapping("/api/interview/history")
+    public Result<List<InterviewListItemDTO>> listInterviewHistory() {
+        return Result.success(historyService.listCurrentUserInterviews());
     }
     
     /**

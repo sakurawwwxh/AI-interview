@@ -9,6 +9,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 
 import java.util.ArrayList;
@@ -17,8 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -96,6 +96,18 @@ class KnowledgeBaseVectorServiceTest {
      */
     private List<Document> createMockDocuments(int count) {
         return createMockDocuments(count, null);
+    }
+
+    /**
+     * 让 vectorStore 模拟抛异常以触发 fallback 路径（执行 Java 端过滤），
+     * 并在 fallback 的第二次调用中返回指定结果。
+     */
+    private void mockFallbackResults(List<Document> results) {
+        // 第一次调用（主路径）抛异常 -> 触发 fallback
+        // 第二次调用（fallback 路径）返回结果
+        when(vectorStore.similaritySearch(any(SearchRequest.class)))
+            .thenThrow(new RuntimeException("模拟 filter 失败"))
+            .thenReturn(results);
     }
 
     /**
@@ -256,14 +268,13 @@ class KnowledgeBaseVectorServiceTest {
             int topK = 5;
 
             List<Document> mockResults = createMockDocuments(10, null);
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, null, topK);
+            List<Document> results = vectorService.similaritySearch(query, null, topK, 0.28);
 
             // Then
             assertEquals(topK, results.size(), "应该返回 topK 个结果");
-            verify(vectorStore, times(1)).similaritySearch(query);
         }
 
         @Test
@@ -280,10 +291,10 @@ class KnowledgeBaseVectorServiceTest {
             mockResults.addAll(createMockDocuments(3, "2"));  // kb_id = "2"
             mockResults.addAll(createMockDocuments(4, "3"));  // kb_id = "3" (应被过滤)
 
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, topK);
+            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, topK, 0.28);
 
             // Then: 只返回 kb_id 为 1 或 2 的文档
             assertEquals(6, results.size(), "应该只返回匹配知识库ID的文档");
@@ -309,10 +320,10 @@ class KnowledgeBaseVectorServiceTest {
             mockResults.add(createDocumentWithLongKbId(100L));
             mockResults.add(createDocumentWithLongKbId(200L)); // 应被过滤
 
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, topK);
+            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, topK, 0.28);
 
             // Then
             assertEquals(2, results.size(), "应该只返回 kb_id=100 的文档");
@@ -326,10 +337,10 @@ class KnowledgeBaseVectorServiceTest {
             int topK = 3;
 
             List<Document> mockResults = createMockDocuments(10, "1");
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, List.of(1L), topK);
+            List<Document> results = vectorService.similaritySearch(query, List.of(1L), topK, 0.28);
 
             // Then
             assertEquals(topK, results.size(), "结果数量应该被 topK 限制");
@@ -340,13 +351,13 @@ class KnowledgeBaseVectorServiceTest {
         void testSearchFailureThrowsException() {
             // Given
             String query = "测试";
-            when(vectorStore.similaritySearch(anyString()))
+            when(vectorStore.similaritySearch(any(SearchRequest.class)))
                 .thenThrow(new RuntimeException("搜索服务不可用"));
 
             // When & Then
             RuntimeException exception = assertThrows(
                 RuntimeException.class,
-                () -> vectorService.similaritySearch(query, null, 5)
+                () -> vectorService.similaritySearch(query, null, 5, 0.28)
             );
 
             assertTrue(exception.getMessage().contains("向量搜索失败"));
@@ -361,10 +372,10 @@ class KnowledgeBaseVectorServiceTest {
             int topK = 5;
 
             List<Document> mockResults = createMockDocuments(10, "1");
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, emptyList, topK);
+            List<Document> results = vectorService.similaritySearch(query, emptyList, topK, 0.28);
 
             // Then: 空列表应该返回所有结果（受 topK 限制）
             assertEquals(topK, results.size());
@@ -375,10 +386,10 @@ class KnowledgeBaseVectorServiceTest {
         void testSearchReturnsEmpty() {
             // Given
             String query = "不存在的内容";
-            when(vectorStore.similaritySearch(query)).thenReturn(List.of());
+            when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, null, 10);
+            List<Document> results = vectorService.similaritySearch(query, null, 10, 0.28);
 
             // Then
             assertTrue(results.isEmpty(), "搜索结果应该为空");
@@ -392,10 +403,10 @@ class KnowledgeBaseVectorServiceTest {
             List<Long> knowledgeBaseIds = List.of(999L); // 不存在的 kb_id
 
             List<Document> mockResults = createMockDocuments(5, "1");
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, 10);
+            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, 10, 0.28);
 
             // Then
             assertTrue(results.isEmpty(), "没有匹配的知识库ID，结果应为空");
@@ -414,10 +425,10 @@ class KnowledgeBaseVectorServiceTest {
             mockResults.add(createDocumentWithInvalidKbId(null));
             mockResults.addAll(createMockDocuments(2, "1")); // 有效的文档
 
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, 10);
+            List<Document> results = vectorService.similaritySearch(query, knowledgeBaseIds, 10, 0.28);
 
             // Then: 无效的 kb_id 应该被过滤掉，只返回有效的
             assertEquals(2, results.size(), "只应返回有效 kb_id 的文档");
@@ -510,10 +521,10 @@ class KnowledgeBaseVectorServiceTest {
         void testEmptyQuery() {
             // Given
             String emptyQuery = "";
-            when(vectorStore.similaritySearch(emptyQuery)).thenReturn(List.of());
+            when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
 
             // When
-            List<Document> results = vectorService.similaritySearch(emptyQuery, null, 5);
+            List<Document> results = vectorService.similaritySearch(emptyQuery, null, 5, 0.28);
 
             // Then
             assertTrue(results.isEmpty());
@@ -525,10 +536,10 @@ class KnowledgeBaseVectorServiceTest {
             // Given
             String query = "测试";
             List<Document> mockResults = createMockDocuments(5);
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            mockFallbackResults(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, null, 0);
+            List<Document> results = vectorService.similaritySearch(query, null, 0, 0.28);
 
             // Then
             assertTrue(results.isEmpty(), "topK=0 应该返回空结果");
@@ -541,10 +552,10 @@ class KnowledgeBaseVectorServiceTest {
             String query = "测试";
             int topK = 100;
             List<Document> mockResults = createMockDocuments(5);
-            when(vectorStore.similaritySearch(query)).thenReturn(mockResults);
+            when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(mockResults);
 
             // When
-            List<Document> results = vectorService.similaritySearch(query, null, topK);
+            List<Document> results = vectorService.similaritySearch(query, null, topK, 0.28);
 
             // Then
             assertEquals(5, results.size(), "应该返回所有可用结果");

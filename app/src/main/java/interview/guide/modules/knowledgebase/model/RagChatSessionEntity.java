@@ -81,6 +81,18 @@ public class RagChatSessionEntity {
     @Column(columnDefinition = "boolean default false")
     private Boolean isPinned = false;
 
+    /**
+     * 所属用户 ID
+     */
+    @Column(name = "user_id")
+    private Long userId;
+
+    /**
+     * Dify 会话 ID（走 Dify 聊天助手模式时由 Dify 返回，用于多轮对话上下文恢复）
+     */
+    @Column(name = "dify_conversation_id", length = 64)
+    private String difyConversationId;
+
     public enum SessionStatus {
         ACTIVE,    // 活跃会话
         ARCHIVED   // 已归档

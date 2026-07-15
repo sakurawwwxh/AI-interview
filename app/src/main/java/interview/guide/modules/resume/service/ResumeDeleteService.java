@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 public class ResumeDeleteService {
     
     private final ResumePersistenceService persistenceService;
+    private final ResumeVersionService versionService;
     private final InterviewPersistenceService interviewPersistenceService;
     private final FileStorageService storageService;
     
@@ -47,6 +48,7 @@ public class ResumeDeleteService {
         interviewPersistenceService.deleteSessionsByResumeId(id);
         
         // 3. 删除数据库记录（包括分析记录）
+        versionService.deleteForResume(id);
         persistenceService.deleteResume(id);
         
         log.info("简历删除完成: id={}", id);

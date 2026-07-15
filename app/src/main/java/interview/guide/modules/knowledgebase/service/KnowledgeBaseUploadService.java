@@ -5,6 +5,7 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileHashService;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.infrastructure.file.FileValidationService;
+import interview.guide.modules.dify.service.DifySyncService;
 import interview.guide.modules.knowledgebase.listener.VectorizeStreamProducer;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
@@ -34,6 +35,7 @@ public class KnowledgeBaseUploadService {
     private final FileValidationService fileValidationService;
     private final FileHashService fileHashService;
     private final VectorizeStreamProducer vectorizeStreamProducer;
+    private final DifySyncService difySyncService;
 
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
@@ -56,9 +58,10 @@ public class KnowledgeBaseUploadService {
         String contentType = parseService.detectContentType(file);
         validateContentType(contentType, fileName);
 
-        // 3. 检查知识库是否已存在（去重）
+        // 3. 检查知识库是否已存在（按用户去重）
         String fileHash = fileHashService.calculateHash(file);
-        Optional<KnowledgeBaseEntity> existingKb = knowledgeBaseRepository.findByFileHash(fileHash);
+        Long userId = interview.guide.modules.user.security.UserContext.getCurrentUserIdOrThrow();
+        Optional<KnowledgeBaseEntity> existingKb = knowledgeBaseRepository.findByFileHashAndUserId(fileHash, userId);
         if (existingKb.isPresent()) {
             log.info("检测到重复知识库: hash={}", fileHash);
             return persistenceService.handleDuplicateKnowledgeBase(existingKb.get(), fileHash);
@@ -76,14 +79,30 @@ public class KnowledgeBaseUploadService {
         log.info("知识库已存储到RustFS: {}", fileKey);
 
         // 6. 保存知识库元数据到数据库（状态为 PENDING）
-        KnowledgeBaseEntity savedKb = persistenceService.saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
+        KnowledgeBaseEntity savedKb;
+        try {
+            savedKb = persistenceService.saveKnowledgeBase(file, name, category, fileKey, fileUrl, fileHash);
+        } catch (Exception e) {
+            // 落库失败时补偿删除已上传的 S3 文件，避免孤儿
+            log.error("落库失败，回滚 S3 文件: fileKey={}, error={}", fileKey, e.getMessage());
+            try {
+                storageService.deleteKnowledgeBase(fileKey);
+            } catch (Exception delErr) {
+                log.error("S3 补偿删除失败，留下孤儿: fileKey={}, error={}", fileKey, delErr.getMessage());
+            }
+            throw e;
+        }
 
         // 7. 发送向量化任务到 Redis Stream（异步处理）
         vectorizeStreamProducer.sendVectorizeTask(savedKb.getId(), content);
 
         log.info("知识库上传完成，向量化任务已入队: {}, kbId={}", fileName, savedKb.getId());
 
-        // 8. 返回结果（状态为 PENDING，前端可轮询获取最新状态）
+        // 8. 异步同步到 Dify（传只读字段，避免异步 save 覆盖向量状态）
+        difySyncService.syncToDify(savedKb.getId(), savedKb.getName(), savedKb.getOriginalFilename(),
+            savedKb.getCategory(), content, savedKb.getDifyDocumentId());
+
+        // 9. 返回结果（状态为 PENDING，前端可轮询获取最新状态）
         return Map.of(
             "knowledgeBase", Map.of(
                 "id", savedKb.getId(),
@@ -121,7 +140,8 @@ public class KnowledgeBaseUploadService {
      * @param kbId 知识库ID
      */
     public void revectorize(Long kbId) {
-        KnowledgeBaseEntity kb = knowledgeBaseRepository.findById(kbId)
+        Long userId = interview.guide.modules.user.security.UserContext.getCurrentUserIdOrThrow();
+        KnowledgeBaseEntity kb = knowledgeBaseRepository.findByIdAndUserId(kbId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "知识库不存在"));
 
         log.info("开始重新向量化知识库: kbId={}, name={}", kbId, kb.getName());

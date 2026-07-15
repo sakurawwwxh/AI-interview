@@ -1,123 +1,144 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { useAuthStore } from '../stores/authStore';
+import { authApi } from './auth';
 
-/**
- * 后端统一响应结构
- */
 interface Result<T = unknown> {
   code: number;
   message: string;
   data: T;
 }
 
-const baseURL = import.meta.env.PROD ? '' : 'http://localhost:8080';
+type RetriableConfig = AxiosRequestConfig & { _retry?: boolean };
+type PendingRequest = { config: RetriableConfig; resolve: (value: AxiosResponse) => void; reject: (reason?: unknown) => void };
 
-const instance: AxiosInstance = axios.create({
-  baseURL,
-  timeout: 60000,
+const baseURL = import.meta.env.PROD ? '' : 'http://localhost:8080';
+const instance: AxiosInstance = axios.create({ baseURL, timeout: 60000 });
+
+let isRefreshing = false;
+let pendingQueue: PendingRequest[] = [];
+
+function applyAuthorization<T extends AxiosRequestConfig>(config: T, token: string): T {
+  (config as AxiosRequestConfig).headers = {
+    ...(config.headers ?? {}),
+    Authorization: `Bearer ${token}`,
+  };
+  return config;
+}
+
+function flushQueue(error?: unknown, token?: string) {
+  const queue = pendingQueue;
+  pendingQueue = [];
+  queue.forEach(({ config, resolve, reject }) => {
+    if (error || !token) {
+      reject(error ?? new Error('登录已过期'));
+      return;
+    }
+    instance(applyAuthorization(config, token)).then(resolve).catch(reject);
+  });
+}
+
+async function refreshAndRetry(originalConfig: RetriableConfig): Promise<AxiosResponse> {
+  if (originalConfig.url?.includes('/api/auth/refresh') || originalConfig._retry) {
+    throw new Error('登录已过期');
+  }
+  if (isRefreshing) {
+    return new Promise<AxiosResponse>((resolve, reject) => pendingQueue.push({ config: originalConfig, resolve, reject }));
+  }
+
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) {
+    const error = new Error('登录已过期');
+    useAuthStore.getState().logout();
+    window.location.assign('/login');
+    throw error;
+  }
+
+  originalConfig._retry = true;
+  isRefreshing = true;
+  try {
+    const refreshed = await authApi.refresh(refreshToken);
+    const store = useAuthStore.getState();
+    if (store.user) {
+      store.login(refreshed.accessToken, refreshed.refreshToken, store.user);
+    } else {
+      store.setToken(refreshed.accessToken);
+    }
+    flushQueue(undefined, refreshed.accessToken);
+    return instance(applyAuthorization(originalConfig, refreshed.accessToken));
+  } catch (error) {
+    flushQueue(error);
+    useAuthStore.getState().logout();
+    window.location.assign('/login');
+    throw error;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+instance.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
-/**
- * 响应拦截器
- * 
- * 后端约定：所有响应都是 HTTP 200 + Result
- * - code === 200 → 成功，返回 data
- * - code !== 200 → 失败，直接显示 message
- */
 instance.interceptors.response.use(
   (response) => {
     const result = response.data as Result;
-    
-    // 检查是否是 Result 格式
-    if (result && typeof result === 'object' && 'code' in result) {
-      if (result.code === 200) {
-        // 成功：返回 data
-        response.data = result.data;
-        return response;
-      }
-      // 失败：直接抛出 message
-      return Promise.reject(new Error(result.message || '请求失败'));
+    if (!result || typeof result !== 'object' || !('code' in result)) return response;
+    if (result.code === 200) {
+      response.data = result.data;
+      return response;
     }
-    
-    // 非 Result 格式，直接返回
-    return response;
+    if (result.code === 9005) return refreshAndRetry(response.config as RetriableConfig);
+    return Promise.reject(new Error(result.message || '请求失败'));
   },
   (error) => {
-    // 有响应的情况：后端返回了结果（即使是错误）
-    if (error.response) {
-      const { data } = error.response;
-      // 尝试解析 Result 格式
-      if (data && typeof data === 'object' && 'code' in data && 'message' in data) {
-        const result = data as Result;
-        return Promise.reject(new Error(result.message || '请求失败'));
-      }
-      // 响应格式不对
-      return Promise.reject(new Error('请求失败，请重试'));
+    const result = error.response?.data as Result | undefined;
+    if (error.response?.status === 401 && result?.code === 9005) {
+      return refreshAndRetry(error.config as RetriableConfig);
     }
-
-    // 没有响应的情况：真正的网络错误或连接被重置
-    // 对于文件上传，可能是网络超时或连接中断，但不一定是文件大小问题
-    // 让后端返回真实的错误信息，而不是在这里假设
-    const config = error.config;
-    const isUpload = config && (
-      config.url?.includes('/upload') ||
-      config.headers?.['Content-Type']?.toString().includes('multipart')
-    );
-
-    if (isUpload) {
-      // 文件上传失败且没有响应，可能是网络超时或连接中断
-      // 不直接假设是文件大小问题，返回更通用的错误信息
-      return Promise.reject(new Error('上传失败，可能是网络超时或连接中断，请重试'));
-    }
-
-    // 其他网络错误
-    return Promise.reject(new Error('网络连接失败，请检查网络'));
-  }
+    if (result?.message) return Promise.reject(new Error(result.message));
+    return Promise.reject(error instanceof Error ? error : new Error('网络连接失败，请检查网络'));
+  },
 );
+
+export function getAuthorizationHeader(): Record<string, string> {
+  const token = useAuthStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export const request = {
   get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return instance.get(url, config).then(res => res.data);
+    return instance.get(url, config).then((res) => res.data);
   },
-
   post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    return instance.post(url, data, config).then(res => res.data);
+    return instance.post(url, data, config).then((res) => res.data);
   },
-
   put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
-    return instance.put(url, data, config).then(res => res.data);
+    return instance.put(url, data, config).then((res) => res.data);
   },
-
+  patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return instance.patch(url, data, config).then((res) => res.data);
+  },
   delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    return instance.delete(url, config).then(res => res.data);
+    return instance.delete(url, config).then((res) => res.data);
   },
-
-  /**
-   * 文件上传
-   */
   upload<T>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<T> {
     return instance.post(url, formData, {
       timeout: 120000,
       headers: { 'Content-Type': 'multipart/form-data' },
       ...config,
-    }).then(res => res.data);
+    }).then((res) => res.data);
   },
-
-  /**
-   * 获取原始实例（用于特殊场景如下载 Blob）
-   */
   getInstance(): AxiosInstance {
     return instance;
   },
 };
 
-/**
- * 获取错误信息
- */
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return '未知错误';
+  return error instanceof Error ? error.message : '未知错误';
 }
 
 export default request;

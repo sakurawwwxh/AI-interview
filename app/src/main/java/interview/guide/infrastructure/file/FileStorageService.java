@@ -54,6 +54,39 @@ public class FileStorageService {
     }
 
     /**
+     * 上传字节数组到存储（用于 Dify 拉取的文档内容）
+     *
+     * <p>Dify 同步场景下，文档内容通过 segments API 拼接得到，没有原始 MultipartFile。
+     * 此方法接受字节数组，内部复用 generateFileKey 生成存储键。
+     *
+     * @param data             文件内容字节数组
+     * @param originalFilename 原始文件名（用于生成存储键）
+     * @param contentType      MIME 类型
+     * @param prefix           存储前缀（如 "knowledgebases"）
+     * @return 存储键 fileKey
+     */
+    public String uploadBytes(byte[] data, String originalFilename, String contentType, String prefix) {
+        ensureBucketExists();
+        String fileKey = generateFileKey(originalFilename, prefix);
+
+        try {
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(storageConfig.getBucket())
+                    .key(fileKey)
+                    .contentType(contentType != null ? contentType : "application/octet-stream")
+                    .contentLength((long) data.length)
+                    .build();
+
+            s3Client.putObject(putRequest, RequestBody.fromBytes(data));
+            log.info("字节数组上传成功: {} -> {}", originalFilename, fileKey);
+            return fileKey;
+        } catch (S3Exception e) {
+            log.error("上传字节数组到RustFS失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.STORAGE_UPLOAD_FAILED, "文件存储失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 删除知识库文件
      */
     public void deleteKnowledgeBase(String fileKey) {

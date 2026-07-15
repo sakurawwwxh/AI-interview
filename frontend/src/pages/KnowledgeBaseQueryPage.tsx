@@ -55,12 +55,26 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [useDifyWorkflow, setUseDifyWorkflow] = useState(false);
 
   // refs
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const rafRef = useRef<number>();
+  const abortRef = useRef<AbortController | null>(null);
 
   const [, startTransition] = useTransition();
+
+  // 组件卸载时清理 rafRef 和 abortController
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadKnowledgeBases();
@@ -255,25 +269,36 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
   };
 
   const handleSubmitQuestion = async () => {
-    if (!question.trim() || selectedKbIds.size === 0 || loading) return;
+    // Dify 工作流模式不需要选择知识库，本地模式需要
+    if (!question.trim() || loading) return;
+    if (!useDifyWorkflow && selectedKbIds.size === 0) return;
 
     const userQuestion = question.trim();
-    setQuestion('');
     setLoading(true);
 
+    // 创建 AbortController 用于停止生成
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
     let sessionId = currentSessionId;
+    // 两种模式都需要创建 session（Dify 模式也保存对话历史）
     if (!sessionId) {
       try {
-        const session = await ragChatApi.createSession(Array.from(selectedKbIds));
+        // Dify 模式不需要选知识库，传空数组创建 session
+        const kbIds = useDifyWorkflow ? [] : Array.from(selectedKbIds);
+        const session = await ragChatApi.createSession(kbIds);
         sessionId = session.id;
         setCurrentSessionId(sessionId);
         setCurrentSessionTitle(session.title);
       } catch (err) {
         console.error('创建会话失败', err);
         setLoading(false);
-        return;
+        return; // 不清空输入框，用户的问题保留
       }
     }
+
+    // 创建会话成功后才清空输入框
+    setQuestion('');
 
     const userMessage: Message = {
       type: 'user',
@@ -305,33 +330,53 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
     };
 
     try {
-      await ragChatApi.sendMessageStream(
-        sessionId,
-        userQuestion,
-        (chunk: string) => {
-          fullContent += chunk;
-          if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-          }
-          rafRef.current = requestAnimationFrame(() => {
-            startTransition(() => {
-              updateAssistantMessage(fullContent);
-            });
-          });
-        },
-        () => {
-          setLoading(false);
-          loadSessions();
-        },
-        (error: Error) => {
-          console.error('流式查询失败:', error);
-          updateAssistantMessage(fullContent || error.message || '回答失败，请重试');
-          setLoading(false);
+      const onChunk = (chunk: string) => {
+        fullContent += chunk;
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
         }
-      );
+        rafRef.current = requestAnimationFrame(() => {
+          startTransition(() => {
+            updateAssistantMessage(fullContent);
+          });
+        });
+      };
+      const onComplete = () => {
+        setLoading(false);
+        abortRef.current = null;
+        loadSessions();
+      };
+      const onError = (error: Error) => {
+        console.error('流式查询失败:', error);
+        updateAssistantMessage(fullContent || error.message || '回答失败，请重试');
+        setLoading(false);
+        abortRef.current = null;
+      };
+
+      if (useDifyWorkflow) {
+        // Dify 聊天模式：走 session 保存对话历史
+        await ragChatApi.sendDifyMessageStream(
+          sessionId!, userQuestion, onChunk, onComplete, onError, abortController.signal
+        );
+      } else {
+        // 本地 RAG 模式
+        await ragChatApi.sendMessageStream(
+          sessionId!, userQuestion, onChunk, onComplete, onError, abortController.signal
+        );
+      }
     } catch (err) {
       console.error('发起流式查询失败:', err);
       updateAssistantMessage(err instanceof Error ? err.message : '回答失败，请重试');
+      setLoading(false);
+      abortRef.current = null;
+    }
+  };
+
+  /** 停止生成 */
+  const handleStopGenerate = () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
       setLoading(false);
     }
   };
@@ -394,7 +439,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
               <h2 className="text-base font-semibold text-slate-800 dark:text-white">对话历史</h2>
               <motion.button
                 onClick={handleNewSession}
-                disabled={selectedKbIds.size === 0}
+                disabled={!useDifyWorkflow && selectedKbIds.size === 0}
                 className="p-1.5 text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -485,7 +530,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         <div className="flex-1 min-w-0">
           <div
               className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm flex flex-col h-full border border-slate-100 dark:border-slate-700">
-            {selectedKbIds.size > 0 ? (
+            {selectedKbIds.size > 0 || currentSessionId ? (
               <>
                 {/* 会话信息 */}
                 <div className="p-4 border-b border-slate-200 dark:border-slate-600">
@@ -584,6 +629,34 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
 
                 {/* 输入区域 */}
                 <div className="p-4 border-t border-slate-200 dark:border-slate-600">
+                  {/* RAG 模式切换 */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <button
+                      onClick={() => setUseDifyWorkflow(false)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                        !useDifyWorkflow
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      本地 RAG
+                    </button>
+                    <button
+                      onClick={() => setUseDifyWorkflow(true)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                        useDifyWorkflow
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      Dify 工作流
+                    </button>
+                    {useDifyWorkflow && (
+                      <span className="text-xs text-slate-400">
+                        通过 Dify 云知识库检索（可在 Dify 控制台查看召回率）
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-3">
                     <input
                       type="text"
@@ -596,13 +669,23 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
                     />
                     <motion.button
                       onClick={handleSubmitQuestion}
-                      disabled={!question.trim() || selectedKbIds.size === 0 || loading}
+                      disabled={!question.trim() || (!useDifyWorkflow && selectedKbIds.size === 0) || loading}
                       className="px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                       whileHover={{ scale: loading ? 1 : 1.02 }}
                       whileTap={{ scale: loading ? 1 : 0.98 }}
                     >
                       发送
                     </motion.button>
+                    {loading && (
+                      <motion.button
+                        onClick={handleStopGenerate}
+                        className="px-4 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all text-sm"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        停止
+                      </motion.button>
+                    )}
                   </div>
                 </div>
               </>

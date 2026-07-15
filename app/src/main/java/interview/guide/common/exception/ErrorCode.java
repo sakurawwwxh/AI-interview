@@ -36,6 +36,7 @@ public enum ErrorCode {
     INTERVIEW_EVALUATION_FAILED(3005, "面试评估失败"),
     INTERVIEW_QUESTION_GENERATION_FAILED(3006, "面试问题生成失败"),
     INTERVIEW_NOT_COMPLETED(3007, "面试尚未完成"),
+    INTERVIEW_EVALUATION_NOT_RETRYABLE(3008, "当前状态不可重新评估"),
     
     // ========== 存储模块错误 4xxx ==========
     STORAGE_UPLOAD_FAILED(4001, "文件上传失败"),
@@ -61,7 +62,24 @@ public enum ErrorCode {
     AI_RATE_LIMIT_EXCEEDED(7005, "AI服务调用频率超限"),
 
     // ========== 限流模块错误 8xxx ==========
-    RATE_LIMIT_EXCEEDED(8001, "请求过于频繁，请稍后再试");
+    RATE_LIMIT_EXCEEDED(8001, "请求过于频繁，请稍后再试"),
+
+    // ========== 用户模块错误 9xxx ==========
+    USER_NOT_FOUND(9001, "用户不存在"),
+    USERNAME_EXISTS(9002, "用户名已存在"),
+    EMAIL_EXISTS(9003, "邮箱已存在"),
+    PASSWORD_WRONG(9004, "用户名或密码错误"),
+    TOKEN_EXPIRED(9005, "登录已过期，请重新登录"),
+    TOKEN_INVALID(9006, "无效的认证凭证"),
+    REFRESH_TOKEN_INVALID(9007, "刷新令牌无效或已过期"),
+
+    // ========== 复练模块错误 10xxx ==========
+    PRACTICE_TASK_NOT_FOUND(10001, "复练任务不存在"),
+
+    // ========== 用户管理错误 10xxx ==========
+    CANNOT_DELETE_SELF(10002, "不能删除自己的账号"),
+    CANNOT_MODIFY_SELF_ROLE(10003, "不能修改自己的角色"),
+    LAST_ADMIN_PROTECTED(10004, "系统至少需要保留一个管理员");
     
     private final Integer code;
     private final String message;

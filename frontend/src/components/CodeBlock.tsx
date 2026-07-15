@@ -2,10 +2,47 @@ import { useState, lazy, Suspense } from 'react';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Check, Copy } from 'lucide-react';
 
-// Lazy load SyntaxHighlighter
-const SyntaxHighlighter = lazy(() =>
-  import('react-syntax-highlighter/dist/esm/prism').then(module => ({ default: module.default }))
-);
+// Load only the languages shown by the application instead of the full Prism bundle.
+const SyntaxHighlighter = lazy(async () => {
+  const [
+    { default: PrismLight },
+    { default: java },
+    { default: javascript },
+    { default: typescript },
+    { default: json },
+    { default: sql },
+    { default: bash },
+    { default: yaml },
+    { default: markup },
+    { default: css },
+  ] = await Promise.all([
+    import('react-syntax-highlighter/dist/esm/prism-light'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/java'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/javascript'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/typescript'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/json'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/sql'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/bash'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/yaml'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/markup'),
+    import('react-syntax-highlighter/dist/esm/languages/prism/css'),
+  ]);
+  PrismLight.registerLanguage('java', java);
+  PrismLight.registerLanguage('javascript', javascript);
+  PrismLight.registerLanguage('typescript', typescript);
+  PrismLight.registerLanguage('json', json);
+  PrismLight.registerLanguage('sql', sql);
+  PrismLight.registerLanguage('bash', bash);
+  PrismLight.registerLanguage('yaml', yaml);
+  PrismLight.registerLanguage('markup', markup);
+  PrismLight.registerLanguage('css', css);
+  PrismLight.alias('javascript', ['js', 'jsx']);
+  PrismLight.alias('typescript', ['ts', 'tsx']);
+  PrismLight.alias('bash', ['sh', 'shell']);
+  PrismLight.alias('yaml', ['yml']);
+  PrismLight.alias('markup', ['html', 'xml']);
+  return { default: PrismLight };
+});
 
 interface CodeBlockProps {
   language?: string;

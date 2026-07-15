@@ -18,6 +18,11 @@ public final class AsyncTaskStreamConstants {
     public static final String FIELD_RETRY_COUNT = "retryCount";
 
     /**
+     * 用户ID字段（用于异步任务归属校验）
+     */
+    public static final String FIELD_USER_ID = "userId";
+
+    /**
      * 文档内容字段
      */
     public static final String FIELD_CONTENT = "content";

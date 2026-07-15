@@ -1,14 +1,21 @@
-import {Link, Outlet, useLocation} from 'react-router-dom';
-import {motion} from 'framer-motion';
-import {ChevronRight, Database, FileStack, MessageSquare, Moon, Sparkles, Sun, Upload, Users,} from 'lucide-react';
-import {useTheme} from '../hooks/useTheme';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  BarChart3, BookOpen, BriefcaseBusiness, BrainCircuit, FileStack, LogOut,
+  Menu, MessageSquare, Moon, Sun, Upload, UserRound, Users, Dumbbell,
+  Shield, X, Home,
+} from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
+import { useAuthStore } from '../stores/authStore';
+import { aiUsageApi, type AiUsageDTO } from '../api/aiUsage';
+import { authApi } from '../api/auth';
+import { useEffect, useState } from 'react';
 
 interface NavItem {
   id: string;
   path: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  description?: string;
 }
 
 interface NavGroup {
@@ -19,157 +26,103 @@ interface NavGroup {
 
 export default function Layout() {
   const location = useLocation();
-  const currentPath = location.pathname;
-    const {theme, toggleTheme} = useTheme();
+  const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  const user = useAuthStore((state) => state.user);
+  const refreshToken = useAuthStore((state) => state.refreshToken);
+  const logout = useAuthStore((state) => state.logout);
+  const [usage, setUsage] = useState<AiUsageDTO | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // 按业务模块组织的导航项
-  const navGroups: NavGroup[] = [
-    {
-      id: 'career',
-      title: '简历与面试',
-      items: [
-        { id: 'upload', path: '/upload', label: '上传简历', icon: Upload, description: 'AI 分析简历' },
-        { id: 'resumes', path: '/history', label: '简历库', icon: FileStack, description: '管理所有简历' },
-        { id: 'interviews', path: '/interviews', label: '面试记录', icon: Users, description: '查看面试历史' },
-      ],
-    },
-    {
-      id: 'knowledge',
-      title: '知识库',
-      items: [
-        { id: 'kb-manage', path: '/knowledgebase', label: '知识库管理', icon: Database, description: '管理知识文档' },
-        { id: 'chat', path: '/knowledgebase/chat', label: '问答助手', icon: MessageSquare, description: '基于知识库问答' },
-      ],
-    },
-  ];
+  useEffect(() => {
+    aiUsageApi.getUsage().then(setUsage).catch(() => setUsage(null));
+  }, []);
+  useEffect(() => setMobileNavOpen(false), [location.pathname]);
 
-  // 判断当前页面是否匹配导航项
-  const isActive = (path: string) => {
-    if (path === '/upload') {
-      return currentPath === '/upload' || currentPath === '/';
+  const handleLogout = async () => {
+    try {
+      if (refreshToken) await authApi.logout(refreshToken);
+    } catch {
+      // Always clear this browser's local authentication state.
     }
-    if (path === '/knowledgebase') {
-      return currentPath === '/knowledgebase' || currentPath === '/knowledgebase/upload';
-    }
-    return currentPath.startsWith(path);
+    logout();
+    navigate('/login', { replace: true });
   };
 
+  const navGroups: NavGroup[] = [
+    { id: 'workspace', title: '准备', items: [
+      { id: 'home', path: '/', label: '今天', icon: Home },
+      { id: 'job-targets', path: '/job-targets', label: '目标岗位', icon: BriefcaseBusiness },
+      { id: 'upload', path: '/upload', label: '上传简历', icon: Upload },
+      { id: 'resumes', path: '/history', label: '简历库', icon: FileStack },
+    ] },
+    { id: 'training', title: '训练', items: [
+      { id: 'interviews', path: '/interviews', label: '模拟面试', icon: Users },
+      { id: 'practice', path: '/practice', label: '专项复练', icon: Dumbbell },
+      { id: 'statistics', path: '/interview-statistics', label: '能力画像', icon: BarChart3 },
+    ] },
+    { id: 'library', title: '资料', items: [
+      { id: 'knowledgebase', path: '/knowledgebase', label: '面试百科', icon: BookOpen },
+      { id: 'chat', path: '/knowledgebase/chat', label: '知识问答', icon: MessageSquare },
+      { id: 'profile', path: '/profile', label: '个人中心', icon: UserRound },
+      ...(user?.role === 'ADMIN' ? [{ id: 'admin-users', path: '/admin/users', label: '用户管理', icon: Shield }] : []),
+    ] },
+  ];
+
+  const isActive = (path: string) => path === '/'
+    ? location.pathname === '/'
+    : location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const usagePercent = usage && usage.dailyLimit > 0
+    ? Math.min(100, Math.round((usage.dailyTokens / usage.dailyLimit) * 100)) : 0;
+
   return (
-      <div
-          className="flex min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 dark:from-slate-900 dark:to-slate-800">
-      {/* 左侧边栏 */}
-          <aside
-              className="w-64 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-700 fixed h-screen left-0 top-0 z-50 flex flex-col">
-        {/* Logo */}
-              <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-          <Link to="/upload" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-                <span
-                    className="text-lg font-bold text-slate-800 dark:text-white tracking-tight block">AI Interview</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">智能面试助手</span>
-            </div>
+    <div className="min-h-screen bg-[var(--shell-bg)] text-[var(--shell-text)] transition-colors duration-200">
+      <div className={`fixed inset-0 z-40 bg-slate-950/35 transition-opacity lg:hidden ${mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+      <button type="button" onClick={() => setMobileNavOpen(true)} aria-label="打开导航" aria-expanded={mobileNavOpen}
+        className="fixed right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] text-[var(--shell-text)] shadow-sm transition hover:bg-[var(--shell-hover)] focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden">
+        <Menu className="h-5 w-5" />
+      </button>
+
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[17.5rem] flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)] transition-transform duration-300 lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex h-[4.75rem] items-center justify-between border-b border-[var(--shell-border)] px-6">
+          <Link to="/" className="flex items-center gap-3" onClick={() => setMobileNavOpen(false)}>
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500 text-white shadow-[0_0_22px_rgba(59,130,246,0.23)]"><BrainCircuit className="h-4 w-4" /></span>
+            <span className="text-sm font-semibold tracking-tight">面试训练</span>
           </Link>
+          <button type="button" onClick={() => setMobileNavOpen(false)} className="text-[var(--shell-muted)] transition hover:text-[var(--shell-text)] lg:hidden" aria-label="关闭导航"><X className="h-5 w-5" /></button>
         </div>
 
-              {/* 主题切换按钮 */}
-              <div className="px-4 pb-2">
-                  <button
-                      onClick={toggleTheme}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                      {theme === 'dark' ? (
-                          <>
-                              <Sun className="w-4 h-4"/>
-                              <span className="text-sm font-medium">浅色模式</span>
-                          </>
-                      ) : (
-                          <>
-                              <Moon className="w-4 h-4"/>
-                              <span className="text-sm font-medium">深色模式</span>
-                          </>
-                      )}
-                  </button>
+        <nav className="flex-1 overflow-y-auto px-3 py-6">
+          {navGroups.map((group, index) => (
+            <section key={group.id} className={index === 0 ? '' : 'mt-7 border-t border-[var(--shell-border)] pt-6'}>
+              <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--shell-subtle)]">{group.title}</p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(item.path);
+                  return <Link key={item.id} to={item.path} onClick={() => setMobileNavOpen(false)}
+                    className={`group flex h-10 items-center gap-3 rounded-md px-3 text-sm transition ${active ? 'bg-[var(--shell-active)] text-[var(--shell-text)]' : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'}`}>
+                    <item.icon className={`h-4 w-4 ${active ? 'text-blue-500' : 'text-[var(--shell-subtle)] group-hover:text-[var(--shell-text)]'}`} />
+                    <span>{item.label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />}
+                  </Link>;
+                })}
               </div>
-
-        {/* 导航菜单 */}
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <div className="space-y-6">
-            {navGroups.map((group) => (
-              <div key={group.id}>
-                {/* 分组标题 */}
-                <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    {group.title}
-                  </span>
-                </div>
-                {/* 分组下的导航项 */}
-                <div className="space-y-1">
-                  {group.items.map((item) => {
-                    const active = isActive(item.path);
-                    return (
-                      <Link
-                        key={item.id}
-                        to={item.path}
-                        className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
-                          ${active
-                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                      >
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors
-                          ${active
-                            ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700 group-hover:text-slate-700 dark:group-hover:text-white'
-                          }`}
-                        >
-                          <item.icon className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className={`text-sm block ${active ? 'font-semibold' : 'font-medium'}`}>
-                            {item.label}
-                          </span>
-                          {item.description && (
-                              <span className="text-xs text-slate-400 dark:text-slate-500 truncate block">
-                              {item.description}
-                            </span>
-                          )}
-                        </div>
-                        {active && (
-                          <ChevronRight className="w-4 h-4 text-primary-400" />
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+            </section>
+          ))}
         </nav>
 
-        {/* 底部信息 */}
-              <div className="p-4 border-t border-slate-100 dark:border-slate-700">
-                  <div
-                      className="px-3 py-2 bg-gradient-to-r from-primary-50 to-indigo-50 dark:from-primary-900/30 dark:to-slate-800 rounded-xl">
-                      <p className="text-xs text-primary-600 dark:text-primary-400 font-medium">AI 面试助手 v1.0</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Powered by AI</p>
+        <div className="border-t border-[var(--shell-border)] px-5 py-5">
+          {usage && <div className="mb-5"><div className="mb-2 flex items-center justify-between text-[11px] text-[var(--shell-muted)]"><span>今日 AI 用量</span><span>{usagePercent}%</span></div><div className="h-px bg-[var(--shell-border)]"><div className="h-px bg-blue-500" style={{ width: `${usagePercent}%` }} /></div></div>}
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--shell-border)] bg-[var(--shell-hover)] text-xs font-semibold text-[var(--shell-muted)]">{(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}</span>
+            <Link to="/profile" className="min-w-0 flex-1" onClick={() => setMobileNavOpen(false)}><p className="truncate text-xs font-medium">{user?.displayName || user?.username || '用户'}</p><p className="mt-0.5 text-[11px] text-[var(--shell-muted)]">账户与模型</p></Link>
+            <button type="button" onClick={toggleTheme} title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'} className="rounded p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]" aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}>{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
+            <button type="button" onClick={handleLogout} title="退出登录" className="rounded p-1 text-[var(--shell-muted)] transition hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
       </aside>
 
-      {/* 主内容区 */}
-      <main className="flex-1 ml-64 p-10 min-h-screen overflow-y-auto">
-        <motion.div
-          key={currentPath}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Outlet />
-        </motion.div>
+      <main className="min-h-screen min-w-0 px-4 pb-10 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-12 lg:pb-14 lg:pt-10">
+        <motion.div key={location.pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, ease: 'easeOut' }}><Outlet /></motion.div>
       </main>
     </div>
   );

@@ -1,5 +1,6 @@
 import {useMemo, useState} from 'react';
 import {AnimatePresence, motion} from 'framer-motion';
+import {Link} from 'react-router-dom';
 import {getScoreColor} from '../utils/score';
 import type {InterviewDetail} from '../api/history';
 
@@ -267,6 +268,15 @@ function QuestionCard({
             得分: {answer.score}
           </span>
         </div>
+          {typeof answer.score === 'number' && answer.score < 60 && (
+            <Link
+              to={`/practice?status=TODO&category=${encodeURIComponent(answer.category || '综合')}`}
+              onClick={(event) => event.stopPropagation()}
+              className="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-200"
+            >
+              去复练
+            </Link>
+          )}
           <motion.svg
           className="w-5 h-5 text-slate-400"
           animate={{ rotate: isExpanded ? 180 : 0 }}

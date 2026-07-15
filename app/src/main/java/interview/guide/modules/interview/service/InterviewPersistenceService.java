@@ -7,10 +7,13 @@ import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewReportDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.interview.repository.InterviewAnswerRepository;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.practice.service.PracticeTaskService;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ public class InterviewPersistenceService {
     private final InterviewAnswerRepository answerRepository;
     private final ResumeRepository resumeRepository;
     private final ObjectMapper objectMapper;
+    private final PracticeTaskService practiceTaskService;
     
     /**
      * 保存新的面试会话
@@ -43,20 +47,24 @@ public class InterviewPersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public InterviewSessionEntity saveSession(String sessionId, Long resumeId, 
                                               int totalQuestions, 
-                                              List<InterviewQuestionDTO> questions) {
+                                              List<InterviewQuestionDTO> questions,
+                                              InterviewTemplateConfig template) {
         try {
-            Optional<ResumeEntity> resumeOpt = resumeRepository.findById(resumeId);
+            Long userId = UserContext.getCurrentUserIdOrThrow();
+            Optional<ResumeEntity> resumeOpt = resumeRepository.findByIdAndUserId(resumeId, userId);
             if (resumeOpt.isEmpty()) {
                 throw new BusinessException(ErrorCode.RESUME_NOT_FOUND);
             }
             
             InterviewSessionEntity session = new InterviewSessionEntity();
             session.setSessionId(sessionId);
+            session.setUserId(userId);
             session.setResume(resumeOpt.get());
             session.setTotalQuestions(totalQuestions);
             session.setCurrentQuestionIndex(0);
             session.setStatus(InterviewSessionEntity.SessionStatus.CREATED);
             session.setQuestionsJson(objectMapper.writeValueAsString(questions));
+            session.setTemplateJson(objectMapper.writeValueAsString(template));
             
             InterviewSessionEntity saved = sessionRepository.save(session);
             log.info("面试会话已保存: sessionId={}, resumeId={}", sessionId, resumeId);
@@ -73,16 +81,18 @@ public class InterviewPersistenceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateSessionStatus(String sessionId, InterviewSessionEntity.SessionStatus status) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
-        if (sessionOpt.isPresent()) {
-            InterviewSessionEntity session = sessionOpt.get();
-            session.setStatus(status);
-            if (status == InterviewSessionEntity.SessionStatus.COMPLETED ||
-                status == InterviewSessionEntity.SessionStatus.EVALUATED) {
-                session.setCompletedAt(LocalDateTime.now());
-            }
-            sessionRepository.save(session);
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
+        if (sessionOpt.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
+        InterviewSessionEntity session = sessionOpt.get();
+        session.setStatus(status);
+        if (status == InterviewSessionEntity.SessionStatus.COMPLETED ||
+            status == InterviewSessionEntity.SessionStatus.EVALUATED) {
+            session.setCompletedAt(LocalDateTime.now());
+        }
+        sessionRepository.save(session);
     }
 
     /**
@@ -90,18 +100,39 @@ public class InterviewPersistenceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateEvaluateStatus(String sessionId, AsyncTaskStatus status, String error) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
-        if (sessionOpt.isPresent()) {
-            InterviewSessionEntity session = sessionOpt.get();
-            session.setEvaluateStatus(status);
-            if (error != null) {
-                session.setEvaluateError(error.length() > 500 ? error.substring(0, 500) : error);
-            } else {
-                session.setEvaluateError(null);
-            }
-            sessionRepository.save(session);
-            log.debug("评估状态已更新: sessionId={}, status={}", sessionId, status);
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
+        if (sessionOpt.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
+        InterviewSessionEntity session = sessionOpt.get();
+        session.setEvaluateStatus(status);
+        if (error != null) {
+            session.setEvaluateError(error.length() > 500 ? error.substring(0, 500) : error);
+        } else {
+            session.setEvaluateError(null);
+        }
+        // 状态切换时同步进度：等待=0，处理中至少 5，完成=100
+        if (status == AsyncTaskStatus.PENDING) {
+            session.setEvaluateProgress(0);
+        } else if (status == AsyncTaskStatus.PROCESSING && session.getEvaluateProgress() == null) {
+            session.setEvaluateProgress(5);
+        } else if (status == AsyncTaskStatus.COMPLETED) {
+            session.setEvaluateProgress(100);
+        }
+        sessionRepository.save(session);
+        log.debug("评估状态已更新: sessionId={}, status={}", sessionId, status);
+    }
+
+    /**
+     * 仅更新评估进度（异步消费者可直接调用，按 sessionId 定位）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEvaluateProgress(String sessionId, int progress) {
+        sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
+            session.setEvaluateProgress(Math.min(100, Math.max(0, progress)));
+            sessionRepository.save(session);
+        });
     }
     
     /**
@@ -109,12 +140,36 @@ public class InterviewPersistenceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateCurrentQuestionIndex(String sessionId, int index) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
-        if (sessionOpt.isPresent()) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
+        if (sessionOpt.isEmpty()) {
+            throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
+        }
+        InterviewSessionEntity session = sessionOpt.get();
+        session.setCurrentQuestionIndex(index);
+        session.setStatus(InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+        sessionRepository.save(session);
+    }
+
+    /**
+     * 更新问题列表 JSON（动态追问追加后回写，保证异步评估能读到追问）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateQuestionsJson(String sessionId, List<InterviewQuestionDTO> questions) {
+        try {
+            Long userId = UserContext.getCurrentUserIdOrThrow();
+            Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
+            if (sessionOpt.isEmpty()) {
+                throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
+            }
             InterviewSessionEntity session = sessionOpt.get();
-            session.setCurrentQuestionIndex(index);
-            session.setStatus(InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+            session.setQuestionsJson(objectMapper.writeValueAsString(questions));
+            session.setTotalQuestions(questions.size());
             sessionRepository.save(session);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (JacksonException e) {
+            log.error("序列化问题列表失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
         }
     }
     
@@ -124,8 +179,10 @@ public class InterviewPersistenceService {
     @Transactional(rollbackFor = Exception.class)
     public InterviewAnswerEntity saveAnswer(String sessionId, int questionIndex,
                                             String question, String category,
-                                            String userAnswer, int score, String feedback) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
+                                            String userAnswer, int score, String feedback,
+                                            Integer answerDurationSeconds) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
@@ -144,6 +201,7 @@ public class InterviewPersistenceService {
         answer.setUserAnswer(userAnswer);
         answer.setScore(score);
         answer.setFeedback(feedback);
+        answer.setAnswerDurationSeconds(answerDurationSeconds);
 
         InterviewAnswerEntity saved = answerRepository.save(answer);
         log.info("面试答案已保存: sessionId={}, questionIndex={}, score={}", 
@@ -155,13 +213,29 @@ public class InterviewPersistenceService {
     /**
      * 保存面试报告
      */
+    /**
+     * 保存面试报告（请求线程调用，从 SecurityContext 取 userId）
+     */
     @Transactional(rollbackFor = Exception.class)
     public void saveReport(String sessionId, InterviewReportDTO report) {
+        Long userId = UserContext.getCurrentUserId();
+        if (userId != null) {
+            saveReport(sessionId, userId, report);
+        } else {
+            // 理论上不应走到这里，保留兜底以避免请求线程异常时丢失报告
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "无法获取当前用户信息");
+        }
+    }
+
+    /**
+     * 保存面试报告（显式传入 userId，供异步评估消费者调用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveReport(String sessionId, Long userId, InterviewReportDTO report) {
         try {
-            Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
             if (sessionOpt.isEmpty()) {
-                log.warn("会话不存在: {}", sessionId);
-                return;
+                throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
             }
 
             InterviewSessionEntity session = sessionOpt.get();
@@ -226,6 +300,7 @@ public class InterviewPersistenceService {
             }
 
             answerRepository.saveAll(answersToSave);
+            practiceTaskService.createTasksForEvaluatedAnswers(session.getUserId(), answersToSave);
             log.info("面试报告已保存: sessionId={}, score={}, 答案数={}",
                 sessionId, report.overallScore(), answersToSave.size());
 
@@ -239,6 +314,14 @@ public class InterviewPersistenceService {
      */
     public Optional<InterviewSessionEntity> findBySessionId(String sessionId) {
         return sessionRepository.findBySessionId(sessionId);
+    }
+
+    /**
+     * 根据会话ID获取会话（鉴权：仅返回属于当前登录用户的会话）
+     */
+    public Optional<InterviewSessionEntity> findBySessionIdForCurrentUser(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return sessionRepository.findBySessionIdAndUserId(sessionId, userId);
     }
     
     /**
@@ -269,19 +352,23 @@ public class InterviewPersistenceService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteSessionBySessionId(String sessionId) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
-        if (sessionOpt.isPresent()) {
-            sessionRepository.delete(sessionOpt.get());
-            log.info("已删除面试会话: sessionId={}", sessionId);
-        } else {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionIdAndUserId(sessionId, userId);
+        if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
+        sessionRepository.delete(sessionOpt.get());
+        log.info("已删除面试会话: sessionId={}", sessionId);
     }
     
     /**
      * 查找未完成的面试会话（CREATED或IN_PROGRESS状态）
      */
     public Optional<InterviewSessionEntity> findUnfinishedSession(Long resumeId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        if (resumeRepository.findByIdAndUserId(resumeId, userId).isEmpty()) {
+            throw new BusinessException(ErrorCode.RESUME_NOT_FOUND);
+        }
         List<InterviewSessionEntity.SessionStatus> unfinishedStatuses = List.of(
             InterviewSessionEntity.SessionStatus.CREATED,
             InterviewSessionEntity.SessionStatus.IN_PROGRESS

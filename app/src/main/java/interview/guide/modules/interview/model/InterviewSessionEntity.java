@@ -14,13 +14,18 @@ import java.util.List;
 @Entity
 @Table(name = "interview_sessions", indexes = {
     @Index(name = "idx_interview_session_resume_created", columnList = "resume_id,created_at"),
-    @Index(name = "idx_interview_session_resume_status_created", columnList = "resume_id,status,created_at")
+    @Index(name = "idx_interview_session_resume_status_created", columnList = "resume_id,status,created_at"),
+    @Index(name = "idx_interview_session_user", columnList = "userId")
 })
 public class InterviewSessionEntity {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    // 所属用户 ID
+    @Column(name = "user_id")
+    private Long userId;
     
     // 会话ID (UUID)
     @Column(nullable = false, unique = true, length = 36)
@@ -45,6 +50,10 @@ public class InterviewSessionEntity {
     // 问题列表 (JSON格式)
     @Column(columnDefinition = "TEXT")
     private String questionsJson;
+
+    // 创建时选定的出题模板快照（JSON）
+    @Column(columnDefinition = "TEXT")
+    private String templateJson;
     
     // 总分 (0-100)
     private Integer overallScore;
@@ -84,6 +93,12 @@ public class InterviewSessionEntity {
     // 评估错误信息
     @Column(length = 500)
     private String evaluateError;
+
+    /**
+     * 评估进度 0-100（异步评估过程中更新，便于前端展示百分比）
+     */
+    @Column(name = "evaluate_progress")
+    private Integer evaluateProgress;
     
     public enum SessionStatus {
         CREATED,      // 会话已创建
@@ -104,6 +119,14 @@ public class InterviewSessionEntity {
     
     public void setId(Long id) {
         this.id = id;
+    }
+    
+    public Long getUserId() {
+        return userId;
+    }
+    
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
     
     public String getSessionId() {
@@ -152,6 +175,14 @@ public class InterviewSessionEntity {
     
     public void setQuestionsJson(String questionsJson) {
         this.questionsJson = questionsJson;
+    }
+
+    public String getTemplateJson() {
+        return templateJson;
+    }
+
+    public void setTemplateJson(String templateJson) {
+        this.templateJson = templateJson;
     }
     
     public Integer getOverallScore() {
@@ -232,6 +263,14 @@ public class InterviewSessionEntity {
 
     public void setEvaluateError(String evaluateError) {
         this.evaluateError = evaluateError;
+    }
+
+    public Integer getEvaluateProgress() {
+        return evaluateProgress;
+    }
+
+    public void setEvaluateProgress(Integer evaluateProgress) {
+        this.evaluateProgress = evaluateProgress;
     }
 
     public void addAnswer(InterviewAnswerEntity answer) {

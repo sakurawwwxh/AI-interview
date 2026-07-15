@@ -2,15 +2,18 @@ package interview.guide.modules.knowledgebase.service;
 
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
+import interview.guide.modules.dify.model.DifySyncStatus;
 import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
 import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
@@ -60,6 +63,7 @@ public class KnowledgeBasePersistenceService {
         try {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
             kb.setFileHash(fileHash);
+            kb.setUserId(UserContext.getCurrentUserIdOrThrow());
             kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(file.getOriginalFilename()));
             kb.setCategory(category != null && !category.trim().isEmpty() ? category.trim() : null);
             kb.setOriginalFilename(file.getOriginalFilename());
@@ -78,17 +82,76 @@ public class KnowledgeBasePersistenceService {
     }
 
     /**
+     * 从 Dify 拉取的文档保存为本地知识库记录
+     *
+     * <p>不接受 MultipartFile，用标量参数。Dify 拉取的记录直接设置
+     * difyDocumentId / difySyncStatus=SYNCED / difySyncTime，避免回环触发 syncToDify。
+     *
+     * @param name            知识库名称
+     * @param originalFilename 原始文件名
+     * @param fileSize        文件大小（字节）
+     * @param contentType     MIME 类型
+     * @param storageKey      RustFS 存储键
+     * @param storageUrl      RustFS 存储URL
+     * @param fileHash        文件内容 SHA-256 哈希
+     * @param difyDocumentId  Dify 文档 ID
+     * @return 保存后的知识库实体
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeBaseEntity saveKnowledgeBaseFromDify(String name, String originalFilename,
+                                                          long fileSize, String contentType,
+                                                          String storageKey, String storageUrl,
+                                                          String fileHash, String difyDocumentId) {
+        return saveKnowledgeBaseFromDify(name, originalFilename, fileSize, contentType,
+            storageKey, storageUrl, fileHash, difyDocumentId, UserContext.getCurrentUserIdOrThrow());
+    }
+
+    /**
+     * 从 Dify 拉取的文档保存为本地知识库记录（指定 userId，供后台同步使用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeBaseEntity saveKnowledgeBaseFromDify(String name, String originalFilename,
+                                                          long fileSize, String contentType,
+                                                          String storageKey, String storageUrl,
+                                                          String fileHash, String difyDocumentId,
+                                                          Long userId) {
+        try {
+            KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
+            kb.setFileHash(fileHash);
+            kb.setUserId(userId);
+            kb.setName(name != null && !name.trim().isEmpty() ? name : extractNameFromFilename(originalFilename));
+            kb.setOriginalFilename(originalFilename);
+            kb.setFileSize(fileSize);
+            kb.setContentType(contentType);
+            kb.setStorageKey(storageKey);
+            kb.setStorageUrl(storageUrl);
+            // Dify 拉取的记录直接标记为已同步，避免回环
+            kb.setDifyDocumentId(difyDocumentId);
+            kb.setDifySyncStatus(DifySyncStatus.SYNCED);
+            kb.setDifySyncTime(LocalDateTime.now());
+
+            KnowledgeBaseEntity saved = knowledgeBaseRepository.save(kb);
+            log.info("Dify 拉取知识库已保存: id={}, name={}, difyDocId={}", saved.getId(), saved.getName(), difyDocumentId);
+            return saved;
+        } catch (Exception e) {
+            log.error("保存 Dify 拉取知识库失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存知识库失败");
+        }
+    }
+
+    /**
      * 更新知识库向量化状态为 PENDING
      */
     @Transactional(rollbackFor = Exception.class)
     public void updateVectorStatusToPending(Long kbId) {
-        KnowledgeBaseEntity kb = knowledgeBaseRepository.findById(kbId)
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        KnowledgeBaseEntity kb = knowledgeBaseRepository.findByIdAndUserId(kbId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "知识库不存在"));
-        
+
         kb.setVectorStatus(VectorStatus.PENDING);
         kb.setVectorError(null);
         knowledgeBaseRepository.save(kb);
-        
+
         log.info("知识库向量化状态已更新为 PENDING: kbId={}", kbId);
     }
 
