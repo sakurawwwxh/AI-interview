@@ -1,5 +1,7 @@
-# Maven build output
+# Maven build output（勿误伤 modules/target 业务包）
 **/target/
+!**/modules/target/
+!**/modules/target/**
 app/out/
 
 # Gradle（兼容旧构建）
