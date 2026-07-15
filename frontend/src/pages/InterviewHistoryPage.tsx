@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { interviewApi } from '../api/interview';
 import { getErrorMessage } from '../api/request';
+import PageHeader from '../components/PageHeader';
 
 interface InterviewHistoryPageProps {
   onBack: () => void;
@@ -42,7 +43,7 @@ interface InterviewStats {
   averageScore: number;
 }
 
-// 统计卡片组件
+// 统计卡片：对齐 Studio shell 令牌
 function StatCard({
   icon: Icon,
   label,
@@ -58,21 +59,21 @@ function StatCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-100 dark:border-slate-700"
+      className="ui-stat-card"
     >
-      <div className="flex items-center gap-4">
-        <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-        <div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                {value}{suffix &&
-                <span className="text-base font-normal text-slate-400 dark:text-slate-500 ml-1">{suffix}</span>}
-          </p>
-        </div>
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color}`}>
+        <Icon className="h-5 w-5 text-white" aria-hidden />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm text-[var(--shell-muted)]">{label}</p>
+        <p className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-[var(--shell-text)]">
+          {value}
+          {suffix && (
+            <span className="ml-1 text-base font-normal text-[var(--shell-subtle)]">{suffix}</span>
+          )}
+        </p>
       </div>
     </motion.div>
   );
@@ -315,109 +316,75 @@ export default function InterviewHistoryPage({
 
   return (
     <motion.div
-      className="w-full"
+      className="mx-auto w-full max-w-6xl space-y-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {/* 头部 */}
-      <div className="flex justify-between items-start mb-8 flex-wrap gap-6">
-        <div>
-          <motion.h1
-              className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <Users className="w-7 h-7 text-primary-500" />
-            面试记录
-          </motion.h1>
-          <motion.p
-              className="text-slate-500 dark:text-slate-400 mt-1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          >
-            查看和管理所有模拟面试记录
-          </motion.p>
-        </div>
+      <PageHeader
+        kicker="训练记录"
+        title="面试记录"
+        description="查看评估进度、导出报告，并从任意一场继续复盘。"
+        actions={
+          <label className="ui-search">
+            <Search className="h-4 w-4 shrink-0 text-[var(--shell-subtle)]" aria-hidden />
+            <input
+              type="search"
+              placeholder="搜索简历名称…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="搜索简历名称"
+            />
+          </label>
+        }
+      />
 
-        <motion.div
-            className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2.5 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 dark:focus-within:ring-primary-900/30 transition-all"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <Search className="w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="搜索简历名称..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400 bg-transparent"
-          />
-        </motion.div>
-      </div>
-
-      {/* 统计卡片 */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <StatCard
-            icon={Users}
-            label="面试总数"
-            value={stats.totalCount}
-            color="bg-primary-500"
-          />
-          <StatCard
-            icon={CheckCircle}
-            label="已完成"
-            value={stats.completedCount}
-            color="bg-emerald-500"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="平均分数"
-            value={stats.averageScore}
-            suffix="分"
-            color="bg-primary-600"
-          />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <StatCard icon={Users} label="面试总数" value={stats.totalCount} color="bg-primary-600" />
+          <StatCard icon={CheckCircle} label="已完成" value={stats.completedCount} color="bg-emerald-500" />
+          <StatCard icon={TrendingUp} label="平均分数" value={stats.averageScore} suffix="分" color="bg-teal-700" />
         </div>
       )}
 
-      {/* 加载状态 */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+        <div className="ui-panel flex min-h-64 items-center justify-center" role="status" aria-live="polite">
+          <Loader2 className="h-7 w-7 animate-spin text-primary-500" aria-hidden />
+          <span className="sr-only">加载面试记录</span>
         </div>
       )}
 
-      {/* 空状态 */}
       {!loading && filteredInterviews.length === 0 && (
         <motion.div
-            className="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700"
-          initial={{ opacity: 0, scale: 0.95 }}
+          className="ui-panel px-6 py-16 text-center"
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
         >
-            <Users className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4"/>
-            <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">暂无面试记录</h3>
-            <p className="text-slate-500 dark:text-slate-400">开始一次模拟面试后，记录将显示在这里</p>
+          <Users className="mx-auto h-12 w-12 text-[var(--shell-subtle)]" aria-hidden />
+          <h3 className="mt-4 text-lg font-semibold text-[var(--shell-text)]">
+            {searchTerm ? '没有匹配的记录' : '暂无面试记录'}
+          </h3>
+          <p className="mt-2 text-sm text-[var(--shell-muted)]">
+            {searchTerm ? '换个关键词试试。' : '从简历库选择一份材料，开始第一场模拟面试。'}
+          </p>
         </motion.div>
       )}
 
-      {/* 表格 */}
       {!loading && filteredInterviews.length > 0 && (
         <motion.div
-            className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
+          className="ui-panel overflow-x-auto"
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.08 }}
         >
-          <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-600">
+          <table className="w-full min-w-[720px]">
+            <thead className="border-b border-[var(--shell-border)] bg-[var(--shell-hover)]/50">
               <tr>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">关联简历</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">题目数</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">状态</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">得分</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">创建时间</th>
-                  <th className="text-right px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300">操作</th>
+                <th className="px-5 py-3.5 text-left text-sm font-medium text-[var(--shell-muted)] sm:px-6">关联简历</th>
+                <th className="px-5 py-3.5 text-left text-sm font-medium text-[var(--shell-muted)] sm:px-6">题目数</th>
+                <th className="px-5 py-3.5 text-left text-sm font-medium text-[var(--shell-muted)] sm:px-6">状态</th>
+                <th className="px-5 py-3.5 text-left text-sm font-medium text-[var(--shell-muted)] sm:px-6">得分</th>
+                <th className="px-5 py-3.5 text-left text-sm font-medium text-[var(--shell-muted)] sm:px-6">创建时间</th>
+                <th className="px-5 py-3.5 text-right text-sm font-medium text-[var(--shell-muted)] sm:px-6">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -430,118 +397,121 @@ export default function InterviewHistoryPage({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
                     onClick={() => onViewInterview(interview.sessionId, interview.resumeId)}
-                    className={`border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group ${
+                    className={`group cursor-pointer border-b border-[var(--shell-border)] transition-colors hover:bg-[var(--shell-hover)] ${
                       highlightSessionId === interview.sessionId
-                        ? 'bg-primary-50/80 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200 dark:ring-primary-800'
+                        ? 'bg-primary-50/80 ring-1 ring-inset ring-primary-200 dark:bg-primary-900/20 dark:ring-primary-800'
                         : ''
                     }`}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4 sm:px-6">
                       <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-slate-400" />
-                        <div>
-                            <p className="font-medium text-slate-800 dark:text-white">{interview.resumeFilename}</p>
-                            <p className="text-xs text-slate-400 dark:text-slate-500">#{interview.sessionId.slice(-8)}</p>
+                        <FileText className="h-5 w-5 shrink-0 text-[var(--shell-subtle)]" aria-hidden />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[var(--shell-text)]">{interview.resumeFilename}</p>
+                          <p className="text-xs text-[var(--shell-subtle)]">#{interview.sessionId.slice(-8)}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm">
+                    <td className="px-5 py-4 sm:px-6">
+                      <span className="inline-flex items-center rounded-lg bg-[var(--shell-hover)] px-2.5 py-1 text-sm text-[var(--shell-muted)]">
                         {interview.totalQuestions} 题
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4 sm:px-6">
                       <div className="flex items-center gap-2">
                         <StatusIcon interview={interview} />
-                          <span
-                            className="text-sm text-slate-600 dark:text-slate-300 max-w-[12rem] truncate"
-                            title={isEvaluateFailed(interview) ? (interview.evaluateError || '评估失败') : getStatusText(interview)}
-                          >
+                        <span
+                          className="max-w-[12rem] truncate text-sm text-[var(--shell-muted)]"
+                          title={isEvaluateFailed(interview) ? (interview.evaluateError || '评估失败') : getStatusText(interview)}
+                        >
                           {getStatusText(interview)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4 sm:px-6">
                       {isEvaluateCompleted(interview) && interview.overallScore !== null ? (
                         <div className="flex items-center gap-3">
-                            <div className="w-16 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-2 w-16 overflow-hidden rounded-full bg-[var(--shell-hover)]">
                             <motion.div
-                              className={`h-full ${getScoreColor(interview.overallScore)} rounded-full`}
+                              className={`h-full rounded-full ${getScoreColor(interview.overallScore)}`}
                               initial={{ width: 0 }}
                               animate={{ width: `${interview.overallScore}%` }}
                               transition={{ duration: 0.8, delay: index * 0.05 }}
                             />
                           </div>
-                            <span className="font-bold text-slate-800 dark:text-white">{interview.overallScore}</span>
+                          <span className="font-semibold tabular-nums text-[var(--shell-text)]">{interview.overallScore}</span>
                         </div>
                       ) : isEvaluating(interview) || (isCompletedStatus(interview.status) && !isEvaluateFailed(interview) && !isEvaluateCompleted(interview)) ? (
-                          <div className="flex items-center gap-2 min-w-[7rem]">
-                            <div className="w-16 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                              <motion.div
-                                className="h-full bg-primary-500 rounded-full"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${resolveEvaluatePercent(interview) ?? 5}%` }}
-                                transition={{ duration: 0.4 }}
-                              />
-                            </div>
-                            <span className="text-primary-500 dark:text-primary-400 text-sm tabular-nums">
-                              {resolveEvaluatePercent(interview) ?? 5}%
-                            </span>
+                        <div className="flex min-w-[7rem] items-center gap-2">
+                          <div className="h-2 w-16 overflow-hidden rounded-full bg-[var(--shell-hover)]">
+                            <motion.div
+                              className="h-full rounded-full bg-primary-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${resolveEvaluatePercent(interview) ?? 5}%` }}
+                              transition={{ duration: 0.4 }}
+                            />
                           </div>
+                          <span className="text-sm tabular-nums text-primary-600 dark:text-primary-400">
+                            {resolveEvaluatePercent(interview) ?? 5}%
+                          </span>
+                        </div>
                       ) : isEvaluateFailed(interview) ? (
-                          <span className="text-red-500 dark:text-red-400 text-sm"
-                                title={interview.evaluateError}>失败</span>
+                        <span className="text-sm text-red-500 dark:text-red-400" title={interview.evaluateError}>失败</span>
                       ) : (
-                          <span className="text-slate-400 dark:text-slate-500">-</span>
+                        <span className="text-[var(--shell-subtle)]">–</span>
                       )}
                     </td>
-                      <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                    <td className="px-5 py-4 text-sm text-[var(--shell-muted)] sm:px-6">
                       {formatDate(interview.createdAt)}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-5 py-4 text-right sm:px-6">
                       <div className="flex items-center justify-end gap-1">
-                        {/* 评估失败：一键重试 */}
                         {isEvaluateFailed(interview) && (
                           <button
+                            type="button"
                             onClick={(e) => handleRetryEvaluation(interview.sessionId, e)}
                             disabled={retryingSessionId === interview.sessionId}
-                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors disabled:opacity-50"
+                            className="ui-icon-btn-warn"
                             title={interview.evaluateError ? `重新评估：${interview.evaluateError}` : '重新评估'}
+                            aria-label="重新评估"
                           >
                             {retryingSessionId === interview.sessionId ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                             ) : (
-                              <RotateCcw className="w-4 h-4" />
+                              <RotateCcw className="h-4 w-4" aria-hidden />
                             )}
                           </button>
                         )}
-                        {/* 导出按钮 */}
                         {isEvaluateCompleted(interview) && (
                           <button
+                            type="button"
                             onClick={(e) => handleExport(interview.sessionId, e)}
                             disabled={exporting === interview.sessionId}
-                            className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50"
-                            title="导出PDF"
+                            className="ui-icon-btn-accent"
+                            title="导出 PDF"
+                            aria-label="导出 PDF"
                           >
                             {exporting === interview.sessionId ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                             ) : (
-                              <Download className="w-4 h-4" />
+                              <Download className="h-4 w-4" aria-hidden />
                             )}
                           </button>
                         )}
-                        {/* 删除按钮 */}
                         <button
+                          type="button"
                           onClick={(e) => handleDeleteClick(interview, e)}
                           disabled={deletingSessionId === interview.sessionId}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50"
+                          className="ui-icon-btn-danger"
                           title="删除"
+                          aria-label="删除面试记录"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="h-4 w-4" aria-hidden />
                         </button>
-                          <ChevronRight
-                              className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all"/>
+                        <ChevronRight
+                          className="h-5 w-5 text-[var(--shell-subtle)] transition group-hover:translate-x-0.5 group-hover:text-primary-500"
+                          aria-hidden
+                        />
                       </div>
                     </td>
                   </motion.tr>

@@ -252,7 +252,33 @@
 
   /* 图标按钮最小触控 44×44 */
   .ui-icon-btn {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40;
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-icon-btn-danger {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-red-500/10 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-red-400;
+  }
+
+  .ui-icon-btn-accent {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-primary-500/10 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-primary-400;
+  }
+
+  .ui-icon-btn-warn {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-amber-500/10 hover:text-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-400;
+  }
+
+  /* 列表/工具栏搜索框 */
+  .ui-search {
+    @apply flex min-h-11 w-full min-w-[16rem] items-center gap-2 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] px-3.5 text-sm text-[var(--shell-text)] shadow-[var(--surface-elevated)] transition focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-500/15 sm:w-72;
+  }
+
+  .ui-search input {
+    @apply min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--shell-subtle)];
+  }
+
+  /* 统计摘要卡 */
+  .ui-stat-card {
+    @apply flex items-center gap-4 rounded-[var(--radius-panel)] border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 shadow-[var(--surface-elevated)];
   }
 
   .ui-input {

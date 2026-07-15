@@ -487,24 +487,28 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                             ))}
                           </datalist>
                           <button
+                            type="button"
                             onClick={() => handleSaveCategory(kb.id)}
                             disabled={savingCategory}
-                            className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors disabled:opacity-50"
+                            className="ui-icon-btn-accent h-9 w-9"
                             title="保存"
+                            aria-label="保存分类"
                           >
                             {savingCategory ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                             ) : (
-                              <Check className="w-4 h-4" />
+                              <Check className="h-4 w-4" aria-hidden />
                             )}
                           </button>
                           <button
+                            type="button"
                             onClick={handleCancelEditCategory}
                             disabled={savingCategory}
-                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 rounded transition-colors disabled:opacity-50"
+                            className="ui-icon-btn h-9 w-9"
                             title="取消"
+                            aria-label="取消编辑分类"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" aria-hidden />
                           </button>
                         </motion.div>
                       ) : (
@@ -524,11 +528,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                               <span className="text-slate-400 dark:text-slate-500 text-sm">未分类</span>
                           )}
                           <button
+                            type="button"
                             onClick={() => handleStartEditCategory(kb)}
-                            className="p-1 text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded opacity-0 group-hover/category:opacity-100 transition-all"
+                            className="ui-icon-btn-accent h-9 w-9 opacity-0 transition-opacity group-hover/category:opacity-100 focus:opacity-100"
                             title="编辑分类"
+                            aria-label="编辑分类"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="h-3.5 w-3.5" aria-hidden />
                           </button>
                         </motion.div>
                       )}
@@ -553,32 +559,35 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {/* 下载按钮 */}
                       <button
+                        type="button"
                         onClick={() => handleDownload(kb)}
-                        className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                        className="ui-icon-btn-accent"
                         title="下载"
+                        aria-label={`下载 ${kb.name}`}
                       >
-                        <Download className="w-4 h-4" />
+                        <Download className="h-4 w-4" aria-hidden />
                       </button>
-                      {/* 重新向量化按钮（仅 FAILED 状态显示） */}
                       {kb.vectorStatus === 'FAILED' && (
                         <button
+                          type="button"
                           onClick={() => handleRevectorize(kb.id)}
                           disabled={revectorizing === kb.id}
-                          className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50"
+                          className="ui-icon-btn-warn"
                           title="重新向量化"
+                          aria-label="重新向量化"
                         >
-                          <RefreshCw className={`w-4 h-4 ${revectorizing === kb.id ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`h-4 w-4 ${revectorizing === kb.id ? 'animate-spin' : ''}`} aria-hidden />
                         </button>
                       )}
-                      {/* 删除按钮 */}
                       <button
+                        type="button"
                         onClick={() => setDeleteItem(kb)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        className="ui-icon-btn-danger"
                         title="删除"
+                        aria-label={`删除 ${kb.name}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
                   </td>
