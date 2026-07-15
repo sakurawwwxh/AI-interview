@@ -92,7 +92,7 @@ export default function AnalysisPanel({
       case '中':
         return 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400';
       case '低':
-        return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400';
+        return 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-400';
       default:
         return 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300';
     }
@@ -105,7 +105,7 @@ export default function AnalysisPanel({
       case '中':
         return 'bg-amber-500 text-white';
       case '低':
-        return 'bg-blue-500 text-white';
+        return 'bg-primary-500 text-white';
       default:
         return 'bg-slate-500 text-white';
     }
@@ -114,7 +114,7 @@ export default function AnalysisPanel({
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
       '项目': 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300',
-      '技能': 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300',
+      '技能': 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300',
       '内容': 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300',
       '格式': 'bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300',
       '结构': 'bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300',
@@ -147,9 +147,9 @@ export default function AnalysisPanel({
     return (
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-12 text-center">
           <div
-              className="w-16 h-16 mx-auto mb-6 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+              className="w-16 h-16 mx-auto mb-6 bg-primary-100 dark:bg-primary-900/50 rounded-full flex items-center justify-center">
           {isExplicitProcessing ? (
-              <Loader2 className="w-8 h-8 text-blue-500 dark:text-blue-400 animate-spin"/>
+              <Loader2 className="w-8 h-8 text-primary-500 dark:text-primary-400 animate-spin"/>
           ) : (
               <Clock className="w-8 h-8 text-yellow-500 dark:text-yellow-400"/>
           )}
@@ -300,7 +300,7 @@ export default function AnalysisPanel({
               label="技能匹配"
               score={skillMatchScore}
               maxScore={20}
-              color="bg-blue-500"
+              color="bg-primary-500"
               delay={0.4}
             />
             <ScoreProgressBar
@@ -417,9 +417,9 @@ function SuggestionSection({
       border: 'bg-amber-100 dark:bg-amber-900/50'
     },
     '低': {
-      bg: 'bg-blue-100 dark:bg-blue-900/50',
-      text: 'text-blue-700 dark:text-blue-300',
-      border: 'bg-blue-100 dark:bg-blue-900/50'
+      bg: 'bg-primary-100 dark:bg-primary-900/50',
+      text: 'text-primary-700 dark:text-primary-300',
+      border: 'bg-primary-100 dark:bg-primary-900/50'
     }
   };
 

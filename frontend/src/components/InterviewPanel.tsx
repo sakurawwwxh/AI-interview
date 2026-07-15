@@ -77,7 +77,7 @@ export default function InterviewPanel({
           <p className="text-slate-500 dark:text-slate-400 mb-6">开始模拟面试，获取专业评估</p>
         <motion.button
           onClick={onStartInterview}
-          className="px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30"
+          className="px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium shadow-lg shadow-primary-500/25"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
