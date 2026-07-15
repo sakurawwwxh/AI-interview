@@ -37,7 +37,24 @@ public class DifySyncScheduler {
             difySyncService.syncFromDify();
             log.info("定时从 Dify 同步完成");
         } catch (Exception e) {
-            log.error("定时从 Dify 同步失败: {}", e.getMessage(), e);
+            // 网络不可达（代理/DNS 超时）属环境问题，避免每次打印完整堆栈刷屏
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            if (isLikelyNetworkIssue(msg)) {
+                log.warn("定时从 Dify 同步失败（网络不可达，可检查代理或将 dify.sync.enabled=false）: {}", msg);
+            } else {
+                log.error("定时从 Dify 同步失败: {}", msg, e);
+            }
         }
+    }
+
+    private static boolean isLikelyNetworkIssue(String message) {
+        String m = message.toLowerCase();
+        return m.contains("timed out")
+            || m.contains("timeout")
+            || m.contains("connection refused")
+            || m.contains("unknown host")
+            || m.contains("i/o error")
+            || m.contains("connectexception")
+            || m.contains("getsockopt");
     }
 }
