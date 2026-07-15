@@ -5,6 +5,7 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.file.FileStorageService;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.resume.model.ResumeEntity;
+import interview.guide.modules.target.repository.JobMatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class ResumeDeleteService {
     
     private final ResumePersistenceService persistenceService;
     private final ResumeVersionService versionService;
+    private final JobMatchRepository jobMatchRepository;
     private final InterviewPersistenceService interviewPersistenceService;
     private final FileStorageService storageService;
     
@@ -47,7 +49,8 @@ public class ResumeDeleteService {
         // 2. 删除面试会话（会自动删除面试答案）
         interviewPersistenceService.deleteSessionsByResumeId(id);
         
-        // 3. 删除数据库记录（包括分析记录）
+        // 3. 删除岗位匹配记录、版本与简历
+        jobMatchRepository.deleteByResumeId(id);
         versionService.deleteForResume(id);
         persistenceService.deleteResume(id);
         

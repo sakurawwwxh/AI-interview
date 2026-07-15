@@ -18,6 +18,22 @@ public class JobTargetController {
     @PutMapping("/{id}") public Result<JobTargetDTO> update(@PathVariable Long id, @Valid @RequestBody JobTargetRequest request) { return Result.success(targetService.update(id, request)); }
     @PatchMapping("/{id}/activate") public Result<JobTargetDTO> activate(@PathVariable Long id) { return Result.success(targetService.activate(id)); }
     @DeleteMapping("/{id}") public Result<Void> delete(@PathVariable Long id) { targetService.delete(id); return Result.success(null); }
-    @PostMapping("/{id}/resumes/{resumeId}/match") @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 3)
-    public Result<JobMatchDTO> match(@PathVariable Long id, @PathVariable Long resumeId) { return Result.success(matchService.match(id, resumeId)); }
+    /** 实时匹配并持久化 */
+    @PostMapping("/{id}/resumes/{resumeId}/match")
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 3)
+    public Result<JobMatchDTO> match(@PathVariable Long id, @PathVariable Long resumeId) {
+        return Result.success(matchService.match(id, resumeId));
+    }
+
+    /** 读取该岗位 + 简历 最近一次已保存的匹配结果 */
+    @GetMapping("/{id}/resumes/{resumeId}/match/latest")
+    public Result<JobMatchDTO> latestMatch(@PathVariable Long id, @PathVariable Long resumeId) {
+        return Result.success(matchService.latest(id, resumeId).orElse(null));
+    }
+
+    /** 某简历下全部匹配历史 */
+    @GetMapping("/resumes/{resumeId}/matches")
+    public Result<List<JobMatchDTO>> listMatchesByResume(@PathVariable Long resumeId) {
+        return Result.success(matchService.listByResume(resumeId));
+    }
 }

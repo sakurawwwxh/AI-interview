@@ -7,7 +7,7 @@ import AnalysisPanel from '../components/AnalysisPanel';
 import InterviewPanel from '../components/InterviewPanel';
 import InterviewDetailPanel from '../components/InterviewDetailPanel';
 import ResumeEditorPanel from '../components/ResumeEditorPanel';
-import {formatDateOnly} from '../utils/date';
+import {formatDateOnly, formatDateTime} from '../utils/date';
 import {CheckSquare, ChevronLeft, Clock, Download, FilePenLine, MessageSquare, Mic, Target} from 'lucide-react';
 
 interface ResumeDetailPageProps {
@@ -70,6 +70,26 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
       setJobTargetId(items.find(item => item.active)?.id);
     }).catch(() => {});
   }, [resumeId]);
+
+  // 切换岗位时加载已持久化的最近匹配结果
+  useEffect(() => {
+    if (!jobTargetId) {
+      setJobMatch(null);
+      return;
+    }
+    let cancelled = false;
+    jobTargetApi
+      .latestMatch(jobTargetId, resumeId)
+      .then((data) => {
+        if (!cancelled) setJobMatch(data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setJobMatch(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [jobTargetId, resumeId]);
 
   // 轮询：当分析状态为待处理时，每5秒刷新一次
   // 待处理判断：显式的 PENDING/PROCESSING 状态，或状态未定义且无分析结果
@@ -360,7 +380,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
               onClick={handleMatch}
               className="ui-btn-primary"
             >
-              {matching ? '分析中…' : '开始匹配'}
+              {matching ? '分析中…' : jobMatch ? '重新匹配' : '开始匹配'}
             </button>
           </div>
           {!jobTargets.length && (
@@ -368,11 +388,19 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
           )}
           {jobMatch && (
             <div className="mt-4 text-sm">
-              <div className="font-semibold text-primary-600 dark:text-primary-400">匹配度 {jobMatch.score}/100</div>
+              <div className="flex flex-wrap items-baseline gap-2">
+                <div className="font-semibold text-primary-600 dark:text-primary-400">匹配度 {jobMatch.score}/100</div>
+                {jobMatch.analyzedAt && (
+                  <span className="text-[11px] text-[var(--shell-subtle)]">
+                    分析于 {formatDateTime(jobMatch.analyzedAt)}
+                    {jobMatch.id != null ? ' · 已保存' : ''}
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-[var(--shell-muted)]">{jobMatch.summary}</p>
-              <p className="mt-2 text-emerald-600">匹配：{jobMatch.matchedSkills.join('、') || '暂无'}</p>
-              <p className="mt-1 text-amber-600">待补齐：{jobMatch.missingSkills.join('、') || '暂无'}</p>
-              {jobMatch.optimizationSuggestions.length > 0 && (
+              <p className="mt-2 text-emerald-600">匹配：{(jobMatch.matchedSkills || []).join('、') || '暂无'}</p>
+              <p className="mt-1 text-amber-600">待补齐：{(jobMatch.missingSkills || []).join('、') || '暂无'}</p>
+              {(jobMatch.optimizationSuggestions || []).length > 0 && (
                 <div className="mt-3 space-y-2">
                   {jobMatch.optimizationSuggestions.map((item, index) => (
                     <div key={`${item.section}-${index}`} className="rounded-lg bg-[var(--shell-hover)] p-3 text-xs">
@@ -402,7 +430,7 @@ export default function ResumeDetailPage({ resumeId, onBack, onStartInterview }:
                 </button>
               </div>
               <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                应用优化稿后请在「简历编辑」中确认并保存为新版本。
+                匹配结果已落库；应用优化稿后请在「简历编辑」中确认并保存为新版本。
               </p>
             </div>
           )}
