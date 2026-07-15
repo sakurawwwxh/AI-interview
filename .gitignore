@@ -1,13 +1,15 @@
 # Maven build output
 **/target/
+app/out/
 
 # Gradle（兼容旧构建）
 .gradle
 build
 
-# IDE
+# IDE / 本地工具
 /.claude
 /.idea
+/.zcode
 /app/bin
 *.iml
 # Environment variables
