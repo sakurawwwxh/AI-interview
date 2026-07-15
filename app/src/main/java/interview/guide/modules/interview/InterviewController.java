@@ -90,12 +90,13 @@ public class InterviewController {
     }
     
     /**
-     * 查找未完成的面试会话
+     * 查找未完成的面试会话。
+     * 没有可续答会话时 data 为 null（成功响应），避免当成业务异常刷 WARN 日志。
      * GET /api/interview/sessions/unfinished/{resumeId}
      */
     @GetMapping("/api/interview/sessions/unfinished/{resumeId}")
     public Result<InterviewSessionDTO> findUnfinishedSession(@PathVariable Long resumeId) {
-        return Result.success(sessionService.findUnfinishedSessionOrThrow(resumeId));
+        return Result.success(sessionService.findUnfinishedSession(resumeId).orElse(null));
     }
     
     /**

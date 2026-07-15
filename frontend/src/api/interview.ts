@@ -59,13 +59,17 @@ export const interviewApi = {
   },
 
   /**
-   * 查找未完成的面试会话
+   * 查找未完成的面试会话。
+   * 后端无会话时返回 data=null（HTTP 仍成功），不再走业务异常。
    */
   async findUnfinishedSession(resumeId: number): Promise<InterviewSession | null> {
     try {
-      return await request.get<InterviewSession>(`/api/interview/sessions/unfinished/${resumeId}`);
+      const session = await request.get<InterviewSession | null>(
+        `/api/interview/sessions/unfinished/${resumeId}`,
+      );
+      return session ?? null;
     } catch {
-      // 如果没有未完成的会话，返回null
+      // 网络/鉴权等真实错误时不阻断开面配置
       return null;
     }
   },

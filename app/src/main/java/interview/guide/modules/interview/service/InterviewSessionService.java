@@ -177,14 +177,6 @@ public class InterviewSessionService {
     }
 
     /**
-     * 查找并恢复未完成的面试会话，如果不存在则抛出异常
-     */
-    public InterviewSessionDTO findUnfinishedSessionOrThrow(Long resumeId) {
-        return findUnfinishedSession(resumeId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND, "未找到未完成的面试会话"));
-    }
-
-    /**
      * 从数据库恢复会话并缓存到 Redis
      */
     private CachedSession restoreSessionFromDatabase(String sessionId) {
