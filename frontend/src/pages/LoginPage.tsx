@@ -39,50 +39,69 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(99,102,241,0.30),transparent_28%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.16),transparent_24%)]" />
-      <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+    <main className="auth-mesh relative min-h-screen overflow-hidden px-4 py-8 text-white sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
         <section className="hidden lg:block">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary-300/20 bg-primary-400/10 px-3 py-1.5 text-sm font-medium text-primary-100">
-            <Sparkles className="h-4 w-4" />
-            面向真实岗位的面试训练
-          </div>
-          <h1 className="mt-6 max-w-xl text-5xl font-bold leading-[1.12] tracking-tight">
-            把下一场面试，
-            <span className="block bg-gradient-to-r from-primary-200 via-indigo-100 to-cyan-200 bg-clip-text text-transparent">准备得更有底气。</span>
-          </h1>
-          <p className="mt-6 max-w-lg text-lg leading-8 text-slate-300">
-            从简历、目标岗位到模拟问答与错题复练，把零散准备变成看得见的成长闭环。
-          </p>
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+            <div className="inline-flex items-center gap-2 rounded-full border border-teal-300/20 bg-teal-400/10 px-3.5 py-1.5 text-sm font-medium text-teal-100">
+              <Sparkles className="h-4 w-4" />
+              面向真实岗位的面试训练
+            </div>
+            <h1 className="mt-7 max-w-xl text-5xl font-bold leading-[1.1] tracking-tight">
+              把下一场面试，
+              <span className="mt-1 block text-gradient-accent">准备得更有底气。</span>
+            </h1>
+            <p className="mt-6 max-w-lg text-lg leading-8 text-slate-300/95">
+              从简历、目标岗位到模拟问答与错题复练，把零散准备变成看得见的成长闭环。
+            </p>
 
-          <div className="mt-9 grid max-w-xl grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm"><Mic2 className="h-5 w-5 text-primary-200" /><p className="mt-4 text-sm font-semibold">模拟面试</p><p className="mt-1 text-xs leading-5 text-slate-400">按岗位生成练习</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm"><Target className="h-5 w-5 text-cyan-200" /><p className="mt-4 text-sm font-semibold">精准复练</p><p className="mt-1 text-xs leading-5 text-slate-400">优先补强薄弱项</p></div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm"><Sparkles className="h-5 w-5 text-violet-200" /><p className="mt-4 text-sm font-semibold">能力画像</p><p className="mt-1 text-xs leading-5 text-slate-400">持续追踪提升</p></div>
-          </div>
+            <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
+              {[
+                { icon: Mic2, title: '模拟面试', desc: '按岗位生成练习', tone: 'text-teal-200' },
+                { icon: Target, title: '精准复练', desc: '优先补强薄弱项', tone: 'text-cyan-200' },
+                { icon: Sparkles, title: '能力画像', desc: '持续追踪提升', tone: 'text-sky-200' },
+              ].map(({ icon: Icon, title, desc, tone }) => (
+                <div key={title} className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 backdrop-blur-md transition hover:border-teal-400/25 hover:bg-white/[0.07]">
+                  <Icon className={`h-5 w-5 ${tone}`} />
+                  <p className="mt-4 text-sm font-semibold">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">{desc}</p>
+                </div>
+              ))}
+            </div>
 
-          <ul className="mt-8 space-y-3 text-sm text-slate-300">
-            {trainingHighlights.map((item) => <li key={item} className="flex items-center gap-3"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />{item}</li>)}
-          </ul>
+            <ul className="mt-9 space-y-3 text-sm text-slate-300">
+              {trainingHighlights.map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-300" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
         </section>
 
         <motion.section
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.45, delay: 0.06 }}
           className="w-full"
         >
-          <div className="rounded-3xl border border-white/10 bg-slate-900/75 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-8">
+          <div className="glass-card p-6 sm:p-8">
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 shadow-lg shadow-primary-500/30">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-teal-700 shadow-lg shadow-teal-500/30">
                 <Mic2 className="h-7 w-7 text-white" />
               </div>
-              <p className="text-sm font-medium text-primary-200">欢迎回来</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">登录 AI 面试助手</h2>
-              <p className="mt-2 text-sm text-slate-400">继续你的面试训练与成长计划</p>
+              <p className="text-sm font-medium text-teal-200/90">欢迎回来</p>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">登录面试训练台</h2>
+              <p className="mt-2 text-sm text-slate-400">继续你的面试准备与成长计划</p>
             </div>
 
-            {notice && <div role="status" className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-sm text-emerald-200">{notice}</div>}
+            {notice && (
+              <div role="status" className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-sm text-emerald-200">
+                {notice}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -94,7 +113,7 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="请输入用户名"
-                  className="w-full rounded-xl border border-slate-600 bg-slate-800/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-primary-400 focus:ring-4 focus:ring-primary-500/20"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
                   disabled={loading}
                   required
                 />
@@ -108,28 +127,44 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
-                  className="w-full rounded-xl border border-slate-600 bg-slate-800/90 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-primary-400 focus:ring-4 focus:ring-primary-500/20"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
                   disabled={loading}
                   required
                 />
               </div>
 
-              {error && <div role="alert" className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">{error}</div>}
+              {error && (
+                <div role="alert" className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">
+                  {error}
+                </div>
+              )}
 
               <motion.button
                 type="submit"
                 disabled={loading || !username.trim() || !password.trim()}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-500 to-indigo-500 px-4 py-3 font-semibold text-white shadow-lg shadow-primary-500/20 transition hover:from-primary-400 hover:to-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 px-4 py-3 font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:from-teal-400 hover:to-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
               >
-                {loading ? <><motion.span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />登录中…</> : <>登录并继续<ArrowRight className="h-4 w-4" /></>}
+                {loading ? (
+                  <>
+                    <motion.span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+                    登录中…
+                  </>
+                ) : (
+                  <>
+                    登录并继续
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </motion.button>
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-400">
               还没有账号？{' '}
-              <Link to="/register" className="font-semibold text-primary-300 transition hover:text-primary-200">立即注册</Link>
+              <Link to="/register" className="font-semibold text-teal-300 transition hover:text-teal-200">
+                立即注册
+              </Link>
             </p>
           </div>
         </motion.section>

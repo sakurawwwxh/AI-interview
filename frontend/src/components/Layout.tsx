@@ -43,7 +43,7 @@ export default function Layout() {
     try {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {
-      // Always clear this browser's local authentication state.
+      // 始终清理本地登录态
     }
     logout();
     navigate('/login', { replace: true });
@@ -76,53 +76,131 @@ export default function Layout() {
     ? Math.min(100, Math.round((usage.dailyTokens / usage.dailyLimit) * 100)) : 0;
 
   return (
-    <div className="min-h-screen bg-[var(--shell-bg)] text-[var(--shell-text)] transition-colors duration-200">
-      <div className={`fixed inset-0 z-40 bg-slate-950/35 transition-opacity lg:hidden ${mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
-      <button type="button" onClick={() => setMobileNavOpen(true)} aria-label="打开导航" aria-expanded={mobileNavOpen}
-        className="fixed right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--shell-border)] bg-[var(--shell-panel)] text-[var(--shell-text)] shadow-sm transition hover:bg-[var(--shell-hover)] focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden">
+    <div className="relative min-h-screen bg-[var(--shell-bg)] text-[var(--shell-text)] transition-colors duration-300">
+      {/* 氛围光晕 */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-0 overflow-hidden"
+      >
+        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-teal-400/10 blur-3xl dark:bg-teal-400/8" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-400/8 blur-3xl dark:bg-cyan-500/6" />
+      </div>
+
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] transition-opacity lg:hidden ${mobileNavOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        onClick={() => setMobileNavOpen(false)}
+        aria-hidden="true"
+      />
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen(true)}
+        aria-label="打开导航"
+        aria-expanded={mobileNavOpen}
+        className="fixed right-4 top-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] text-[var(--shell-text)] shadow-[var(--surface-elevated)] transition hover:bg-[var(--shell-hover)] focus:outline-none focus:ring-2 focus:ring-teal-500/40 lg:hidden"
+      >
         <Menu className="h-5 w-5" />
       </button>
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[17.5rem] flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)] transition-transform duration-300 lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex h-[4.75rem] items-center justify-between border-b border-[var(--shell-border)] px-6">
-          <Link to="/" className="flex items-center gap-3" onClick={() => setMobileNavOpen(false)}>
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500 text-white shadow-[0_0_22px_rgba(59,130,246,0.23)]"><BrainCircuit className="h-4 w-4" /></span>
-            <span className="text-sm font-semibold tracking-tight">面试训练</span>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[17.5rem] flex-col border-r border-[var(--shell-border)] bg-[var(--shell-panel)]/95 shadow-[var(--surface-elevated)] backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex h-[4.75rem] items-center justify-between border-b border-[var(--shell-border)] px-5">
+          <Link to="/" className="group flex items-center gap-3" onClick={() => setMobileNavOpen(false)}>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-teal-700 text-white shadow-lg shadow-teal-600/25 transition group-hover:scale-[1.03]">
+              <BrainCircuit className="h-4 w-4" />
+            </span>
+            <div className="leading-tight">
+              <span className="block text-sm font-semibold tracking-tight">面试训练</span>
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--shell-subtle)]">Studio</span>
+            </div>
           </Link>
-          <button type="button" onClick={() => setMobileNavOpen(false)} className="text-[var(--shell-muted)] transition hover:text-[var(--shell-text)] lg:hidden" aria-label="关闭导航"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={() => setMobileNavOpen(false)} className="rounded-lg p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] lg:hidden" aria-label="关闭导航">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-6">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 scrollbar-thin">
           {navGroups.map((group, index) => (
-            <section key={group.id} className={index === 0 ? '' : 'mt-7 border-t border-[var(--shell-border)] pt-6'}>
-              <p className="px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--shell-subtle)]">{group.title}</p>
-              <div className="space-y-0.5">
+            <section key={group.id} className={index === 0 ? '' : 'mt-6 border-t border-[var(--shell-border)] pt-5'}>
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--shell-subtle)]">{group.title}</p>
+              <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = isActive(item.path);
-                  return <Link key={item.id} to={item.path} onClick={() => setMobileNavOpen(false)}
-                    className={`group flex h-10 items-center gap-3 rounded-md px-3 text-sm transition ${active ? 'bg-[var(--shell-active)] text-[var(--shell-text)]' : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'}`}>
-                    <item.icon className={`h-4 w-4 ${active ? 'text-blue-500' : 'text-[var(--shell-subtle)] group-hover:text-[var(--shell-text)]'}`} />
-                    <span>{item.label}</span>{active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />}
-                  </Link>;
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.path}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={`group relative flex h-10 items-center gap-3 rounded-xl px-3 text-sm transition ${
+                        active
+                          ? 'bg-[var(--shell-active)] font-medium text-[var(--shell-text)] shadow-sm'
+                          : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                      }`}
+                    >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-teal-500" />
+                      )}
+                      <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-teal-600 dark:text-teal-400' : 'text-[var(--shell-subtle)] group-hover:text-[var(--shell-text)]'}`} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
                 })}
               </div>
             </section>
           ))}
         </nav>
 
-        <div className="border-t border-[var(--shell-border)] px-5 py-5">
-          {usage && <div className="mb-5"><div className="mb-2 flex items-center justify-between text-[11px] text-[var(--shell-muted)]"><span>今日 AI 用量</span><span>{usagePercent}%</span></div><div className="h-px bg-[var(--shell-border)]"><div className="h-px bg-blue-500" style={{ width: `${usagePercent}%` }} /></div></div>}
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--shell-border)] bg-[var(--shell-hover)] text-xs font-semibold text-[var(--shell-muted)]">{(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}</span>
-            <Link to="/profile" className="min-w-0 flex-1" onClick={() => setMobileNavOpen(false)}><p className="truncate text-xs font-medium">{user?.displayName || user?.username || '用户'}</p><p className="mt-0.5 text-[11px] text-[var(--shell-muted)]">账户与模型</p></Link>
-            <button type="button" onClick={toggleTheme} title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'} className="rounded p-1 text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]" aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}>{theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
-            <button type="button" onClick={handleLogout} title="退出登录" className="rounded p-1 text-[var(--shell-muted)] transition hover:bg-red-500/10 hover:text-red-500"><LogOut className="h-4 w-4" /></button>
+        <div className="border-t border-[var(--shell-border)] px-4 py-4">
+          {usage && (
+            <div className="mb-4 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-hover)]/60 px-3 py-2.5">
+              <div className="mb-1.5 flex items-center justify-between text-[11px] text-[var(--shell-muted)]">
+                <span>今日 AI 用量</span>
+                <span className="tabular-nums font-medium text-[var(--shell-text)]">{usagePercent}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--shell-border)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 transition-all duration-500"
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/10 text-xs font-bold text-teal-700 ring-1 ring-teal-500/20 dark:text-teal-300">
+              {(user?.displayName || user?.username || 'U').slice(0, 1).toUpperCase()}
+            </span>
+            <Link to="/profile" className="min-w-0 flex-1" onClick={() => setMobileNavOpen(false)}>
+              <p className="truncate text-xs font-semibold">{user?.displayName || user?.username || '用户'}</p>
+              <p className="mt-0.5 text-[11px] text-[var(--shell-muted)]">账户与模型</p>
+            </Link>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+              className="rounded-lg p-1.5 text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+              aria-label={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="退出登录"
+              className="rounded-lg p-1.5 text-[var(--shell-muted)] transition hover:bg-red-500/10 hover:text-red-500"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
 
-      <main className="min-h-screen min-w-0 px-4 pb-10 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-12 lg:pb-14 lg:pt-10">
-        <motion.div key={location.pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22, ease: 'easeOut' }}><Outlet /></motion.div>
+      <main className="relative min-h-screen min-w-0 px-4 pb-12 pt-20 sm:px-6 lg:ml-[17.5rem] lg:px-10 lg:pb-16 lg:pt-10 xl:px-14">
+        <motion.div
+          key={location.pathname}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Outlet />
+        </motion.div>
       </main>
     </div>
   );

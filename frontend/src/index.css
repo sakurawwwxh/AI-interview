@@ -2,40 +2,54 @@
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ── 设计令牌：深夜面试工作室 ── */
 :root {
-  --shell-bg: #f6f7f9;
+  --shell-bg: #f3f5f8;
   --shell-panel: #ffffff;
-  --shell-border: #e5e7eb;
-  --shell-text: #172033;
+  --shell-border: #e2e8f0;
+  --shell-text: #0f172a;
   --shell-muted: #64748b;
   --shell-subtle: #94a3b8;
-  --shell-hover: #f1f5f9;
-  --shell-active: #eaf1fb;
+  --shell-hover: #eef2f7;
+  --shell-active: #e0f2f1;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+  --accent-glow: rgba(15, 118, 110, 0.22);
+  --surface-elevated: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.06);
+  --surface-float: 0 12px 40px rgb(15 23 42 / 0.1);
+  --radius-panel: 1.25rem;
 }
 
 .dark {
-  --shell-bg: #15171a;
-  --shell-panel: #111315;
-  --shell-border: rgb(255 255 255 / 0.08);
-  --shell-text: #f1f5f9;
+  --shell-bg: #0b0f14;
+  --shell-panel: #121820;
+  --shell-border: rgb(148 163 184 / 0.12);
+  --shell-text: #e8eef7;
   --shell-muted: #94a3b8;
   --shell-subtle: #64748b;
-  --shell-hover: rgb(255 255 255 / 0.045);
-  --shell-active: rgb(255 255 255 / 0.07);
+  --shell-hover: rgb(255 255 255 / 0.04);
+  --shell-active: rgb(45 212 191 / 0.1);
+  --accent: #2dd4bf;
+  --accent-soft: rgb(45 212 191 / 0.12);
+  --accent-glow: rgba(45, 212, 191, 0.18);
+  --surface-elevated: 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px rgb(0 0 0 / 0.35);
+  --surface-float: 0 20px 50px rgb(0 0 0 / 0.45);
 }
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --color-primary-50: #f0fdfa;
+  --color-primary-100: #ccfbf1;
+  --color-primary-200: #99f6e4;
+  --color-primary-300: #5eead4;
+  --color-primary-400: #2dd4bf;
+  --color-primary-500: #14b8a6;
+  --color-primary-600: #0d9488;
+  --color-primary-700: #0f766e;
+  --color-primary-800: #115e59;
+  --color-primary-900: #134e4a;
+  --font-sans: "Instrument Sans", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Instrument Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -52,23 +66,51 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* 轻量纸张颗粒，避免纯扁平 */
+  body::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+    mix-blend-mode: soft-light;
+  }
+
+  .dark body::before {
+    opacity: 0.2;
+    mix-blend-mode: overlay;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
   * {
     border-color: rgb(148 163 184 / 0.16);
   }
 
   ::selection {
-    background: rgb(59 130 246 / 0.32);
+    background: rgb(20 184 166 / 0.35);
     color: white;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 }
 
 @layer components {
   .dark-card {
-    @apply rounded-xl border border-slate-200 bg-white dark:border-white/[0.08] dark:bg-[#202328];
+    @apply rounded-2xl border border-slate-200/90 bg-white dark:border-white/[0.08] dark:bg-[#151b24];
+    box-shadow: var(--surface-elevated);
   }
 
   .dark-input {
-    @apply border border-slate-200 bg-white text-slate-900 dark:border-white/[0.12] dark:bg-[#17191d] dark:text-slate-100;
+    @apply border border-slate-200 bg-white text-slate-900 dark:border-white/[0.12] dark:bg-[#0f141b] dark:text-slate-100;
   }
 
   .dark-text {
@@ -77,6 +119,38 @@
 
   .dark-text-muted {
     @apply text-slate-500 dark:text-slate-400;
+  }
+
+  /* 全局按钮 / 面板增强类，页面可复用 */
+  .ui-panel {
+    background: var(--shell-panel);
+    border: 1px solid var(--shell-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--surface-elevated);
+  }
+
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-700/20 transition hover:from-teal-400 hover:to-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-400/40 disabled:cursor-not-allowed disabled:opacity-55;
+  }
+
+  .ui-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)];
+  }
+
+  .ui-input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/15 dark:border-white/10 dark:bg-[#0f141b] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-teal-400;
+  }
+
+  .auth-mesh {
+    background:
+      radial-gradient(ellipse 80% 60% at 15% 20%, rgba(45, 212, 191, 0.22), transparent 50%),
+      radial-gradient(ellipse 70% 50% at 85% 75%, rgba(56, 189, 248, 0.14), transparent 45%),
+      radial-gradient(ellipse 50% 40% at 50% 100%, rgba(99, 102, 241, 0.1), transparent 40%),
+      #060a10;
+  }
+
+  .glass-card {
+    @apply rounded-3xl border border-white/10 bg-slate-900/70 shadow-2xl shadow-black/40 backdrop-blur-2xl;
   }
 }
 
@@ -97,5 +171,9 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: rgb(148 163 184 / 0.45);
+  }
+
+  .text-gradient-accent {
+    @apply bg-gradient-to-r from-teal-200 via-cyan-100 to-sky-200 bg-clip-text text-transparent;
   }
 }
