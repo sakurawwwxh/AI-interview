@@ -511,6 +511,58 @@ public class InterviewSessionService {
     }
 
     /**
+     * 评估失败后一键重试：重置为 PENDING 并重新入队 Stream。
+     * 仅允许 FAILED；进行中/已完成不可重复触发。
+     */
+    public void retryEvaluation(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        InterviewSessionEntity entity = persistenceService.findBySessionIdForCurrentUser(sessionId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+
+        InterviewSessionEntity.SessionStatus status = entity.getStatus();
+        if (status != InterviewSessionEntity.SessionStatus.COMPLETED
+            && status != InterviewSessionEntity.SessionStatus.EVALUATED) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "仅已交卷的面试可重新评估");
+        }
+
+        AsyncTaskStatus evaluateStatus = entity.getEvaluateStatus();
+        if (evaluateStatus == AsyncTaskStatus.PROCESSING || evaluateStatus == AsyncTaskStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "评估正在进行中，请稍后再试");
+        }
+        // 已成功出分则不可重试
+        if (evaluateStatus == AsyncTaskStatus.COMPLETED && entity.getOverallScore() != null) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE,
+                "评估已完成，无需重试");
+        }
+        // 允许：FAILED；或无 evaluateStatus / 未出分的异常历史数据
+        boolean retryable = evaluateStatus == null
+            || evaluateStatus == AsyncTaskStatus.FAILED
+            || (evaluateStatus == AsyncTaskStatus.COMPLETED && entity.getOverallScore() == null);
+        if (!retryable) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_NOT_RETRYABLE);
+        }
+
+        try {
+            // 确保会话状态回到 COMPLETED，便于消费者落库报告
+            if (status == InterviewSessionEntity.SessionStatus.EVALUATED
+                && entity.getOverallScore() == null) {
+                persistenceService.updateSessionStatus(sessionId,
+                    InterviewSessionEntity.SessionStatus.COMPLETED);
+            }
+            persistenceService.updateEvaluateStatus(sessionId, AsyncTaskStatus.PENDING, null);
+            sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
+        } catch (Exception e) {
+            log.warn("重置评估状态失败: sessionId={}, error={}", sessionId, e.getMessage());
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_FAILED, "重置评估状态失败，请重试");
+        }
+
+        evaluateStreamProducer.sendEvaluateTask(userId, sessionId);
+        log.info("会话 {} 评估已重新入队", sessionId);
+    }
+
+    /**
      * 获取或恢复会话（优先从缓存获取）
      */
     private CachedSession getOrRestoreSession(String sessionId) {

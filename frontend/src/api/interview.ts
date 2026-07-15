@@ -90,4 +90,11 @@ export const interviewApi = {
   async completeInterview(sessionId: string): Promise<void> {
     return request.post<void>(`/api/interview/sessions/${sessionId}/complete`);
   },
+
+  /**
+   * 评估失败后重新入队评估
+   */
+  async retryEvaluation(sessionId: string): Promise<void> {
+    return request.post<void>(`/api/interview/sessions/${sessionId}/retry-evaluation`);
+  },
 };
