@@ -226,11 +226,16 @@ export default function Layout() {
         tabIndex={-1}
         className="relative min-h-screen min-w-0 px-4 pb-14 pt-20 outline-none sm:px-6 lg:ml-[17.5rem] lg:px-10 lg:pb-16 lg:pt-10 xl:px-14"
       >
+        {/*
+          路由切换只用轻微位移，不用 opacity:0。
+          否则在部分环境下动画未完成/被打断时，会出现「页面空白，刷新才正常」。
+        */}
         <motion.div
           key={location.pathname}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ y: 8 }}
+          animate={{ y: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          style={{ opacity: 1 }}
         >
           <Outlet />
         </motion.div>

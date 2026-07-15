@@ -70,7 +70,11 @@ function ResumeDetailWrapper() {
   };
 
   const handleStartInterview = (resumeText: string, resumeId: number, jobTargetId?: number) => {
-    navigate(`/interview/${resumeId}`, { state: { resumeText, jobTargetId } });
+    // 仅传 id + 可选岗位；正文在 InterviewWrapper 同步 state / API 加载，避免大文本 state 异常
+    const text = (resumeText || '').trim();
+    navigate(`/interview/${resumeId}`, {
+      state: text ? { resumeText: text, jobTargetId } : { jobTargetId },
+    });
   };
 
   return (
@@ -82,65 +86,101 @@ function ResumeDetailWrapper() {
   );
 }
 
-// 模拟面试包装器
+// 模拟面试包装器：同步读 location.state，避免 effect 竞态导致一直转圈/空白
 function InterviewWrapper() {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const locationState = location.state as { resumeText?: string; jobTargetId?: number } | null;
-  const [resumeText, setResumeText] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const locationState = (location.state as { resumeText?: string; jobTargetId?: number } | null) ?? null;
+
+  // 首次渲染即用导航 state，刷新时再走 API
+  const [resumeText, setResumeText] = useState(() => locationState?.resumeText?.trim() || '');
+  const [loading, setLoading] = useState(() => !locationState?.resumeText?.trim());
+  const [loadError, setLoadError] = useState<string | null>(null);
   const initialJobTargetId = locationState?.jobTargetId;
 
   useEffect(() => {
-    // 优先从location state获取resumeText
-    const stateText = locationState?.resumeText;
+    let cancelled = false;
+    const stateText = ((location.state as { resumeText?: string } | null)?.resumeText || '').trim();
+
     if (stateText) {
       setResumeText(stateText);
+      setLoadError(null);
       setLoading(false);
-    } else if (resumeId) {
-      // 如果没有，从API获取简历详情
-      historyApi.getResumeDetail(parseInt(resumeId, 10))
-        .then(resume => {
-          setResumeText(resume.resumeText);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error('获取简历文本失败', err);
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [resumeId, locationState?.resumeText]);
+
+    if (!resumeId) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    setLoadError(null);
+    historyApi
+      .getResumeDetail(parseInt(resumeId, 10))
+      .then((resume) => {
+        if (cancelled) return;
+        const text = (resume.resumeText || '').trim();
+        setResumeText(text);
+        setLoadError(text ? null : '该简历没有可用文本，无法开始面试');
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('获取简历文本失败', err);
+        if (cancelled) return;
+        setLoadError('加载简历失败，请返回后重试');
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // location.key：每次导航（含同 resumeId 再次开面）都重新对齐 state
+  }, [resumeId, location.key]);
 
   if (!resumeId) {
     return <Navigate to="/history" replace />;
   }
 
   const handleBack = () => {
-    // 尝试返回详情页，如果失败则返回历史列表
     navigate(`/history/${resumeId}`, { replace: false });
   };
 
   const handleInterviewComplete = (sessionId?: string) => {
-    // 面试完成后跳转到面试记录页，并高亮刚交卷的会话
     navigate('/interviews', { state: { highlightSessionId: sessionId } });
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite" aria-busy="true">
         <div className="text-center">
-          <div className="w-10 h-10 border-3 border-slate-200 border-t-primary-500 rounded-full mx-auto mb-4 animate-spin" />
-          <p className="text-slate-500">加载中...</p>
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-3 border-slate-200 border-t-primary-500" aria-hidden />
+          <p className="text-sm text-[var(--shell-muted)]">正在准备面试…</p>
         </div>
+      </div>
+    );
+  }
+
+  if (loadError || !resumeText) {
+    return (
+      <div className="ui-panel mx-auto max-w-lg px-6 py-12 text-center">
+        <p className="text-base font-semibold text-[var(--shell-text)]">无法开始模拟面试</p>
+        <p className="mt-2 text-sm text-[var(--shell-muted)]">{loadError || '缺少简历文本'}</p>
+        <button type="button" onClick={handleBack} className="ui-btn-primary mt-6">
+          返回简历详情
+        </button>
       </div>
     );
   }
 
   return (
     <Interview
+      key={`${resumeId}-${location.key}`}
       resumeText={resumeText}
       resumeId={parseInt(resumeId, 10)}
       initialJobTargetId={initialJobTargetId}

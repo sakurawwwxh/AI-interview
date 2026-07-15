@@ -56,24 +56,28 @@ export default function InterviewConfigPanel({
   const canRecommend = Boolean(selectedJob?.jobDescription?.trim());
 
   return (
-      <motion.div
-      className="max-w-2xl mx-auto"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <motion.div
+      className="mx-auto max-w-2xl"
+      initial={{ y: 12 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.25 }}
     >
-          <div
-              className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-sm dark:shadow-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
-                  <div
-                      className="w-10 h-10 bg-primary-100 dark:bg-primary-900/50 rounded-xl flex items-center justify-center">
-                      <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+      <div className="ui-panel-signal p-6 sm:p-8">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-800 text-white shadow-md shadow-teal-700/20">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+              <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2" />
+              <circle cx="12" cy="12" r="2" fill="currentColor" />
             </svg>
           </div>
-          面试配置
-        </h2>
+          <div>
+            <p className="page-kicker text-primary-700 dark:text-primary-400">开场配置</p>
+            <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--shell-text)] sm:text-2xl">
+              面试配置
+            </h2>
+          </div>
+        </div>
 
         {/* 未完成面试提示 */}
         <AnimatePresence>
@@ -142,39 +146,36 @@ export default function InterviewConfigPanel({
 
         <div className="space-y-6">
           <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-              题目数量
-            </label>
-            <div className="grid grid-cols-5 gap-3">
+            <label className="mb-3 block text-sm font-semibold text-[var(--shell-text)]">题目数量</label>
+            <div className="grid grid-cols-5 gap-2 sm:gap-3">
               {questionCounts.map((count) => (
-                <motion.button
+                <button
                   key={count}
+                  type="button"
                   onClick={() => onQuestionCountChange(count)}
-                  className={`px-4 py-3 rounded-xl font-medium transition-all ${
+                  className={`min-h-11 rounded-xl font-medium tabular-nums transition ${
                     questionCount === count
-                      ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
-                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                      : 'bg-[var(--shell-hover)] text-[var(--shell-muted)] hover:bg-[var(--shell-active)] hover:text-[var(--shell-text)]'
                   }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
                 >
                   {count}
-                </motion.button>
+                </button>
               ))}
             </div>
           </div>
 
           <div>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">面试模板</label>
+              <label className="block text-sm font-semibold text-[var(--shell-text)]">面试模板</label>
               <button
                 type="button"
                 disabled={!canRecommend || !onRecommendTemplate}
                 onClick={onRecommendTemplate}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50"
                 title={canRecommend ? '根据所选岗位 JD 推荐最匹配的模板' : '请先选择目标岗位'}
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 按岗位推荐模板
               </button>
             </div>
@@ -185,114 +186,116 @@ export default function InterviewConfigPanel({
                   : null;
                 const isRecommended = Boolean(templateRecommendReason && template.id === item.id);
                 return (
-                <motion.button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onTemplateChange(item)}
-                  className={`rounded-xl border p-4 text-left transition-all ${
-                    template.id === item.id
-                      ? 'border-primary-500 bg-primary-50 shadow-sm dark:bg-primary-900/30'
-                      : 'border-slate-200 bg-slate-50 hover:border-primary-300 dark:border-slate-600 dark:bg-slate-700/50'
-                  }`}
-                  whileHover={{ y: -1 }}
-                >
-                  <span className="flex items-center gap-2">
-                    <span className="block font-semibold text-slate-800 dark:text-white">{item.name}</span>
-                    {isRecommended && (
-                      <span className="rounded-full bg-primary-500/15 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:text-primary-300">
-                        推荐
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onTemplateChange(item)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      template.id === item.id
+                        ? 'border-primary-500 bg-primary-50 shadow-sm dark:bg-primary-900/30'
+                        : 'border-[var(--shell-border)] bg-[var(--shell-hover)]/50 hover:border-primary-300'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="block font-semibold text-[var(--shell-text)]">{item.name}</span>
+                      {isRecommended && (
+                        <span className="rounded-full bg-primary-500/15 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:text-primary-300">
+                          推荐
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-xs text-[var(--shell-muted)]">
+                      基础 {item.difficultyDistribution.basic}% · 进阶 {item.difficultyDistribution.advanced}% · 专家{' '}
+                      {item.difficultyDistribution.expert}%
+                    </span>
+                    {preview && preview.score > 0 && (
+                      <span className="mt-1 block text-[11px] text-[var(--shell-subtle)]">
+                        匹配分 {Math.round(preview.score)}
                       </span>
                     )}
-                  </span>
-                  <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                    基础 {item.difficultyDistribution.basic}% · 进阶 {item.difficultyDistribution.advanced}% · 专家 {item.difficultyDistribution.expert}%
-                  </span>
-                  {preview && preview.score > 0 && (
-                    <span className="mt-1 block text-[11px] text-slate-400">匹配分 {Math.round(preview.score)}</span>
-                  )}
-                </motion.button>
+                  </button>
                 );
               })}
             </div>
-            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              当前模板：{template.questionTypes.map(item => `${item.type} ${item.weight}%`).join(' · ')}；每个主问题追问 {template.followUpCount} 次。
+            <p className="mt-3 text-sm text-[var(--shell-muted)]">
+              当前模板：{template.questionTypes.map((item) => `${item.type} ${item.weight}%`).join(' · ')}
+              ；每个主问题追问 {template.followUpCount} 次。
             </p>
             {templateRecommendReason && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-primary-600 dark:text-primary-300">
-                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                 {templateRecommendReason}
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">目标岗位（可选）</label>
-            <select value={jobTargetId ?? ''} onChange={event => onJobTargetChange(event.target.value ? Number(event.target.value) : undefined)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+            <label className="mb-3 block text-sm font-semibold text-[var(--shell-text)]">目标岗位（可选）</label>
+            <select
+              value={jobTargetId ?? ''}
+              onChange={(event) => onJobTargetChange(event.target.value ? Number(event.target.value) : undefined)}
+              className="ui-input"
+            >
               <option value="">综合面试（不指定 JD）</option>
-              {jobTargets.map(item => <option key={item.id} value={item.id}>{item.title}{item.company ? ` · ${item.company}` : ''}{item.active ? '（当前）' : ''}</option>)}
+              {jobTargets.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                  {item.company ? ` · ${item.company}` : ''}
+                  {item.active ? '（当前）' : ''}
+                </option>
+              ))}
             </select>
-            {!jobTargets.length && <p className="mt-2 text-xs text-slate-500">可在“目标岗位”中粘贴 JD，生成更有针对性的题目。</p>}
-            {canRecommend && (
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                已选岗位后，可用上方「按岗位推荐模板」自动匹配，或切换岗位时自动推荐一次。
-              </p>
+            {!jobTargets.length && (
+              <p className="mt-2 text-xs text-[var(--shell-muted)]">可在「目标岗位」中粘贴 JD，生成更有针对性的题目。</p>
             )}
           </div>
 
-          <div className="mb-6">
-              <label
-                  className="block text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3">简历预览（前500字）</label>
-              <textarea
-              value={resumeText.substring(0, 500) + (resumeText.length > 500 ? '...' : '')}
+          <div>
+            <label className="mb-3 block text-sm font-semibold text-[var(--shell-muted)]">简历预览（前 500 字）</label>
+            <textarea
+              value={resumeText.substring(0, 500) + (resumeText.length > 500 ? '…' : '')}
               readOnly
-              className="w-full h-32 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-400 text-sm resize-none"
+              className="h-32 w-full resize-none rounded-xl border border-[var(--shell-border)] bg-[var(--shell-hover)]/40 p-4 text-sm text-[var(--shell-muted)]"
             />
           </div>
 
           <AnimatePresence>
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm"
+                initial={{ y: -6 }}
+                animate={{ y: 0 }}
+                exit={{ y: -6 }}
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
               >
-                ⚠️ {error}
+                {error}
               </motion.div>
             )}
           </AnimatePresence>
 
-            <div className="flex justify-center gap-4">
-                <motion.button
-              onClick={onBack}
-              className="px-6 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              ← 返回
-            </motion.button>
-            <motion.button
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            <button type="button" onClick={onBack} className="ui-btn-ghost min-w-[7rem]">
+              返回
+            </button>
+            <button
+              type="button"
               onClick={onStart}
               disabled={isCreating}
-              className="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/25 hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-              whileHover={{ scale: isCreating ? 1 : 1.02, y: isCreating ? 0 : -1 }}
-              whileTap={{ scale: isCreating ? 1 : 0.98 }}
+              aria-busy={isCreating}
+              className="ui-btn-primary min-w-[10rem]"
             >
               {isCreating ? (
                 <>
-                    <motion.span
-                    className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                    aria-hidden
                   />
-                  正在生成题目...
+                  正在生成题目…
                 </>
               ) : (
-                <>
-                  开始面试 →
-                </>
+                '开始面试'
               )}
-            </motion.button>
+            </button>
           </div>
         </div>
       </div>

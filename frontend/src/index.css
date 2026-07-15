@@ -405,7 +405,7 @@
   }
 }
 
-/* 减少动效偏好：尊重系统设置 */
+/* 减少动效偏好：只关装饰动画，避免全局 * 打断路由/Framer 可见性 */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -414,13 +414,5 @@
   .reveal-up,
   .reveal-fade {
     animation: none !important;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }

@@ -549,65 +549,63 @@ export default function Interview({
   };
 
   const renderSubmitted = () => (
-    <div className="mx-auto max-w-lg rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/30">
-        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+    <div className="ui-panel-signal relative mx-auto max-w-lg overflow-hidden px-8 py-12 text-center sm:px-10">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-teal-400/15 blur-3xl" aria-hidden />
+      <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-800 text-white shadow-lg shadow-teal-700/25">
+        <CheckCircle2 className="h-8 w-8" aria-hidden />
       </div>
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">已提交，正在生成评估报告</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+      <p className="page-kicker text-primary-700 dark:text-primary-400">卷面已交</p>
+      <h2 className="font-display mt-2 text-2xl font-semibold tracking-tight text-[var(--shell-text)]">
+        正在生成评估报告
+      </h2>
+      <p className="mt-3 text-sm leading-6 text-[var(--shell-muted)]">
         题目评分与综合反馈会在后台异步完成。完成后可在「面试记录」中查看分数与详细报告。
       </p>
       <div className="mt-6 inline-flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         即将跳转到面试记录…
       </div>
       <button
         type="button"
         onClick={() => session && onInterviewComplete(session.sessionId)}
-        className="mt-8 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-600"
+        className="ui-btn-primary mt-8"
       >
         立即查看记录
       </button>
     </div>
   );
 
-    return (
+  return (
     <div className="pb-10">
-      {/* 页面头部 */}
-        <motion.div
-        className="text-center mb-10"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 flex items-center justify-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          模拟面试
-        </h1>
-            <p className="text-slate-500 dark:text-slate-400">{stageSubtitles[stage]}</p>
-      </motion.div>
+      <header className="mb-8 text-center sm:mb-10">
+        <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-teal-800 text-white shadow-lg shadow-teal-700/20">
+          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <p className="page-kicker text-primary-700 dark:text-primary-400">训练现场</p>
+        <h1 className="font-display mt-2 text-3xl font-semibold tracking-tight text-[var(--shell-text)]">模拟面试</h1>
+        <p className="mt-2 text-sm text-[var(--shell-muted)]">{stageSubtitles[stage]}</p>
+      </header>
 
       {usingDefaultQuestions && stage === 'interview' && (
         <div className="mx-auto mb-6 flex max-w-4xl items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>AI 出题失败，本次已切换为备用题库。答题与评估流程不受影响，可稍后重试创建以获取个性化题目。</span>
         </div>
       )}
 
-        <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait" initial={false}>
         {stage === 'config' && (
           <motion.div
             key="config"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
+            initial={{ y: 12 }}
+            animate={{ y: 0 }}
+            exit={{ y: -8 }}
+            transition={{ duration: 0.22 }}
           >
             {renderConfig()}
           </motion.div>
@@ -615,10 +613,10 @@ export default function Interview({
         {stage === 'interview' && (
           <motion.div
             key="interview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            initial={{ y: 8 }}
+            animate={{ y: 0 }}
+            exit={{ y: -6 }}
+            transition={{ duration: 0.22 }}
           >
             {renderInterview()}
           </motion.div>
@@ -626,10 +624,10 @@ export default function Interview({
         {stage === 'submitted' && (
           <motion.div
             key="submitted"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            initial={{ y: 10 }}
+            animate={{ y: 0 }}
+            exit={{ y: -6 }}
+            transition={{ duration: 0.22 }}
           >
             {renderSubmitted()}
           </motion.div>
