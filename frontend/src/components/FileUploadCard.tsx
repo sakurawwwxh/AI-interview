@@ -74,11 +74,11 @@ export default function FileUploadCard({
   return (
     <div className="mx-auto max-w-6xl py-2">
       <div className="mb-8 flex items-start gap-4 border-b border-[var(--shell-border)] pb-6">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
           <UploadCloud className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">训练资料</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">训练资料</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[var(--shell-text)]">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--shell-muted)]">{subtitle}</p>
         </div>
@@ -94,7 +94,7 @@ export default function FileUploadCard({
             onDragLeave={(event) => { event.preventDefault(); setDragOver(false); }}
             onDrop={handleDrop}
             onClick={openPicker}
-            className={`group relative min-h-[300px] cursor-pointer border border-dashed p-6 transition-colors sm:p-10 ${dragOver ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-500/10' : 'border-[var(--shell-border)] bg-[var(--shell-hover)] hover:border-blue-400 hover:bg-blue-50/40 dark:hover:bg-blue-500/5'}`}
+            className={`group relative min-h-[300px] cursor-pointer border border-dashed p-6 transition-colors sm:p-10 ${dragOver ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-500/10' : 'border-[var(--shell-border)] bg-[var(--shell-hover)] hover:border-primary-400 hover:bg-primary-50/40 dark:hover:bg-primary-500/5'}`}
           >
             <input id={inputId} type="file" className="hidden" accept={accept} onChange={handleChange} disabled={uploading} />
             {selectedFile ? (
@@ -111,12 +111,12 @@ export default function FileUploadCard({
               </div>
             ) : (
               <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] text-blue-600 dark:text-blue-400">
+                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--shell-border)] bg-[var(--shell-panel)] text-primary-600 dark:text-primary-400">
                   <UploadCloud className="h-6 w-6" />
                 </div>
                 <h2 className="text-lg font-semibold text-[var(--shell-text)]">拖入文件，或从设备中选择</h2>
                 <p className="mt-2 text-sm text-[var(--shell-muted)]">{formatHint} · {maxSizeHint}</p>
-                <button type="button" onClick={(event) => { event.stopPropagation(); openPicker(); }} className="mt-6 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">{selectButtonText}</button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); openPicker(); }} className="mt-6 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700">{selectButtonText}</button>
               </div>
             )}
           </div>
@@ -124,7 +124,7 @@ export default function FileUploadCard({
           {showNameInput && selectedFile && (
             <div className="mt-5 border-t border-[var(--shell-border)] pt-5">
               <label htmlFor={`${inputId}-name`} className="mb-2 block text-sm font-medium text-[var(--shell-text)]">{nameLabel}</label>
-              <input id={`${inputId}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={namePlaceholder} disabled={uploading} className="w-full rounded-lg border border-[var(--shell-border)] bg-[var(--shell-bg)] px-3 py-2.5 text-sm text-[var(--shell-text)] outline-none transition placeholder:text-[var(--shell-subtle)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />
+              <input id={`${inputId}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={namePlaceholder} disabled={uploading} className="w-full rounded-lg border border-[var(--shell-border)] bg-[var(--shell-bg)] px-3 py-2.5 text-sm text-[var(--shell-text)] outline-none transition placeholder:text-[var(--shell-subtle)] focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15" />
             </div>
           )}
 
@@ -132,7 +132,7 @@ export default function FileUploadCard({
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--shell-border)] pt-5">
             {onBack ? <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-[var(--shell-muted)] hover:text-[var(--shell-text)]"><ArrowLeft className="h-4 w-4" />返回</button> : <span />}
-            <button type="button" disabled={!selectedFile || uploading} onClick={() => selectedFile && onUpload(selectedFile, name.trim() || undefined)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45">
+            <button type="button" disabled={!selectedFile || uploading} onClick={() => selectedFile && onUpload(selectedFile, name.trim() || undefined)} className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-45">
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {uploading ? '正在处理…' : uploadButtonText}
             </button>
@@ -148,7 +148,7 @@ export default function FileUploadCard({
               ['03', '开始训练', '生成贴合背景的面试题'],
             ].map(([number, heading, detail], index) => (
               <li key={number} className="flex gap-3">
-                <span className={`mt-0.5 text-xs font-semibold ${index === 0 ? 'text-blue-600 dark:text-blue-400' : 'text-[var(--shell-subtle)]'}`}>{number}</span>
+                <span className={`mt-0.5 text-xs font-semibold ${index === 0 ? 'text-primary-600 dark:text-primary-400' : 'text-[var(--shell-subtle)]'}`}>{number}</span>
                 <div><p className="text-sm font-medium text-[var(--shell-text)]">{heading}</p><p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">{detail}</p></div>
               </li>
             ))}

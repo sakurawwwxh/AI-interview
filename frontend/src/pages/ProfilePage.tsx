@@ -232,9 +232,9 @@ export default function ProfilePage() {
           <div className="mt-5 flex items-end justify-between"><div><span className="text-3xl font-bold text-slate-800 dark:text-white">{practiceSummary?.todoCount ?? '–'}</span><p className="mt-1 text-xs text-slate-500">待复练题目</p></div><ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-amber-500" /></div>
           <p className="mt-3 text-xs text-slate-500">{practiceSummary?.averageImprovement != null ? `平均提升 ${practiceSummary.averageImprovement >= 0 ? '+' : ''}${practiceSummary.averageImprovement} 分` : '从低分题开始建立复练闭环'}</p>
         </Link>
-        <Link to="/interview-statistics" className={`${cardClassName} group p-5 transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md dark:hover:border-indigo-800`}>
-          <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500 dark:text-slate-400">能力画像</span><span className="rounded-lg bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300"><BarChart3 className="h-4 w-4" /></span></div>
-          <div className="mt-5 flex items-end justify-between"><div><p className="text-lg font-bold text-slate-800 dark:text-white">查看成长趋势</p><p className="mt-1 text-xs text-slate-500">能力雷达、分数趋势与补强建议</p></div><ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-indigo-500" /></div>
+        <Link to="/interview-statistics" className={`${cardClassName} group p-5 transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md dark:hover:border-primary-800`}>
+          <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500 dark:text-slate-400">能力画像</span><span className="rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300"><BarChart3 className="h-4 w-4" /></span></div>
+          <div className="mt-5 flex items-end justify-between"><div><p className="text-lg font-bold text-slate-800 dark:text-white">查看成长趋势</p><p className="mt-1 text-xs text-slate-500">能力雷达、分数趋势与补强建议</p></div><ArrowRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-1 group-hover:text-primary-500" /></div>
         </Link>
       </section>
 

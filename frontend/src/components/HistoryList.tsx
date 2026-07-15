@@ -48,7 +48,7 @@ function StatusIcon({ status, hasScore }: { status?: AnalyzeStatus; hasScore: bo
     case 'COMPLETED':
       return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'PROCESSING':
-      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />;
     case 'PENDING':
       return <Clock className="w-4 h-4 text-yellow-500" />;
     case 'FAILED':
@@ -282,7 +282,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
             icon={MessageSquare}
             label="面试总数"
             value={stats.totalInterviewCount}
-            color="bg-indigo-500"
+            color="bg-primary-600"
           />
           <StatCard
             icon={Eye}

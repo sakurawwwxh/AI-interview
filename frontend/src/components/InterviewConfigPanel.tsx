@@ -82,11 +82,11 @@ export default function InterviewConfigPanel({
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl text-blue-700 dark:text-blue-400 text-sm text-center"
+              className="mb-6 p-4 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-xl text-primary-700 dark:text-primary-400 text-sm text-center"
             >
               <div className="flex items-center justify-center gap-2">
                   <motion.div
-                  className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
+                  className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 />
@@ -152,7 +152,7 @@ export default function InterviewConfigPanel({
                   onClick={() => onQuestionCountChange(count)}
                   className={`px-4 py-3 rounded-xl font-medium transition-all ${
                     questionCount === count
-                      ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+                      ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
                         : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                   whileHover={{ scale: 1.05 }}
@@ -274,7 +274,7 @@ export default function InterviewConfigPanel({
             <motion.button
               onClick={onStart}
               disabled={isCreating}
-              className="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30 hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/25 hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
               whileHover={{ scale: isCreating ? 1 : 1.02, y: isCreating ? 0 : -1 }}
               whileTap={{ scale: isCreating ? 1 : 0.98 }}
             >

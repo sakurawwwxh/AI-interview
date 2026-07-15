@@ -19,7 +19,7 @@ function scoreLabel(score: number) {
 
 function scoreTone(score: number) {
   if (score >= 80) return 'bg-emerald-500';
-  if (score >= 60) return 'bg-blue-600';
+  if (score >= 60) return 'bg-primary-600';
   return 'bg-amber-500';
 }
 
@@ -43,13 +43,13 @@ export default function InterviewStatisticsPage() {
   const abilities = useMemo(() => [...(statistics?.abilityScores ?? [])].sort((a, b) => a.averageScore - b.averageScore), [statistics]);
   const priority = statistics?.weaknesses?.[0] ?? abilities[0];
 
-  if (loading) return <div className="flex min-h-[52vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div>;
-  if (error || !statistics) return <section className="flex min-h-[52vh] flex-col items-center justify-center border border-red-200 bg-[var(--shell-panel)] p-8 text-center dark:border-red-500/25"><AlertCircle className="h-9 w-9 text-red-600" /><h1 className="mt-4 text-lg font-semibold text-[var(--shell-text)]">能力画像暂时不可用</h1><p className="mt-2 max-w-md text-sm leading-6 text-[var(--shell-muted)]">{error ?? '暂时无法读取统计数据，请稍后重试。'}</p><button onClick={loadStatistics} className="mt-5 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">重新加载</button></section>;
+  if (loading) return <div className="flex min-h-[52vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary-600" /></div>;
+  if (error || !statistics) return <section className="flex min-h-[52vh] flex-col items-center justify-center border border-red-200 bg-[var(--shell-panel)] p-8 text-center dark:border-red-500/25"><AlertCircle className="h-9 w-9 text-red-600" /><h1 className="mt-4 text-lg font-semibold text-[var(--shell-text)]">能力画像暂时不可用</h1><p className="mt-2 max-w-md text-sm leading-6 text-[var(--shell-muted)]">{error ?? '暂时无法读取统计数据，请稍后重试。'}</p><button onClick={loadStatistics} className="mt-5 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white">重新加载</button></section>;
   if (statistics.completedInterviewCount === 0) return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-[var(--shell-border)] pb-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">成长档案</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">成长档案</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--shell-text)]">能力画像</h1>
           <p className="mt-2 text-sm text-[var(--shell-muted)]">这里会沉淀每一次真实作答留下的能力信号，而不是一份开始前的问卷。</p>
         </div>
@@ -63,7 +63,7 @@ export default function InterviewStatisticsPage() {
             <h2 className="mt-4 max-w-2xl text-3xl font-semibold leading-tight tracking-tight text-[var(--shell-text)]">完成一次模拟面试，<br />让训练有迹可循。</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--shell-muted)]">系统会根据你的真实回答生成第一份基线：哪些能力已具优势、哪些该优先补强，以及下一次练习该从哪里开始。</p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/history" className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">选择简历并开始<ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/history" className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700">选择简历并开始<ArrowRight className="h-4 w-4" /></Link>
               <Link to="/upload" className="inline-flex items-center gap-2 rounded-lg border border-[var(--shell-border)] px-4 py-2.5 text-sm font-semibold text-[var(--shell-text)] transition hover:bg-[var(--shell-hover)]">先上传简历<ChevronRight className="h-4 w-4" /></Link>
             </div>
             <div className="mt-9 grid border-t border-[var(--shell-border)] pt-6 sm:grid-cols-3">
@@ -73,7 +73,7 @@ export default function InterviewStatisticsPage() {
                 ['03', '获得成长基线', '查看能力分布、趋势和复练建议'],
               ].map(([step, title, description], index) => (
                 <div key={step} className={'pr-5 ' + (index > 0 ? 'mt-5 border-t border-[var(--shell-border)] pt-5 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0' : '')}>
-                  <p className="text-xs font-semibold tracking-[0.14em] text-blue-600 dark:text-blue-400">{step}</p>
+                  <p className="text-xs font-semibold tracking-[0.14em] text-primary-600 dark:text-primary-400">{step}</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--shell-text)]">{title}</p>
                   <p className="mt-1.5 text-xs leading-5 text-[var(--shell-muted)]">{description}</p>
                 </div>
@@ -82,7 +82,7 @@ export default function InterviewStatisticsPage() {
           </div>
 
           <aside className="border-t border-[var(--shell-border)] bg-[#111827] p-7 text-slate-100 lg:border-l lg:border-t-0 sm:p-9">
-            <div className="flex items-center gap-2 text-blue-300"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">评分后可见</p></div>
+            <div className="flex items-center gap-2 text-primary-300"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">评分后可见</p></div>
             <h3 className="mt-4 text-xl font-semibold tracking-tight">你的第一份成长复盘</h3>
             <p className="mt-2 text-sm leading-6 text-slate-400">不是一个空泛总分，而是一份可以直接指导下一步练习的训练记录。</p>
             <div className="mt-7 space-y-4 border-y border-white/10 py-5">
@@ -92,12 +92,12 @@ export default function InterviewStatisticsPage() {
                 ['训练路径', '可直接进入的专项复练'],
               ].map(([title, description]) => (
                 <div key={title} className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-blue-300">—</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-primary-300">—</span>
                   <div><p className="text-sm font-medium text-slate-100">{title}</p><p className="mt-0.5 text-xs text-slate-400">{description}</p></div>
                 </div>
               ))}
             </div>
-            <Link to="/job-targets" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-blue-300 transition hover:text-blue-200">先设定目标岗位<ChevronRight className="h-4 w-4" /></Link>
+            <Link to="/job-targets" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary-300 transition hover:text-primary-200">先设定目标岗位<ChevronRight className="h-4 w-4" /></Link>
           </aside>
         </div>
       </section>
@@ -109,7 +109,7 @@ export default function InterviewStatisticsPage() {
           [Sparkles, '下一步训练建议', '把薄弱项直接转成专项复练，让每次努力都有方向。'],
         ].map(([Icon, title, description]) => {
           const CardIcon = Icon as typeof BookOpenCheck;
-          return <article key={title as string} className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5"><CardIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" /><h3 className="mt-4 text-sm font-semibold text-[var(--shell-text)]">{title as string}</h3><p className="mt-2 text-sm leading-6 text-[var(--shell-muted)]">{description as string}</p></article>;
+          return <article key={title as string} className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5"><CardIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" /><h3 className="mt-4 text-sm font-semibold text-[var(--shell-text)]">{title as string}</h3><p className="mt-2 text-sm leading-6 text-[var(--shell-muted)]">{description as string}</p></article>;
         })}
       </section>
     </div>
@@ -120,11 +120,11 @@ export default function InterviewStatisticsPage() {
   const changeText = change === null ? '还需一次训练' : `${change >= 0 ? '+' : ''}${change} 分`;
 
   return <div className="mx-auto max-w-6xl space-y-6">
-    <header className="flex flex-wrap items-end justify-between gap-5 border-b border-[var(--shell-border)] pb-6"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">成长复盘</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--shell-text)]">能力画像</h1><p className="mt-2 text-sm text-[var(--shell-muted)]">不只是分数：把每次回答留下的信号，变成下一次训练的方向。</p></div><Link to="/practice" className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">开始专项复练 <ArrowRight className="h-4 w-4" /></Link></header>
+    <header className="flex flex-wrap items-end justify-between gap-5 border-b border-[var(--shell-border)] pb-6"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">成长复盘</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--shell-text)]">能力画像</h1><p className="mt-2 text-sm text-[var(--shell-muted)]">不只是分数：把每次回答留下的信号，变成下一次训练的方向。</p></div><Link to="/practice" className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700">开始专项复练 <ArrowRight className="h-4 w-4" /></Link></header>
 
     <section className="grid overflow-hidden border border-[var(--shell-border)] bg-[var(--shell-panel)] lg:grid-cols-[1.15fr_0.85fr]">
       <div className="p-6 sm:p-8"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--shell-subtle)]">当前综合表现</p><div className="mt-4 flex items-end gap-4"><span className="text-6xl font-semibold leading-none tracking-[-0.06em] text-[var(--shell-text)]">{statistics.averageScore}</span><span className="mb-1 text-sm font-medium text-[var(--shell-muted)]">/ 100 分</span></div><p className="mt-3 text-base font-medium text-[var(--shell-text)]">{scoreLabel(statistics.averageScore)}</p><p className="mt-1 text-sm leading-6 text-[var(--shell-muted)]">基于 {statistics.completedInterviewCount} 次已评分模拟面试汇总。</p><div className="mt-7 flex flex-wrap gap-x-8 gap-y-4 border-t border-[var(--shell-border)] pt-5"><div><p className="text-xs text-[var(--shell-subtle)]">最近得分</p><p className="mt-1 text-lg font-semibold text-[var(--shell-text)]">{statistics.latestScore ?? '—'} 分</p></div><div className="border-l border-[var(--shell-border)] pl-8"><p className="text-xs text-[var(--shell-subtle)]">相对上次</p><p className="mt-1 inline-flex items-center gap-1 text-lg font-semibold text-[var(--shell-text)]"><ChangeIcon className={`h-4 w-4 ${change !== null && change < 0 ? 'text-amber-500' : 'text-emerald-500'}`} />{changeText}</p></div></div></div>
-      <div className="border-t border-[var(--shell-border)] bg-[var(--shell-hover)] p-6 lg:border-l lg:border-t-0 sm:p-8"><div className="flex items-center gap-2 text-blue-600 dark:text-blue-400"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">本次训练建议</p></div>{priority ? <><h2 className="mt-4 text-xl font-semibold text-[var(--shell-text)]">优先补强「{priority.category}」</h2><p className="mt-2 text-sm leading-6 text-[var(--shell-muted)]">该维度当前平均 {priority.averageScore} 分，来自 {priority.questionCount} 道已评分题目。集中复练，比平均用力更有效。</p><Link to={`/practice?status=TODO&category=${encodeURIComponent(priority.category)}`} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400">查看对应复练题 <ChevronRight className="h-4 w-4" /></Link></> : <p className="mt-4 text-sm text-[var(--shell-muted)]">再积累更多评分结果，系统会给出稳定建议。</p>}</div>
+      <div className="border-t border-[var(--shell-border)] bg-[var(--shell-hover)] p-6 lg:border-l lg:border-t-0 sm:p-8"><div className="flex items-center gap-2 text-primary-600 dark:text-primary-400"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">本次训练建议</p></div>{priority ? <><h2 className="mt-4 text-xl font-semibold text-[var(--shell-text)]">优先补强「{priority.category}」</h2><p className="mt-2 text-sm leading-6 text-[var(--shell-muted)]">该维度当前平均 {priority.averageScore} 分，来自 {priority.questionCount} 道已评分题目。集中复练，比平均用力更有效。</p><Link to={`/practice?status=TODO&category=${encodeURIComponent(priority.category)}`} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary-600 dark:text-primary-400">查看对应复练题 <ChevronRight className="h-4 w-4" /></Link></> : <p className="mt-4 text-sm text-[var(--shell-muted)]">再积累更多评分结果，系统会给出稳定建议。</p>}</div>
     </section>
 
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -132,6 +132,6 @@ export default function InterviewStatisticsPage() {
       <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 sm:p-6"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">能力分布</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">把注意力放在最有价值的差距上。</h2><div className="mt-5 space-y-5">{abilities.map((item, index) => <div key={item.category} className="group"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><span className="w-5 text-xs font-semibold text-[var(--shell-subtle)]">{String(index + 1).padStart(2, '0')}</span><span className="truncate text-sm font-medium text-[var(--shell-text)]">{item.category}</span></div><span className="text-sm font-semibold text-[var(--shell-text)]">{item.averageScore}</span></div><div className="ml-8 mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--shell-hover)]"><div className={`h-full rounded-full ${scoreTone(item.averageScore)}`} style={{ width: `${item.averageScore}%` }} /></div><p className="ml-8 mt-1.5 text-xs text-[var(--shell-muted)]">{item.questionCount} 道已评分题目</p></div>)}</div></section>
     </div>
 
-    <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)]"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--shell-border)] p-5 sm:px-6"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">训练队列</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">从薄弱项开始，逐个建立优势。</h2></div><Link to="/practice" className="text-sm font-semibold text-blue-600 dark:text-blue-400">查看全部复练</Link></div><div className="divide-y divide-[var(--shell-border)]">{statistics.weaknesses.map((item, index) => <Link key={item.category} to={`/practice?status=TODO&category=${encodeURIComponent(item.category)}`} className="flex items-center justify-between gap-5 p-5 transition hover:bg-[var(--shell-hover)] sm:px-6"><div className="flex min-w-0 items-center gap-4"><span className="text-sm font-semibold text-[var(--shell-subtle)]">0{index + 1}</span><div><p className="text-sm font-semibold text-[var(--shell-text)]">{item.category}</p><p className="mt-1 text-xs text-[var(--shell-muted)]">当前平均 {item.averageScore} 分 · {item.questionCount} 道已评分题目</p></div></div><span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400">去复练 <ArrowRight className="h-4 w-4" /></span></Link>)}</div></section>
+    <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)]"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--shell-border)] p-5 sm:px-6"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">训练队列</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">从薄弱项开始，逐个建立优势。</h2></div><Link to="/practice" className="text-sm font-semibold text-primary-600 dark:text-primary-400">查看全部复练</Link></div><div className="divide-y divide-[var(--shell-border)]">{statistics.weaknesses.map((item, index) => <Link key={item.category} to={`/practice?status=TODO&category=${encodeURIComponent(item.category)}`} className="flex items-center justify-between gap-5 p-5 transition hover:bg-[var(--shell-hover)] sm:px-6"><div className="flex min-w-0 items-center gap-4"><span className="text-sm font-semibold text-[var(--shell-subtle)]">0{index + 1}</span><div><p className="text-sm font-semibold text-[var(--shell-text)]">{item.category}</p><p className="mt-1 text-xs text-[var(--shell-muted)]">当前平均 {item.averageScore} 分 · {item.questionCount} 道已评分题目</p></div></div><span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary-600 dark:text-primary-400">去复练 <ArrowRight className="h-4 w-4" /></span></Link>)}</div></section>
   </div>;
 }

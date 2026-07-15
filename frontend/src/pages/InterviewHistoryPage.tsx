@@ -110,7 +110,7 @@ function StatusIcon({ interview }: { interview: InterviewWithResume }) {
   }
   // 正在评估
   if (isEvaluating(interview)) {
-      return <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin"/>;
+      return <RefreshCw className="w-4 h-4 text-primary-500 dark:text-primary-400 animate-spin"/>;
   }
   // 评估完成
   if (isEvaluateCompleted(interview)) {
@@ -118,7 +118,7 @@ function StatusIcon({ interview }: { interview: InterviewWithResume }) {
   }
   // 面试进行中
   if (interview.status === 'IN_PROGRESS') {
-      return <PlayCircle className="w-4 h-4 text-blue-500 dark:text-blue-400"/>;
+      return <PlayCircle className="w-4 h-4 text-primary-500 dark:text-primary-400"/>;
   }
   // 面试已完成但评估未开始
   if (isCompletedStatus(interview.status)) {
@@ -376,7 +376,7 @@ export default function InterviewHistoryPage({
             label="平均分数"
             value={stats.averageScore}
             suffix="分"
-            color="bg-indigo-500"
+            color="bg-primary-600"
           />
         </div>
       )}
@@ -479,13 +479,13 @@ export default function InterviewHistoryPage({
                           <div className="flex items-center gap-2 min-w-[7rem]">
                             <div className="w-16 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                               <motion.div
-                                className="h-full bg-blue-500 rounded-full"
+                                className="h-full bg-primary-500 rounded-full"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${resolveEvaluatePercent(interview) ?? 5}%` }}
                                 transition={{ duration: 0.4 }}
                               />
                             </div>
-                            <span className="text-blue-500 dark:text-blue-400 text-sm tabular-nums">
+                            <span className="text-primary-500 dark:text-primary-400 text-sm tabular-nums">
                               {resolveEvaluatePercent(interview) ?? 5}%
                             </span>
                           </div>

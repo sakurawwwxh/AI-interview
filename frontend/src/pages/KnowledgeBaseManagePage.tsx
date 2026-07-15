@@ -55,7 +55,7 @@ function StatusIcon({ status }: { status: VectorStatus }) {
     case 'COMPLETED':
       return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'PROCESSING':
-      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />;
     case 'PENDING':
       return <Clock className="w-4 h-4 text-yellow-500" />;
     case 'FAILED':
@@ -327,7 +327,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
             icon={MessageSquare}
             label="总提问次数"
             value={stats.totalQuestionCount}
-            color="bg-indigo-500"
+            color="bg-primary-600"
           />
           <StatCard
             icon={Eye}
