@@ -13,11 +13,14 @@ import {
   Loader2,
   PlayCircle,
   RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
   TrendingUp,
   Users,
 } from 'lucide-react';
+import { interviewApi } from '../api/interview';
+import { getErrorMessage } from '../api/request';
 
 interface InterviewHistoryPageProps {
   onBack: () => void;
@@ -180,6 +183,7 @@ export default function InterviewHistoryPage({
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [deleteItem, setDeleteItem] = useState<InterviewWithResume | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [retryingSessionId, setRetryingSessionId] = useState<string | null>(null);
   const pollingRef = useRef<number | null>(null);
 
   const loadAllInterviews = useCallback(async (isPolling = false) => {
@@ -288,6 +292,20 @@ export default function InterviewHistoryPage({
       alert('导出失败，请重试');
     } finally {
       setExporting(null);
+    }
+  };
+
+  /** 评估失败后重新入队 */
+  const handleRetryEvaluation = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRetryingSessionId(sessionId);
+    try {
+      await interviewApi.retryEvaluation(sessionId);
+      await loadAllInterviews(true);
+    } catch (err) {
+      alert(getErrorMessage(err) || '重新评估失败，请稍后重试');
+    } finally {
+      setRetryingSessionId(null);
     }
   };
 
@@ -483,6 +501,21 @@ export default function InterviewHistoryPage({
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {/* 评估失败：一键重试 */}
+                        {isEvaluateFailed(interview) && (
+                          <button
+                            onClick={(e) => handleRetryEvaluation(interview.sessionId, e)}
+                            disabled={retryingSessionId === interview.sessionId}
+                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors disabled:opacity-50"
+                            title={interview.evaluateError ? `重新评估：${interview.evaluateError}` : '重新评估'}
+                          >
+                            {retryingSessionId === interview.sessionId ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
                         {/* 导出按钮 */}
                         {isEvaluateCompleted(interview) && (
                           <button

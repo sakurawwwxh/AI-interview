@@ -124,6 +124,16 @@ public class InterviewController {
         sessionService.completeInterview(sessionId);
         return Result.success(null);
     }
+
+    /**
+     * 评估失败后重新入队评估
+     */
+    @PostMapping("/api/interview/sessions/{sessionId}/retry-evaluation")
+    public Result<Void> retryEvaluation(@PathVariable String sessionId) {
+        log.info("重新评估: {}", sessionId);
+        sessionService.retryEvaluation(sessionId);
+        return Result.success(null);
+    }
     
     /**
      * 获取面试会话详情

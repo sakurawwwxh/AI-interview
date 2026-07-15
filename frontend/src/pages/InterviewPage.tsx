@@ -10,6 +10,12 @@ import type {InterviewTemplateConfig} from '../types/interview';
 import {interviewTemplates} from '../constants/interviewTemplates';
 import {jobTargetApi, type JobTarget} from '../api/jobTarget';
 import {recommendTemplate} from '../utils/templateRecommend';
+import {
+  clearInterviewDraft,
+  clearSessionDrafts,
+  loadInterviewDraft,
+  saveInterviewDraft,
+} from '../utils/interviewDraft';
 
 type InterviewStage = 'config' | 'interview' | 'submitted';
 
@@ -24,12 +30,20 @@ interface Message {
 interface InterviewProps {
   resumeText: string;
   resumeId?: number;
+  /** 从简历详情「按岗位开面」带入的岗位 ID */
+  initialJobTargetId?: number;
   onBack: () => void;
   /** 交卷完成回调，可携带 sessionId 便于记录页高亮 */
   onInterviewComplete: (sessionId?: string) => void;
 }
 
-export default function Interview({ resumeText, resumeId, onBack, onInterviewComplete }: InterviewProps) {
+export default function Interview({
+  resumeText,
+  resumeId,
+  initialJobTargetId,
+  onBack,
+  onInterviewComplete,
+}: InterviewProps) {
   const [stage, setStage] = useState<InterviewStage>('config');
   const [questionCount, setQuestionCount] = useState(8);
   const [template, setTemplate] = useState<InterviewTemplateConfig>(interviewTemplates[0]);
@@ -45,15 +59,18 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [forceCreateNew, setForceCreateNew] = useState(false);
   const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
-  const [jobTargetId, setJobTargetId] = useState<number | undefined>();
+  const [jobTargetId, setJobTargetId] = useState<number | undefined>(initialJobTargetId);
   const [usingDefaultQuestions, setUsingDefaultQuestions] = useState(false);
   const [templateRecommendReason, setTemplateRecommendReason] = useState<string | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
   const questionStartedAtRef = useRef(performance.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
   const autoNavigateRef = useRef<number | undefined>(undefined);
   /** 用户是否手动改过模板；改过后不再因切换岗位自动覆盖 */
   const userPickedTemplateRef = useRef(false);
+  const draftTimerRef = useRef<number | undefined>(undefined);
+  const serverDraftTimerRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -114,17 +131,81 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   useEffect(() => {
     jobTargetApi.list().then(items => {
       setJobTargets(items);
-      const active = items.find(item => item.active);
-      if (active) {
-        setJobTargetId(active.id);
-        // 初始带出当前岗位时自动推荐一次模板
-        const rec = recommendTemplate(active.jobDescription, interviewTemplates);
+      // 优先使用路由带入的岗位，否则用当前激活岗位
+      const preferred = initialJobTargetId
+        ? items.find((item) => item.id === initialJobTargetId)
+        : items.find((item) => item.active);
+      if (preferred) {
+        setJobTargetId(preferred.id);
+        const rec = recommendTemplate(preferred.jobDescription, interviewTemplates);
         if (rec) {
           setTemplate(rec.template);
           setTemplateRecommendReason(rec.reason);
         }
       }
     }).catch(() => {});
+  }, [initialJobTargetId]);
+
+  /**
+   * 切换题目时恢复：服务端已答 > 本地草稿 > 空
+   */
+  useEffect(() => {
+    if (!session || !currentQuestion || stage !== 'interview') return;
+    const fromServer = currentQuestion.userAnswer?.trim();
+    if (fromServer) {
+      setAnswer(fromServer);
+      return;
+    }
+    const draft = loadInterviewDraft(session.sessionId, currentQuestion.questionIndex);
+    setAnswer(draft?.answer ?? '');
+  }, [session?.sessionId, currentQuestion?.questionIndex, stage]);
+
+  /**
+   * 输入变化：立即写 localStorage；防抖 1.5s 调用后端暂存
+   */
+  const handleAnswerChange = (value: string) => {
+    setAnswer(value);
+    if (!session || !currentQuestion || isSubmitting) return;
+
+    saveInterviewDraft(session.sessionId, currentQuestion.questionIndex, value);
+
+    if (draftTimerRef.current) {
+      window.clearTimeout(draftTimerRef.current);
+    }
+    draftTimerRef.current = window.setTimeout(() => {
+      // 仅视觉反馈 local 已存；服务端另走防抖
+    }, 100);
+
+    if (serverDraftTimerRef.current) {
+      window.clearTimeout(serverDraftTimerRef.current);
+    }
+    serverDraftTimerRef.current = window.setTimeout(async () => {
+      if (!value.trim() || !session || !currentQuestion) return;
+      try {
+        setDraftSaving(true);
+        await interviewApi.saveAnswer({
+          sessionId: session.sessionId,
+          questionIndex: currentQuestion.questionIndex,
+          answer: value.trim(),
+          answerDurationSeconds: Math.max(
+            1,
+            Math.floor((performance.now() - questionStartedAtRef.current) / 1000),
+          ),
+        });
+      } catch (err) {
+        console.warn('暂存答案失败（本地草稿仍可用）', err);
+      } finally {
+        setDraftSaving(false);
+      }
+    }, 1500);
+  };
+
+  // 卸载时清防抖定时器
+  useEffect(() => {
+    return () => {
+      if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+      if (serverDraftTimerRef.current) window.clearTimeout(serverDraftTimerRef.current);
+    };
   }, []);
 
   /** 根据当前岗位 JD 推荐并应用模板 */
@@ -229,12 +310,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     if (currentQ) {
       setCurrentQuestion(currentQ);
 
-        // 如果当前问题已有答案，显示在输入框中
-      if (currentQ.userAnswer) {
-        setAnswer(currentQ.userAnswer);
-      }
-
-        // 恢复消息历史
+      // 答案由 currentQuestion 的 effect 从服务端/草稿恢复
+      // 恢复消息历史
       const restoredMessages: Message[] = [];
       for (let i = 0; i <= sessionToRestore.currentQuestionIndex; i++) {
         const q = sessionToRestore.questions?.[i];
@@ -336,12 +413,20 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     setMessages(prev => [...prev, userMessage]);
 
     try {
+      // 取消未完成的暂存请求
+      if (serverDraftTimerRef.current) {
+        window.clearTimeout(serverDraftTimerRef.current);
+        serverDraftTimerRef.current = undefined;
+      }
+
       const response = await interviewApi.submitAnswer({
         sessionId: session.sessionId,
         questionIndex: currentQuestion.questionIndex,
         answer: answer.trim(),
         answerDurationSeconds: Math.max(1, Math.floor((performance.now() - questionStartedAtRef.current) / 1000))
       });
+
+      clearInterviewDraft(session.sessionId, currentQuestion.questionIndex);
 
       setSession(previous => previous ? {
         ...previous,
@@ -361,7 +446,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
           isFollowUp: response.nextQuestion!.isFollowUp,
         }]);
       } else {
-        // 面试已完成，进入评估过渡态
+        clearSessionDrafts(session.sessionId);
         enterSubmittedStage();
       }
     } catch (err) {
@@ -377,7 +462,24 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
 
     setIsSubmitting(true);
     try {
+      // 交卷前尽量把当前输入暂存
+      if (answer.trim() && currentQuestion) {
+        try {
+          await interviewApi.saveAnswer({
+            sessionId: session.sessionId,
+            questionIndex: currentQuestion.questionIndex,
+            answer: answer.trim(),
+            answerDurationSeconds: Math.max(
+              1,
+              Math.floor((performance.now() - questionStartedAtRef.current) / 1000),
+            ),
+          });
+        } catch {
+          // 暂存失败不阻拦交卷
+        }
+      }
       await interviewApi.completeInterview(session.sessionId);
+      clearSessionDrafts(session.sessionId);
       setShowCompleteConfirm(false);
       enterSubmittedStage();
     } catch (err) {
@@ -419,12 +521,16 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     if (!session || !currentQuestion) return null;
 
     return (
+      <>
+      {draftSaving && (
+        <p className="mb-2 text-center text-xs text-slate-400 dark:text-slate-500">答案已自动暂存…</p>
+      )}
       <InterviewChatPanel
         session={session}
         currentQuestion={currentQuestion}
         messages={messages}
         answer={answer}
-        onAnswerChange={setAnswer}
+        onAnswerChange={handleAnswerChange}
         onSubmit={handleSubmitAnswer}
         elapsedSeconds={elapsedSeconds}
         onCompleteEarly={handleCompleteEarly}
@@ -432,6 +538,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
         showCompleteConfirm={showCompleteConfirm}
         onShowCompleteConfirm={setShowCompleteConfirm}
       />
+      </>
     );
   };
 

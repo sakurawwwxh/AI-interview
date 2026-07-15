@@ -68,8 +68,8 @@ function ResumeDetailWrapper() {
     navigate('/history');
   };
 
-  const handleStartInterview = (resumeText: string, resumeId: number) => {
-    navigate(`/interview/${resumeId}`, { state: { resumeText } });
+  const handleStartInterview = (resumeText: string, resumeId: number, jobTargetId?: number) => {
+    navigate(`/interview/${resumeId}`, { state: { resumeText, jobTargetId } });
   };
 
   return (
@@ -86,12 +86,14 @@ function InterviewWrapper() {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as { resumeText?: string; jobTargetId?: number } | null;
   const [resumeText, setResumeText] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const initialJobTargetId = locationState?.jobTargetId;
 
   useEffect(() => {
     // 优先从location state获取resumeText
-    const stateText = (location.state as { resumeText?: string })?.resumeText;
+    const stateText = locationState?.resumeText;
     if (stateText) {
       setResumeText(stateText);
       setLoading(false);
@@ -109,7 +111,7 @@ function InterviewWrapper() {
     } else {
       setLoading(false);
     }
-  }, [resumeId, location.state]);
+  }, [resumeId, locationState?.resumeText]);
 
   if (!resumeId) {
     return <Navigate to="/history" replace />;
@@ -140,6 +142,7 @@ function InterviewWrapper() {
     <Interview
       resumeText={resumeText}
       resumeId={parseInt(resumeId, 10)}
+      initialJobTargetId={initialJobTargetId}
       onBack={handleBack}
       onInterviewComplete={handleInterviewComplete}
     />
