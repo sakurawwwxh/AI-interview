@@ -152,15 +152,27 @@ public class AnswerEvaluationService {
             String fallbackOverallFeedback = mergeOverallFeedback(batchResults);
             List<String> fallbackStrengths = mergeListItems(batchResults, true);
             List<String> fallbackImprovements = mergeListItems(batchResults, false);
-            FinalSummaryDTO finalSummary = summarizeBatchResults(
-                sessionId,
-                resumeSummary,
-                questions,
-                mergedEvaluations,
-                fallbackOverallFeedback,
-                fallbackStrengths,
-                fallbackImprovements
-            );
+
+            // 单批评估时跳过二次 summary，直接复用本批综合结论，少一次 LLM 调用
+            FinalSummaryDTO finalSummary;
+            if (batchResults.size() <= 1) {
+                log.info("单批评估，跳过二次汇总: sessionId={}, questionCount={}", sessionId, questions.size());
+                finalSummary = new FinalSummaryDTO(
+                    fallbackOverallFeedback,
+                    fallbackStrengths,
+                    fallbackImprovements
+                );
+            } else {
+                finalSummary = summarizeBatchResults(
+                    sessionId,
+                    resumeSummary,
+                    questions,
+                    mergedEvaluations,
+                    fallbackOverallFeedback,
+                    fallbackStrengths,
+                    fallbackImprovements
+                );
+            }
 
             // 转换为业务对象
             return convertToReport(

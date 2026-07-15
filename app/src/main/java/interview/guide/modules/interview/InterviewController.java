@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -140,6 +141,14 @@ public class InterviewController {
     @GetMapping("/api/interview/statistics")
     public Result<InterviewStatisticsDTO> getInterviewStatistics() {
         return Result.success(statisticsService.getStatistics());
+    }
+
+    /**
+     * 当前用户全部面试记录列表（含关联简历摘要）
+     */
+    @GetMapping("/api/interview/history")
+    public Result<List<InterviewListItemDTO>> listInterviewHistory() {
+        return Result.success(historyService.listCurrentUserInterviews());
     }
     
     /**

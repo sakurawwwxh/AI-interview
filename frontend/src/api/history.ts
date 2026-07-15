@@ -54,6 +54,12 @@ export interface InterviewItem {
   referenceAnswers?: unknown[];
 }
 
+/** 面试记录列表项（含简历摘要，一次接口返回） */
+export interface InterviewHistoryItem extends InterviewItem {
+  resumeId: number;
+  resumeFilename: string;
+}
+
 export interface AnswerItem {
   questionIndex: number;
   question: string;
@@ -140,6 +146,13 @@ export const historyApi = {
    */
   async getInterviewDetail(sessionId: string): Promise<InterviewDetail> {
     return request.get<InterviewDetail>(`/api/interview/sessions/${sessionId}/details`);
+  },
+
+  /**
+   * 当前用户全部面试记录（含关联简历，避免 N+1）
+   */
+  async getInterviewHistory(): Promise<InterviewHistoryItem[]> {
+    return request.get<InterviewHistoryItem[]>('/api/interview/history');
   },
 
   /**

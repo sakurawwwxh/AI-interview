@@ -6,6 +6,7 @@ import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO.QuestionType;
+import interview.guide.modules.interview.model.QuestionGenerationResult;
 import interview.guide.modules.userai.service.UserAiChatClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +20,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 面试问题生成服务
@@ -42,6 +47,28 @@ public class InterviewQuestionService {
     private final int followUpCount;
     
     private static final int MAX_FOLLOW_UP_COUNT = 2;
+    /** 历史题相似度阈值：归一化后包含或字符重叠率超过该值视为重复 */
+    private static final double HISTORY_OVERLAP_THRESHOLD = 0.72;
+    /** 归一化时去掉空白与常见中英文标点 */
+    private static final Pattern NON_WORD = Pattern.compile("[\\s\\p{Punct}\\u3000-\\u303F\\uFF00-\\uFFEF]+");
+
+    /**
+     * JD 关键词 → 题型加成。命中时对应题型权重按倍率放大。
+     */
+    private static final Map<QuestionType, List<String>> JD_TYPE_KEYWORDS = Map.ofEntries(
+        Map.entry(QuestionType.MYSQL, List.of("mysql", "sql", "数据库", "索引", "事务", "innodb")),
+        Map.entry(QuestionType.REDIS, List.of("redis", "缓存", "分布式锁", "缓存一致性")),
+        Map.entry(QuestionType.JAVA_BASIC, List.of("java", "jvm", "gc", "垃圾回收", "面向对象")),
+        Map.entry(QuestionType.JAVA_COLLECTION, List.of("集合", "hashmap", "concurrenthashmap", "list", "map")),
+        Map.entry(QuestionType.JAVA_CONCURRENT, List.of("并发", "多线程", "线程池", "锁", "synchronized", "juc")),
+        Map.entry(QuestionType.SPRING, List.of("spring", "ioc", "aop", "bean", "依赖注入")),
+        Map.entry(QuestionType.SPRING_BOOT, List.of("spring boot", "springboot", "starter", "自动配置")),
+        Map.entry(QuestionType.FRONTEND, List.of("前端", "react", "vue", "javascript", "typescript", "css")),
+        Map.entry(QuestionType.DISTRIBUTED_SYSTEM, List.of("分布式", "微服务", "rpc", "消息队列", "kafka", "mq")),
+        Map.entry(QuestionType.ARCHITECTURE, List.of("架构", "高可用", "高并发", "系统设计", "限流", "降级")),
+        Map.entry(QuestionType.PROJECT, List.of("项目", "业务", "落地", "负责", "架构设计")),
+        Map.entry(QuestionType.SOFT_SKILLS, List.of("沟通", "协作", "领导力", "软技能", "团队"))
+    );
 
     // 中间DTO用于接收AI响应
     private record QuestionListDTO(
@@ -79,16 +106,11 @@ public class InterviewQuestionService {
     }
     
     /**
-     * 生成面试问题
-     * 
-     * @param resumeText 简历文本
-     * @param questionCount 问题数量
-     * @param historicalQuestions 历史问题列表（可选）
-     * @return 面试问题列表
+     * 生成面试问题（兼容旧调用，仅返回题目列表）
      */
     public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount, List<String> historicalQuestions) {
-        return generateQuestions(resumeText, questionCount, historicalQuestions,
-            InterviewTemplateConfig.defaultBackend(followUpCount));
+        return generateQuestionsWithSource(resumeText, questionCount, historicalQuestions,
+            InterviewTemplateConfig.defaultBackend(followUpCount), null).questions();
     }
 
     public List<InterviewQuestionDTO> generateQuestions(
@@ -96,7 +118,7 @@ public class InterviewQuestionService {
             int questionCount,
             List<String> historicalQuestions,
             InterviewTemplateConfig template) {
-        return generateQuestions(resumeText, questionCount, historicalQuestions, template, null);
+        return generateQuestionsWithSource(resumeText, questionCount, historicalQuestions, template, null).questions();
     }
 
     public List<InterviewQuestionDTO> generateQuestions(
@@ -105,73 +127,74 @@ public class InterviewQuestionService {
             List<String> historicalQuestions,
             InterviewTemplateConfig template,
             String targetJob) {
-        log.info("开始生成面试问题，简历长度: {}, 问题数量: {}, 历史问题数: {}", 
+        return generateQuestionsWithSource(resumeText, questionCount, historicalQuestions, template, targetJob).questions();
+    }
+
+    /**
+     * 生成面试问题并标记来源（AI / DEFAULT）。
+     * AI 失败时降级默认题库，保证本地可用。
+     */
+    public QuestionGenerationResult generateQuestionsWithSource(
+            String resumeText,
+            int questionCount,
+            List<String> historicalQuestions,
+            InterviewTemplateConfig template,
+            String targetJob) {
+        log.info("开始生成面试问题，简历长度: {}, 问题数量: {}, 历史问题数: {}",
             resumeText.length(), questionCount, historicalQuestions != null ? historicalQuestions.size() : 0);
-        
+
         InterviewTemplateConfig normalizedTemplate = template.normalize(followUpCount);
-        TemplateDistribution distribution = calculateTemplateDistribution(questionCount, normalizedTemplate);
-        
+        // 有 JD 时按关键词放大相关题型权重
+        InterviewTemplateConfig weightedTemplate = boostTemplateByJobDescription(normalizedTemplate, targetJob);
+        TemplateDistribution distribution = calculateTemplateDistribution(questionCount, weightedTemplate);
+
         try {
-            // 加载系统提示词
             String systemPrompt = systemPromptTemplate.render();
-            
-            // 加载用户提示词并填充变量
             Map<String, Object> variables = new HashMap<>();
             variables.put("questionCount", questionCount);
             variables.put("questionPlan", distribution.questionPlan());
-            variables.put("difficultyDistribution", difficultyText(normalizedTemplate.difficultyDistribution()));
-            variables.put("followUpCount", normalizedTemplate.followUpCount());
+            variables.put("difficultyDistribution", difficultyText(weightedTemplate.difficultyDistribution()));
+            variables.put("followUpCount", weightedTemplate.followUpCount());
             variables.put("resumeText", resumeText);
             variables.put("targetJob", targetJob == null || targetJob.isBlank()
                 ? "未指定岗位目标；请基于简历进行综合面试。" : targetJob);
-            
-            // 添加历史问题
+
             if (historicalQuestions != null && !historicalQuestions.isEmpty()) {
-                String historicalText = String.join("\n", historicalQuestions);
-                variables.put("historicalQuestions", historicalText);
+                variables.put("historicalQuestions", String.join("\n", historicalQuestions));
             } else {
                 variables.put("historicalQuestions", "暂无历史提问");
             }
-            
+
             String userPrompt = userPromptTemplate.render(variables);
-            
-            // 添加格式指令到系统提示词
             String systemPromptWithFormat = systemPrompt + "\n\n" + outputConverter.getFormat();
-            
-            // 调用AI
-            QuestionListDTO dto;
-            try {
-                dto = structuredOutputInvoker.invoke(
-                    chatClientFactory.forCurrentUser(),
-                    chatClientFactory.fallbackForCurrentUser(),
-                    systemPromptWithFormat,
-                    userPrompt,
-                    outputConverter,
-                    ErrorCode.INTERVIEW_QUESTION_GENERATION_FAILED,
-                    "面试问题生成失败：",
-                    "结构化问题生成",
-                    log
-                );
-                log.debug("AI响应解析成功: questions count={}", dto.questions().size());
-            } catch (Exception e) {
-                log.error("面试问题生成AI调用失败: {}", e.getMessage(), e);
-                throw new BusinessException(ErrorCode.INTERVIEW_QUESTION_GENERATION_FAILED, 
-                    "面试问题生成失败：" + e.getMessage());
+
+            QuestionListDTO dto = structuredOutputInvoker.invoke(
+                chatClientFactory.forCurrentUser(),
+                chatClientFactory.fallbackForCurrentUser(),
+                systemPromptWithFormat,
+                userPrompt,
+                outputConverter,
+                ErrorCode.INTERVIEW_QUESTION_GENERATION_FAILED,
+                "面试问题生成失败：",
+                "结构化问题生成",
+                log
+            );
+
+            List<InterviewQuestionDTO> questions = convertToQuestions(dto, weightedTemplate.followUpCount());
+            if (questions.isEmpty()) {
+                log.warn("AI 返回空题列表，降级为默认题库");
+                return QuestionGenerationResult.defaults(
+                    generateDefaultQuestions(questionCount, weightedTemplate.followUpCount(), historicalQuestions));
             }
-            
-            // 转换为业务对象
-            List<InterviewQuestionDTO> questions = convertToQuestions(dto, normalizedTemplate.followUpCount());
-            log.info("成功生成 {} 个面试问题", questions.size());
-            
-            return questions;
-            
-        } catch (BusinessException e) {
-            // 业务异常（如 AI 调用明确失败）应向上传播，不降级为默认题库
-            throw e;
+
+            questions = dedupeAgainstHistory(questions, historicalQuestions, questionCount, weightedTemplate.followUpCount());
+            log.info("成功生成 {} 个面试问题（AI）", questions.size());
+            return QuestionGenerationResult.ai(questions);
+
         } catch (Exception e) {
             log.error("生成面试问题失败，降级为默认题库: {}", e.getMessage(), e);
-            // 返回默认问题集
-            return generateDefaultQuestions(questionCount, normalizedTemplate.followUpCount());
+            return QuestionGenerationResult.defaults(
+                generateDefaultQuestions(questionCount, weightedTemplate.followUpCount(), historicalQuestions));
         }
     }
 
@@ -180,6 +203,153 @@ public class InterviewQuestionService {
      */
     public List<InterviewQuestionDTO> generateQuestions(String resumeText, int questionCount) {
         return generateQuestions(resumeText, questionCount, null);
+    }
+
+    /**
+     * 根据 JD 文本提升相关题型权重（未命中则保持原样）。
+     */
+    InterviewTemplateConfig boostTemplateByJobDescription(InterviewTemplateConfig template, String targetJob) {
+        if (targetJob == null || targetJob.isBlank()) {
+            return template;
+        }
+        String jd = targetJob.toLowerCase(Locale.ROOT);
+        List<InterviewTemplateConfig.QuestionTypeWeight> boosted = new ArrayList<>();
+        boolean anyBoost = false;
+        for (InterviewTemplateConfig.QuestionTypeWeight item : template.questionTypes()) {
+            List<String> keywords = JD_TYPE_KEYWORDS.getOrDefault(item.type(), List.of());
+            boolean hit = keywords.stream().anyMatch(jd::contains);
+            if (hit) {
+                // 命中关键词：权重 ×1.8 并至少 +8，使分配更倾斜
+                int newWeight = Math.max(item.weight() + 8, (int) Math.round(item.weight() * 1.8));
+                boosted.add(new InterviewTemplateConfig.QuestionTypeWeight(item.type(), newWeight));
+                anyBoost = true;
+            } else {
+                boosted.add(item);
+            }
+        }
+        if (!anyBoost) {
+            return template;
+        }
+        log.info("已按 JD 关键词调整题型权重");
+        return new InterviewTemplateConfig(
+            template.id(),
+            template.name(),
+            boosted,
+            template.difficultyDistribution(),
+            template.followUpCount()
+        );
+    }
+
+    /**
+     * 过滤与历史题高度相似的新题，不足数量时用默认题补齐。
+     */
+    List<InterviewQuestionDTO> dedupeAgainstHistory(
+        List<InterviewQuestionDTO> generated,
+        List<String> historicalQuestions,
+        int expectedCount,
+        int followUpLimit
+    ) {
+        if (historicalQuestions == null || historicalQuestions.isEmpty()) {
+            return reindex(generated.stream().limit(expectedCount).toList());
+        }
+        List<String> historyNorm = historicalQuestions.stream()
+            .map(this::normalizeQuestionText)
+            .filter(s -> !s.isBlank())
+            .toList();
+
+        List<InterviewQuestionDTO> kept = new ArrayList<>();
+        Set<String> usedNorm = new HashSet<>();
+        for (InterviewQuestionDTO q : generated) {
+            if (q == null || q.question() == null || q.question().isBlank()) {
+                continue;
+            }
+            String norm = normalizeQuestionText(q.question());
+            if (usedNorm.contains(norm) || isSimilarToAny(norm, historyNorm)) {
+                log.debug("过滤与历史重复的题目: {}", q.question());
+                continue;
+            }
+            kept.add(q);
+            usedNorm.add(norm);
+            if (kept.size() >= expectedCount) {
+                break;
+            }
+        }
+
+        if (kept.size() < expectedCount) {
+            for (InterviewQuestionDTO fallback : generateDefaultQuestions(expectedCount * 2, followUpLimit, historicalQuestions)) {
+                String norm = normalizeQuestionText(fallback.question());
+                if (usedNorm.contains(norm) || isSimilarToAny(norm, historyNorm)) {
+                    continue;
+                }
+                kept.add(fallback);
+                usedNorm.add(norm);
+                if (kept.size() >= expectedCount) {
+                    break;
+                }
+            }
+        }
+        return reindex(kept.stream().limit(expectedCount).toList());
+    }
+
+    private boolean isSimilarToAny(String normalized, List<String> historyNorm) {
+        for (String history : historyNorm) {
+            if (history.isBlank() || normalized.isBlank()) {
+                continue;
+            }
+            if (history.contains(normalized) || normalized.contains(history)) {
+                return true;
+            }
+            if (charOverlapRatio(normalized, history) >= HISTORY_OVERLAP_THRESHOLD) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 基于字符集合 Jaccard 的粗粒度重叠率 */
+    private double charOverlapRatio(String a, String b) {
+        Set<Character> setA = new HashSet<>();
+        Set<Character> setB = new HashSet<>();
+        for (char c : a.toCharArray()) {
+            setA.add(c);
+        }
+        for (char c : b.toCharArray()) {
+            setB.add(c);
+        }
+        if (setA.isEmpty() || setB.isEmpty()) {
+            return 0;
+        }
+        int intersection = 0;
+        for (Character c : setA) {
+            if (setB.contains(c)) {
+                intersection++;
+            }
+        }
+        int union = setA.size() + setB.size() - intersection;
+        return union == 0 ? 0 : (double) intersection / union;
+    }
+
+    private String normalizeQuestionText(String text) {
+        if (text == null) {
+            return "";
+        }
+        return NON_WORD.matcher(text.toLowerCase(Locale.ROOT)).replaceAll("");
+    }
+
+    private List<InterviewQuestionDTO> reindex(List<InterviewQuestionDTO> questions) {
+        List<InterviewQuestionDTO> result = new ArrayList<>();
+        int index = 0;
+        for (InterviewQuestionDTO q : questions) {
+            result.add(InterviewQuestionDTO.create(
+                index++,
+                q.question(),
+                q.type(),
+                q.category(),
+                q.isFollowUp(),
+                q.parentQuestionIndex()
+            ));
+        }
+        return result;
     }
     
     /**
@@ -214,11 +384,13 @@ public class InterviewQuestionService {
     }
     
     /**
-     * 生成默认问题（备用）
+     * 生成默认问题（备用），尽量避开历史题。
      */
-    private List<InterviewQuestionDTO> generateDefaultQuestions(int count, int followUpLimit) {
-        List<InterviewQuestionDTO> questions = new ArrayList<>();
-        
+    private List<InterviewQuestionDTO> generateDefaultQuestions(
+        int count,
+        int followUpLimit,
+        List<String> historicalQuestions
+    ) {
         String[][] defaultQuestions = {
             {"请介绍一下你在简历中提到的最重要的项目，你在其中承担了什么角色？", "PROJECT", "项目经历"},
             {"MySQL的索引有哪些类型？B+树索引的原理是什么？", "MYSQL", "MySQL"},
@@ -231,24 +403,34 @@ public class InterviewQuestionService {
             {"Java的垃圾回收机制是怎样的？常见的GC算法有哪些？", "JAVA_BASIC", "Java基础"},
             {"线程池的核心参数有哪些？如何合理配置？", "JAVA_CONCURRENT", "Java并发"},
         };
-        
-        int index = 0;
-        for (int i = 0; i < Math.min(count, defaultQuestions.length); i++) {
-            String mainQuestion = defaultQuestions[i][0];
-            QuestionType type = QuestionType.valueOf(defaultQuestions[i][1]);
-            String category = defaultQuestions[i][2];
-            questions.add(InterviewQuestionDTO.create(
-                index++,
-                mainQuestion,
-                type,
-                category,
-                false,
-                null
-            ));
 
+        List<String> historyNorm = historicalQuestions == null
+            ? List.of()
+            : historicalQuestions.stream().map(this::normalizeQuestionText).filter(s -> !s.isBlank()).toList();
+
+        List<InterviewQuestionDTO> preferred = new ArrayList<>();
+        List<InterviewQuestionDTO> fallback = new ArrayList<>();
+        for (String[] row : defaultQuestions) {
+            InterviewQuestionDTO q = InterviewQuestionDTO.create(
+                0, row[0], QuestionType.valueOf(row[1]), row[2], false, null);
+            String norm = normalizeQuestionText(q.question());
+            if (isSimilarToAny(norm, historyNorm)) {
+                fallback.add(q);
+            } else {
+                preferred.add(q);
+            }
         }
-        
-        return questions;
+
+        List<InterviewQuestionDTO> selected = new ArrayList<>();
+        selected.addAll(preferred);
+        for (InterviewQuestionDTO q : fallback) {
+            if (selected.size() >= count) {
+                break;
+            }
+            selected.add(q);
+        }
+        // followUpLimit 预留参数，默认题不预生成追问
+        return reindex(selected.stream().limit(count).toList());
     }
 
     private String buildFollowUpCategory(String category, int order) {

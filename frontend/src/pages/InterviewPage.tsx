@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {AnimatePresence, motion} from 'framer-motion';
+import {AlertTriangle, CheckCircle2, Loader2} from 'lucide-react';
 import {interviewApi} from '../api/interview';
 import ConfirmDialog from '../components/ConfirmDialog';
 import InterviewConfigPanel from '../components/InterviewConfigPanel';
@@ -9,20 +10,22 @@ import type {InterviewTemplateConfig} from '../types/interview';
 import {interviewTemplates} from '../constants/interviewTemplates';
 import {jobTargetApi, type JobTarget} from '../api/jobTarget';
 
-type InterviewStage = 'config' | 'interview';
+type InterviewStage = 'config' | 'interview' | 'submitted';
 
 interface Message {
   type: 'interviewer' | 'user';
   content: string;
   category?: string;
   questionIndex?: number;
+  isFollowUp?: boolean;
 }
 
 interface InterviewProps {
   resumeText: string;
   resumeId?: number;
   onBack: () => void;
-  onInterviewComplete: () => void;
+  /** 交卷完成回调，可携带 sessionId 便于记录页高亮 */
+  onInterviewComplete: (sessionId?: string) => void;
 }
 
 export default function Interview({ resumeText, resumeId, onBack, onInterviewComplete }: InterviewProps) {
@@ -42,9 +45,11 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
   const [forceCreateNew, setForceCreateNew] = useState(false);
   const [jobTargets, setJobTargets] = useState<JobTarget[]>([]);
   const [jobTargetId, setJobTargetId] = useState<number | undefined>();
+  const [usingDefaultQuestions, setUsingDefaultQuestions] = useState(false);
   const questionStartedAtRef = useRef(performance.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
+  const autoNavigateRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -77,6 +82,30 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId]);
+
+  // 交卷过渡页：约 2.5s 后自动进入面试记录
+  useEffect(() => {
+    if (stage !== 'submitted' || !session) return;
+    autoNavigateRef.current = window.setTimeout(() => {
+      onInterviewComplete(session.sessionId);
+    }, 2500);
+    return () => {
+      if (autoNavigateRef.current) {
+        window.clearTimeout(autoNavigateRef.current);
+        autoNavigateRef.current = undefined;
+      }
+    };
+  }, [stage, session, onInterviewComplete]);
+
+  /** 标记出题来源并进入面试流程 */
+  const markQuestionSource = (created: InterviewSession) => {
+    setUsingDefaultQuestions(created.questionsSource === 'DEFAULT');
+  };
+
+  /** 交卷成功后进入过渡态，不再直接硬跳转 */
+  const enterSubmittedStage = () => {
+    setStage('submitted');
+  };
 
   useEffect(() => {
     jobTargetApi.list().then(items => {
@@ -122,6 +151,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
 
   const restoreSession = async (sessionToRestore: InterviewSession) => {
     setSession(sessionToRestore);
+    markQuestionSource(sessionToRestore);
 
         // 恢复当前问题
     const currentQ = await loadCurrentQuestion(sessionToRestore);
@@ -186,6 +216,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
 
             // 重置强制创建标志
       setForceCreateNew(false);
+      markQuestionSource(newSession);
 
             // 如果返回的是未完成的会话（currentQuestionIndex > 0 或已有答案），恢复它
       if (!newSession.questions?.length) {
@@ -263,8 +294,8 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
           isFollowUp: response.nextQuestion!.isFollowUp,
         }]);
       } else {
-        // 面试已完成，评估将在后台进行，跳转到面试记录页
-        onInterviewComplete();
+        // 面试已完成，进入评估过渡态
+        enterSubmittedStage();
       }
     } catch (err) {
       setError('提交答案失败，请重试');
@@ -281,8 +312,7 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
     try {
       await interviewApi.completeInterview(session.sessionId);
       setShowCompleteConfirm(false);
-      // 面试已完成，评估将在后台进行，跳转到面试记录页
-      onInterviewComplete();
+      enterSubmittedStage();
     } catch (err) {
       setError('提前交卷失败，请重试');
       console.error(err);
@@ -338,8 +368,32 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
 
   const stageSubtitles = {
     config: '配置您的面试参数',
-    interview: '认真回答每个问题，展示您的实力'
+    interview: '认真回答每个问题，展示您的实力',
+    submitted: '评估任务已在后台启动',
   };
+
+  const renderSubmitted = () => (
+    <div className="mx-auto max-w-lg rounded-2xl border border-slate-100 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/30">
+        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+      </div>
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">已提交，正在生成评估报告</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        题目评分与综合反馈会在后台异步完成。完成后可在「面试记录」中查看分数与详细报告。
+      </p>
+      <div className="mt-6 inline-flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        即将跳转到面试记录…
+      </div>
+      <button
+        type="button"
+        onClick={() => session && onInterviewComplete(session.sessionId)}
+        className="mt-8 rounded-xl bg-primary-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-primary-600"
+      >
+        立即查看记录
+      </button>
+    </div>
+  );
 
     return (
     <div className="pb-10">
@@ -363,6 +417,13 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
             <p className="text-slate-500 dark:text-slate-400">{stageSubtitles[stage]}</p>
       </motion.div>
 
+      {usingDefaultQuestions && stage === 'interview' && (
+        <div className="mx-auto mb-6 flex max-w-4xl items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>AI 出题失败，本次已切换为备用题库。答题与评估流程不受影响，可稍后重试创建以获取个性化题目。</span>
+        </div>
+      )}
+
         <AnimatePresence mode="wait" initial={false}>
         {stage === 'config' && (
           <motion.div
@@ -384,6 +445,17 @@ export default function Interview({ resumeText, resumeId, onBack, onInterviewCom
             transition={{ duration: 0.3 }}
           >
             {renderInterview()}
+          </motion.div>
+        )}
+        {stage === 'submitted' && (
+          <motion.div
+            key="submitted"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {renderSubmitted()}
           </motion.div>
         )}
       </AnimatePresence>

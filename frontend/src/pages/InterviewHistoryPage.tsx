@@ -22,6 +22,8 @@ import {
 interface InterviewHistoryPageProps {
   onBack: () => void;
   onViewInterview: (sessionId: string, resumeId?: number) => void;
+  /** 刚交卷的会话 ID，列表中高亮显示 */
+  highlightSessionId?: string;
 }
 
 interface InterviewWithResume extends InterviewItem {
@@ -123,27 +125,22 @@ function StatusIcon({ interview }: { interview: InterviewWithResume }) {
     return <Clock className="w-4 h-4 text-yellow-500 dark:text-yellow-400"/>;
 }
 
-// 状态文本
+// 状态文本（表格内保持简短，完整错误用 title 展示）
 function getStatusText(interview: InterviewWithResume): string {
-  // 评估失败
   if (isEvaluateFailed(interview)) {
     return '评估失败';
   }
-  // 正在评估
   if (isEvaluating(interview)) {
-    return interview.evaluateStatus === 'PROCESSING' ? '评估中' : '等待评估';
+    return interview.evaluateStatus === 'PROCESSING' ? '评估中（生成报告）' : '等待评估';
   }
-  // 评估完成
   if (isEvaluateCompleted(interview)) {
     return '已完成';
   }
-  // 面试进行中
   if (interview.status === 'IN_PROGRESS') {
     return '进行中';
   }
-  // 面试已完成但评估未开始
   if (isCompletedStatus(interview.status)) {
-    return '已提交';
+    return '已提交，等待评估';
   }
   return '已创建';
 }
@@ -155,7 +152,11 @@ function getScoreColor(score: number): string {
   return 'bg-red-500';
 }
 
-export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview }: InterviewHistoryPageProps) {
+export default function InterviewHistoryPage({
+  onBack: _onBack,
+  onViewInterview,
+  highlightSessionId,
+}: InterviewHistoryPageProps) {
   const [interviews, setInterviews] = useState<InterviewWithResume[]>([]);
   const [stats, setStats] = useState<InterviewStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,26 +171,12 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
       setLoading(true);
     }
     try {
-      const resumes = await historyApi.getResumes();
-      const allInterviews: InterviewWithResume[] = [];
-
-      for (const resume of resumes) {
-        const detail = await historyApi.getResumeDetail(resume.id);
-        if (detail.interviews && detail.interviews.length > 0) {
-          detail.interviews.forEach(interview => {
-            allInterviews.push({
-              ...interview,
-              resumeId: resume.id,
-              resumeFilename: resume.filename
-            });
-          });
-        }
-      }
-
-      // 按创建时间倒序排序
-      allInterviews.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      // 一次接口拉齐列表，避免「简历 × 详情」N+1
+      const allInterviews: InterviewWithResume[] = (await historyApi.getInterviewHistory()).map(item => ({
+        ...item,
+        resumeId: item.resumeId,
+        resumeFilename: item.resumeFilename,
+      }));
 
       setInterviews(allInterviews);
 
@@ -209,6 +196,13 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
       }
     }
   }, []);
+
+  // 高亮刚交卷的行并滚入视野
+  useEffect(() => {
+    if (!highlightSessionId || loading) return;
+    const row = document.querySelector(`[data-session-id="${highlightSessionId}"]`);
+    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightSessionId, loading, interviews]);
 
   // 初始加载
   useEffect(() => {
@@ -397,11 +391,16 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
                 {filteredInterviews.map((interview, index) => (
                   <motion.tr
                     key={interview.sessionId}
+                    data-session-id={interview.sessionId}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
                     onClick={() => onViewInterview(interview.sessionId, interview.resumeId)}
-                    className="border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group"
+                    className={`border-b border-slate-50 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors group ${
+                      highlightSessionId === interview.sessionId
+                        ? 'bg-primary-50/80 dark:bg-primary-900/20 ring-1 ring-inset ring-primary-200 dark:ring-primary-800'
+                        : ''
+                    }`}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -421,7 +420,10 @@ export default function InterviewHistoryPage({ onBack: _onBack, onViewInterview 
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <StatusIcon interview={interview} />
-                          <span className="text-sm text-slate-600 dark:text-slate-300">
+                          <span
+                            className="text-sm text-slate-600 dark:text-slate-300 max-w-[12rem] truncate"
+                            title={isEvaluateFailed(interview) ? (interview.evaluateError || '评估失败') : getStatusText(interview)}
+                          >
                           {getStatusText(interview)}
                         </span>
                       </div>
