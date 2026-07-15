@@ -77,13 +77,18 @@ public class InterviewSessionService {
             var target = jobTargetService.getOwned(request.jobTargetId());
             targetJob = "岗位：" + target.getTitle() + "\nJD：\n" + target.getJobDescription();
         }
-        List<InterviewQuestionDTO> questions = questionService.generateQuestions(
+        QuestionGenerationResult generation = questionService.generateQuestionsWithSource(
             request.resumeText(),
             request.questionCount(),
             historicalQuestions,
             template,
             targetJob
         );
+        List<InterviewQuestionDTO> questions = generation.questions();
+        String questionsSource = generation.source();
+        if (InterviewSessionDTO.SOURCE_DEFAULT.equals(questionsSource)) {
+            log.warn("会话 {} 使用默认题库出题", sessionId);
+        }
 
         // 保存到 Redis 缓存
         sessionCache.saveSession(
@@ -112,7 +117,8 @@ public class InterviewSessionService {
             questions.size(),
             0,
             questions,
-            SessionStatus.CREATED
+            SessionStatus.CREATED,
+            questionsSource
         );
     }
 

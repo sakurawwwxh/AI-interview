@@ -7,6 +7,8 @@ export interface InterviewSession {
   currentQuestionIndex: number;
   questions: InterviewQuestion[];
   status: 'CREATED' | 'IN_PROGRESS' | 'COMPLETED' | 'EVALUATED';
+  /** 出题来源：AI | DEFAULT；历史会话可能为空 */
+  questionsSource?: 'AI' | 'DEFAULT' | string | null;
 }
 
 export interface InterviewQuestion {

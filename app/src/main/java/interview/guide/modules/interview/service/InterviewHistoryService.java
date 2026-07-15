@@ -9,11 +9,15 @@ import interview.guide.infrastructure.export.PdfExportService;
 import interview.guide.infrastructure.mapper.InterviewMapper;
 import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewDetailDTO;
+import interview.guide.modules.interview.model.InterviewListItemDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
+import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,9 +32,40 @@ import java.util.Optional;
 public class InterviewHistoryService {
 
     private final InterviewPersistenceService interviewPersistenceService;
+    private final InterviewSessionRepository sessionRepository;
     private final PdfExportService pdfExportService;
     private final ObjectMapper objectMapper;
     private final InterviewMapper interviewMapper;
+
+    /**
+     * 当前用户的全部面试记录列表（含简历文件名，一次查询）
+     */
+    @Transactional(readOnly = true)
+    public List<InterviewListItemDTO> listCurrentUserInterviews() {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return sessionRepository.findAllByUserIdWithResumeOrderByCreatedAtDesc(userId).stream()
+            .map(this::toListItem)
+            .toList();
+    }
+
+    private InterviewListItemDTO toListItem(InterviewSessionEntity session) {
+        String filename = session.getResume() != null ? session.getResume().getOriginalFilename() : "未知简历";
+        Long resumeId = session.getResume() != null ? session.getResume().getId() : null;
+        return new InterviewListItemDTO(
+            session.getId(),
+            session.getSessionId(),
+            resumeId,
+            filename,
+            session.getTotalQuestions(),
+            session.getStatus() != null ? session.getStatus().name() : null,
+            session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null,
+            session.getEvaluateError(),
+            session.getOverallScore(),
+            session.getOverallFeedback(),
+            session.getCreatedAt(),
+            session.getCompletedAt()
+        );
+    }
 
     /**
      * 获取面试会话详情

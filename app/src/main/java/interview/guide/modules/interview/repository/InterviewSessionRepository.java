@@ -78,4 +78,10 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
         Long resumeId,
         List<SessionStatus> statuses
     );
+
+    /**
+     * 按用户拉取全部面试（含简历，用于记录列表，避免前端 N+1）
+     */
+    @Query("SELECT s FROM InterviewSessionEntity s JOIN FETCH s.resume WHERE s.userId = :userId ORDER BY s.createdAt DESC")
+    List<InterviewSessionEntity> findAllByUserIdWithResumeOrderByCreatedAtDesc(@Param("userId") Long userId);
 }

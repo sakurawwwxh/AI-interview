@@ -1,7 +1,6 @@
 package interview.guide.modules.interview.service;
 
 import interview.guide.common.ai.StructuredOutputInvoker;
-import interview.guide.common.exception.BusinessException;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewTemplateConfig;
 import interview.guide.modules.userai.service.UserAiChatClientFactory;
@@ -36,6 +35,7 @@ class InterviewQuestionServiceTest {
         chatClient = mock(ChatClient.class);
         chatClientFactory = mock(UserAiChatClientFactory.class);
         when(chatClientFactory.forCurrentUser()).thenReturn(chatClient);
+        when(chatClientFactory.fallbackForCurrentUser()).thenReturn(null);
         structuredOutputInvoker = mock(StructuredOutputInvoker.class);
 
         service = new InterviewQuestionService(
@@ -53,16 +53,53 @@ class InterviewQuestionServiceTest {
     class GenerateQuestions {
 
         @Test
-        @DisplayName("AI 调用失败时抛出 BusinessException（不降级）")
-        void shouldThrowBusinessExceptionWhenAIFails() {
+        @DisplayName("AI 调用失败时降级为默认题库并标记 DEFAULT")
+        void shouldFallbackToDefaultWhenAIFails() {
             when(structuredOutputInvoker.invoke(
-                any(), anyString(), anyString(), any(BeanOutputConverter.class),
+                any(), any(), anyString(), anyString(), any(BeanOutputConverter.class),
                 any(), anyString(), anyString(), any()))
                 .thenThrow(new RuntimeException("AI 不可用"));
 
-            // invoke 内部 catch 会包装为 BusinessException，外层 catch 不再降级
-            assertThrows(BusinessException.class, () ->
-                service.generateQuestions("简历内容", 6, null));
+            var result = service.generateQuestionsWithSource(
+                "简历内容", 6, null, InterviewTemplateConfig.defaultBackend(1), null);
+
+            assertEquals("DEFAULT", result.source());
+            assertEquals(6, result.questions().size());
+            assertFalse(result.questions().getFirst().question().isBlank());
+        }
+
+        @Test
+        @DisplayName("JD 关键词提升相关题型权重")
+        void shouldBoostWeightsByJobDescription() {
+            InterviewTemplateConfig base = InterviewTemplateConfig.defaultBackend(1);
+            InterviewTemplateConfig boosted = service.boostTemplateByJobDescription(
+                base, "岗位：后端\nJD：精通 Redis 缓存与 MySQL 索引优化");
+
+            int redisBase = base.questionTypes().stream()
+                .filter(w -> w.type() == InterviewQuestionDTO.QuestionType.REDIS)
+                .mapToInt(InterviewTemplateConfig.QuestionTypeWeight::weight).findFirst().orElse(0);
+            int redisBoosted = boosted.questionTypes().stream()
+                .filter(w -> w.type() == InterviewQuestionDTO.QuestionType.REDIS)
+                .mapToInt(InterviewTemplateConfig.QuestionTypeWeight::weight).findFirst().orElse(0);
+            assertTrue(redisBoosted > redisBase);
+        }
+
+        @Test
+        @DisplayName("历史题去重过滤高度相似题目")
+        void shouldDedupeAgainstHistory() {
+            List<InterviewQuestionDTO> generated = List.of(
+                InterviewQuestionDTO.create(0, "MySQL的索引有哪些类型？B+树索引的原理是什么？",
+                    InterviewQuestionDTO.QuestionType.MYSQL, "MySQL"),
+                InterviewQuestionDTO.create(1, "请介绍你最有挑战的项目",
+                    InterviewQuestionDTO.QuestionType.PROJECT, "项目经历")
+            );
+            List<String> history = List.of("MySQL的索引有哪些类型？B+树索引的原理是什么？");
+
+            List<InterviewQuestionDTO> result = service.dedupeAgainstHistory(generated, history, 2, 1);
+
+            assertEquals(2, result.size());
+            assertTrue(result.stream().noneMatch(q ->
+                q.question().contains("MySQL的索引有哪些类型")));
         }
 
         @Test

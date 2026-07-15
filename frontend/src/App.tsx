@@ -23,6 +23,7 @@ const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
 const JobTargetsPage = lazy(() => import('./pages/JobTargetsPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 
 // Loading component
 const Loading = () => (
@@ -119,9 +120,9 @@ function InterviewWrapper() {
     navigate(`/history/${resumeId}`, { replace: false });
   };
 
-  const handleInterviewComplete = () => {
-    // 面试完成后跳转到面试记录页
-    navigate('/interviews');
+  const handleInterviewComplete = (sessionId?: string) => {
+    // 面试完成后跳转到面试记录页，并高亮刚交卷的会话
+    navigate('/interviews', { state: { highlightSessionId: sessionId } });
   };
 
   if (loading) {
@@ -170,7 +171,7 @@ function App() {
             }
           >
             {/* 默认重定向到上传页面 */}
-            <Route index element={<Navigate to="/upload" replace />} />
+            <Route index element={<DashboardPage />} />
 
             {/* 上传页面 */}
             <Route path="upload" element={<UploadPageWrapper />} />
@@ -215,6 +216,8 @@ function App() {
 // 面试记录页面包装器
 function InterviewHistoryWrapper() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightSessionId = (location.state as { highlightSessionId?: string } | null)?.highlightSessionId;
 
   const handleBack = () => {
     navigate('/upload');
@@ -239,7 +242,13 @@ function InterviewHistoryWrapper() {
     }
   };
 
-  return <InterviewHistoryPage onBack={handleBack} onViewInterview={handleViewInterview} />;
+  return (
+    <InterviewHistoryPage
+      onBack={handleBack}
+      onViewInterview={handleViewInterview}
+      highlightSessionId={highlightSessionId}
+    />
+  );
 }
 
 // 知识库管理页面包装器
