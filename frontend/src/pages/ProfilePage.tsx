@@ -37,8 +37,8 @@ function formatResetTime(seconds: number) {
   return `${hours} 小时 ${minutes} 分钟后重置`;
 }
 
-const inputClassName = 'mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-slate-600 dark:bg-slate-900 dark:text-white';
-const cardClassName = 'rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800';
+const inputClassName = 'mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-white/[0.12] dark:bg-[#17191d] dark:text-white';
+const cardClassName = 'rounded-lg border border-slate-200/80 bg-white dark:border-white/[0.08] dark:bg-[#202328]';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -201,9 +201,9 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
-      <section className="relative overflow-hidden rounded-3xl bg-slate-900 px-6 py-7 text-white shadow-xl shadow-slate-900/10 sm:px-8">
-        <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary-500/30 blur-3xl" />
-        <div className="absolute -bottom-20 left-1/3 h-52 w-52 rounded-full bg-cyan-400/15 blur-3xl" />
+      <section className="relative border-y border-white/[0.08] px-0 py-8 text-white">
+        <div className="hidden" />
+        <div className="hidden" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20">
@@ -238,7 +238,7 @@ export default function ProfilePage() {
         </Link>
       </section>
 
-      {growthPlan && <section className="rounded-2xl border border-primary-100 bg-gradient-to-r from-primary-50 via-white to-indigo-50 p-5 dark:border-primary-900/50 dark:from-primary-950/30 dark:via-slate-800 dark:to-indigo-950/20"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm font-semibold text-primary-600 dark:text-primary-300">本周训练计划</p><h2 className="mt-1 text-xl font-bold text-slate-800 dark:text-white">{growthPlan.headline}</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{growthPlan.targetRole ? `目标岗位：${growthPlan.targetRole}` : '设置目标岗位后，可获得更有针对性的训练。'}</p></div><Link to="/practice" className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700">开始复练<ArrowRight className="h-4 w-4" /></Link></div><div className="mt-5 grid gap-3 md:grid-cols-3">{growthPlan.actions.map((action, index) => <Link key={`${action.title}-${index}`} to={action.link} className="rounded-xl border border-white/80 bg-white/80 p-4 transition hover:-translate-y-0.5 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900/60"><div className="flex items-center justify-between gap-2"><span className={`text-xs font-semibold ${action.priority === 'HIGH' ? 'text-red-500' : 'text-amber-600'}`}>{action.priority === 'HIGH' ? '优先处理' : '建议完成'}</span>{action.score != null && <span className="text-sm font-bold text-primary-600">{action.score} 分</span>}</div><h3 className="mt-2 font-semibold text-slate-800 dark:text-white">{index + 1}. {action.title}</h3><p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p></Link>)}</div></section>}
+      {growthPlan && <section className="border-y border-primary-100 bg-transparent py-6 dark:border-white/[0.08]"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm font-semibold text-primary-600 dark:text-primary-300">本周训练计划</p><h2 className="mt-1 text-xl font-bold text-slate-800 dark:text-white">{growthPlan.headline}</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{growthPlan.targetRole ? `目标岗位：${growthPlan.targetRole}` : '设置目标岗位后，可获得更有针对性的训练。'}</p></div><Link to="/practice" className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700">开始复练<ArrowRight className="h-4 w-4" /></Link></div><div className="mt-5 grid gap-3 md:grid-cols-3">{growthPlan.actions.map((action, index) => <Link key={`${action.title}-${index}`} to={action.link} className="border-b border-slate-200 py-4 transition hover:bg-slate-50 dark:border-white/[0.08] dark:hover:bg-white/[0.03]"><div className="flex items-center justify-between gap-2"><span className={`text-xs font-semibold ${action.priority === 'HIGH' ? 'text-red-500' : 'text-amber-600'}`}>{action.priority === 'HIGH' ? '优先处理' : '建议完成'}</span>{action.score != null && <span className="text-sm font-bold text-primary-600">{action.score} 分</span>}</div><h3 className="mt-2 font-semibold text-slate-800 dark:text-white">{index + 1}. {action.title}</h3><p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">{action.description}</p></Link>)}</div></section>}
 
       <section className="grid gap-6 xl:grid-cols-12">
         <div className="space-y-6 xl:col-span-5">
