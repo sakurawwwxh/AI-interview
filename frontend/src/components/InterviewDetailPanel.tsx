@@ -91,16 +91,19 @@ function ScoreCard({
   strokeDashoffset: number;
 }) {
   return (
-    <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-primary-700 rounded-2xl p-8 text-white">
-      <div className="flex flex-col items-center text-center">
+    // 深墨底 + 青绿信号：白字仅出现在真正深色背景上
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-800 via-teal-900 to-[#0a1412] p-8 text-white shadow-[var(--surface-elevated)]">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-teal-400/20 blur-3xl" aria-hidden />
+      <div className="pointer-events-none absolute -bottom-12 left-8 h-32 w-32 rounded-full bg-amber-400/10 blur-3xl" aria-hidden />
+      <div className="relative flex flex-col items-center text-center">
         {/* 圆环进度条 */}
-        <div className="relative w-32 h-32 mb-6">
-          <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+        <div className="relative mb-6 h-32 w-32">
+          <svg className="h-32 w-32 -rotate-90 transform" viewBox="0 0 120 120" aria-hidden>
             <circle
               cx="60"
               cy="60"
               r="54"
-              stroke="rgba(255,255,255,0.2)"
+              stroke="rgba(255,255,255,0.18)"
               strokeWidth="8"
               fill="none"
             />
@@ -108,31 +111,31 @@ function ScoreCard({
               cx="60"
               cy="60"
               r="54"
-              stroke="white"
+              stroke="#5eead4"
               strokeWidth="8"
               fill="none"
               strokeLinecap="round"
               strokeDasharray={circumference}
               initial={{ strokeDashoffset: circumference }}
               animate={{ strokeDashoffset }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
+              transition={{ duration: 1.2, ease: 'easeOut' }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <motion.span
-              className="text-4xl font-bold"
+              className="font-display text-4xl font-semibold tabular-nums tracking-tight"
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.35 }}
             >
-              {score ?? '-'}
+              {score ?? '–'}
             </motion.span>
-            <span className="text-sm text-white/70">总分</span>
+            <span className="text-sm text-teal-100/75">总分</span>
           </div>
         </div>
 
-        <h3 className="text-2xl font-bold mb-3">面试评估</h3>
-        <p className="text-white/90 max-w-2xl leading-relaxed">
+        <h3 className="font-display mb-3 text-2xl font-semibold tracking-tight">面试评估</h3>
+        <p className="max-w-2xl leading-relaxed text-teal-50/90">
           {feedback || '表现良好，展示了扎实的技术基础。'}
         </p>
       </div>

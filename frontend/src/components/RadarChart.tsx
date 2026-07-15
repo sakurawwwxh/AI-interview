@@ -74,9 +74,9 @@ export default function RadarChart({ data, height = 320, className = '' }: Radar
           <Radar
             name="得分"
             dataKey="score"
-            stroke="#6366f1"
-            fill="#6366f1"
-            fillOpacity={0.6}
+            stroke="#0d9488"
+            fill="#14b8a6"
+            fillOpacity={0.35}
             strokeWidth={2}
           />
           <Tooltip

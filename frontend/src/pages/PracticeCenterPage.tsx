@@ -32,7 +32,7 @@ export default function PracticeCenterPage() {
     ['待复练', summary?.todoCount ?? '-', 'text-amber-500'],
     ['已完成', summary?.completedCount ?? '-', 'text-emerald-500'],
     ['本周完成', summary?.completedThisWeek ?? '-', 'text-primary-500'],
-    ['平均提升', summary?.averageImprovement == null ? '-' : `${summary.averageImprovement >= 0 ? '+' : ''}${summary.averageImprovement} 分`, 'text-violet-500'],
+    ['平均提升', summary?.averageImprovement == null ? '-' : `${summary.averageImprovement >= 0 ? '+' : ''}${summary.averageImprovement} 分`, 'text-primary-600 dark:text-primary-400'],
   ];
 
   return <div className="mx-auto max-w-6xl">

@@ -81,10 +81,11 @@ export default function InterviewStatisticsPage() {
             </div>
           </div>
 
-          <aside className="border-t border-[var(--shell-border)] bg-[#111827] p-7 text-slate-100 lg:border-l lg:border-t-0 sm:p-9">
-            <div className="flex items-center gap-2 text-primary-300"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">评分后可见</p></div>
-            <h3 className="mt-4 text-xl font-semibold tracking-tight">你的第一份成长复盘</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-400">不是一个空泛总分，而是一份可以直接指导下一步练习的训练记录。</p>
+          {/* 明确深墨侧栏：白/浅字只出现在深色底上 */}
+          <aside className="border-t border-teal-900/40 bg-gradient-to-br from-teal-950 via-[#0a1412] to-[#070b0a] p-7 text-teal-50 lg:border-l lg:border-t-0 sm:p-9">
+            <div className="flex items-center gap-2 text-teal-300"><Sparkles className="h-4 w-4" /><p className="text-xs font-semibold uppercase tracking-[0.16em]">评分后可见</p></div>
+            <h3 className="mt-4 text-xl font-semibold tracking-tight text-white">你的第一份成长复盘</h3>
+            <p className="mt-2 text-sm leading-6 text-teal-100/70">不是一个空泛总分，而是一份可以直接指导下一步练习的训练记录。</p>
             <div className="mt-7 space-y-4 border-y border-white/10 py-5">
               {[
                 ['表达呈现', '能力分数与关键反馈'],
@@ -92,12 +93,12 @@ export default function InterviewStatisticsPage() {
                 ['训练路径', '可直接进入的专项复练'],
               ].map(([title, description]) => (
                 <div key={title} className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-semibold text-primary-300">—</span>
-                  <div><p className="text-sm font-medium text-slate-100">{title}</p><p className="mt-0.5 text-xs text-slate-400">{description}</p></div>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-teal-400/20 bg-teal-400/10 text-xs font-semibold text-teal-200">—</span>
+                  <div><p className="text-sm font-medium text-teal-50">{title}</p><p className="mt-0.5 text-xs text-teal-100/60">{description}</p></div>
                 </div>
               ))}
             </div>
-            <Link to="/job-targets" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary-300 transition hover:text-primary-200">先设定目标岗位<ChevronRight className="h-4 w-4" /></Link>
+            <Link to="/job-targets" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-teal-300 transition hover:text-teal-200">先设定目标岗位<ChevronRight className="h-4 w-4" /></Link>
           </aside>
         </div>
       </section>
@@ -128,7 +129,7 @@ export default function InterviewStatisticsPage() {
     </section>
 
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-      <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">训练轨迹</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">分数的变化，比单次高低更重要。</h2><p className="mt-1 text-sm text-[var(--shell-muted)]">按完成评分时间排列。</p></div><BookOpenCheck className="h-5 w-5 text-[var(--shell-subtle)]" /></div><div className="mt-5 h-[280px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ left: -18, right: 8, top: 8, bottom: 0 }}><CartesianGrid stroke="currentColor" opacity={0.08} vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} /><YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} /><Tooltip labelFormatter={(_, payload) => payload[0]?.payload?.date ?? ''} /><Line type="monotone" dataKey="score" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: '#2563eb' }} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer></div></section>
+      <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">训练轨迹</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">分数的变化，比单次高低更重要。</h2><p className="mt-1 text-sm text-[var(--shell-muted)]">按完成评分时间排列。</p></div><BookOpenCheck className="h-5 w-5 text-[var(--shell-subtle)]" /></div><div className="mt-5 h-[280px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ left: -18, right: 8, top: 8, bottom: 0 }}><CartesianGrid stroke="currentColor" opacity={0.08} vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} /><YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} /><Tooltip labelFormatter={(_, payload) => payload[0]?.payload?.date ?? ''} /><Line type="monotone" dataKey="score" stroke="#0d9488" strokeWidth={2.5} dot={{ r: 3, fill: '#0d9488' }} activeDot={{ r: 5, fill: '#14b8a6' }} /></LineChart></ResponsiveContainer></div></section>
       <section className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5 sm:p-6"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--shell-subtle)]">能力分布</p><h2 className="mt-1 text-lg font-semibold text-[var(--shell-text)]">把注意力放在最有价值的差距上。</h2><div className="mt-5 space-y-5">{abilities.map((item, index) => <div key={item.category} className="group"><div className="flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><span className="w-5 text-xs font-semibold text-[var(--shell-subtle)]">{String(index + 1).padStart(2, '0')}</span><span className="truncate text-sm font-medium text-[var(--shell-text)]">{item.category}</span></div><span className="text-sm font-semibold text-[var(--shell-text)]">{item.averageScore}</span></div><div className="ml-8 mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--shell-hover)]"><div className={`h-full rounded-full ${scoreTone(item.averageScore)}`} style={{ width: `${item.averageScore}%` }} /></div><p className="ml-8 mt-1.5 text-xs text-[var(--shell-muted)]">{item.questionCount} 道已评分题目</p></div>)}</div></section>
     </div>
 
