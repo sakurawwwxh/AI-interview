@@ -40,12 +40,13 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (!enabled) {
-            log.info("管理员引导已禁用 (app.admin.bootstrap.enabled=false)");
+            log.debug("管理员引导已禁用 (app.admin.bootstrap.enabled=false)");
             return;
         }
 
+        // 已创建过管理员时属正常启动路径，勿用 INFO 刷屏
         if (userRepository.existsByUsername(username)) {
-            log.info("管理员账号已存在，跳过引导: username={}", username);
+            log.debug("管理员账号已存在，跳过引导: username={}", username);
             return;
         }
 
@@ -58,6 +59,7 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         admin.setDailyTokenQuota(500000L);
         userRepository.save(admin);
 
+        // 仅首次创建时打 INFO，便于确认引导成功
         log.info("管理员账号已创建: username={}, email={}", username, email);
     }
 }
