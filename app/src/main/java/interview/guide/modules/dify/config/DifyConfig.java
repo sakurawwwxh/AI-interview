@@ -9,9 +9,12 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>Dify 有两类 API Key：
  * <ul>
- *   <li>{@code datasetApiKey}（dataset-xxx）：知识库文档同步用，调用 /datasets/* 端点</li>
+ *   <li>{@code apiKey}（dataset-xxx）：知识库文档同步用，调用 /datasets/* 端点</li>
  *   <li>{@code appApiKey}（app-xxx）：工作流/对话用，调用 /workflows/run、/chat-messages 端点</li>
  * </ul>
+ *
+ * <p>访问 Dify Cloud（api.dify.ai）若本机使用 Clash 等代理，Java 默认不走系统代理，
+ * 需配置 {@code dify.proxy.*}，否则会出现 198.18.x.x Fake-IP 连接超时。
  */
 @Configuration
 @ConfigurationProperties(prefix = "dify")
@@ -35,16 +38,18 @@ public class DifyConfig {
     /** 同步配置 */
     private SyncConfig sync = new SyncConfig();
 
+    /** 出站 HTTP 代理（可选，用于本机代理访问 Dify Cloud） */
+    private ProxyConfig proxy = new ProxyConfig();
+
     @Data
     public static class SyncConfig {
         /**
          * 是否启用与 Dify 的双向同步。
-         * 默认关闭：本地若访问不了 api.dify.ai（代理/DNS 伪 IP 等）会周期性超时刷屏。
-         * 需要云端知识库同步时，在 application.yml 设置 dify.sync.enabled=true。
+         * 需要云端知识库同步时设为 true，并确保网络可达（或配置 proxy）。
          */
         private boolean enabled = false;
 
-        /** 同步间隔（毫秒），默认600000毫秒（10分钟） */
+        /** 同步间隔（毫秒），默认 10 分钟 */
         private long interval = 600000;
 
         /** 重试次数 */
@@ -52,5 +57,27 @@ public class DifyConfig {
 
         /** 重试延迟（毫秒） */
         private long retryDelay = 5000;
+    }
+
+    @Data
+    public static class ProxyConfig {
+        /** 是否启用代理 */
+        private boolean enabled = false;
+
+        /** 代理主机，本机 Clash 一般为 127.0.0.1 */
+        private String host = "127.0.0.1";
+
+        /**
+         * 代理端口。Clash 常见 HTTP 端口为 7890，以客户端设置为准，不要想当然。
+         */
+        private int port = 7890;
+
+        /** 连接超时（毫秒） */
+        private int connectTimeoutMs = 15000;
+
+        /** 是否已配置可用代理 */
+        public boolean isConfigured() {
+            return enabled && host != null && !host.isBlank() && port > 0;
+        }
     }
 }

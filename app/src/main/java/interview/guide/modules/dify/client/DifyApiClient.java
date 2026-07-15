@@ -7,6 +7,8 @@ import interview.guide.modules.dify.exception.DifyApiException;
 import interview.guide.modules.dify.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -15,7 +17,12 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.transport.ProxyProvider;
 
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -26,6 +33,7 @@ import java.util.*;
  *
  * <p>使用 Spring 6.1+ 引入的 {@link RestClient} 作为 HTTP 客户端（Spring Boot 4.0 已移除
  * RestTemplateBuilder 和 RestTemplate 的自动配置支持）。
+ * 可选通过 {@code dify.proxy.*} 走本机 HTTP 代理访问 Dify Cloud。
  */
 @Service
 @Slf4j
@@ -43,20 +51,66 @@ public class DifyApiClient {
     public DifyApiClient(DifyConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.objectMapper = objectMapper;
+
+        JdkClientHttpRequestFactory requestFactory = buildRequestFactory(config);
         // 知识库 API 用的 RestClient（dataset-xxx key）
         this.datasetClient = RestClient.builder()
+            .requestFactory(requestFactory)
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getApiKey())
             .build();
         // 工作流/对话 API 用的 RestClient（app-xxx key）
         this.appClient = RestClient.builder()
+            .requestFactory(requestFactory)
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getAppApiKey())
             .build();
         // 流式工作流用的 WebClient（app-xxx key）
         this.appWebClient = WebClient.builder()
             .baseUrl(config.getApiUrl())
+            .clientConnector(new ReactorClientHttpConnector(buildReactorHttpClient(config)))
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + config.getAppApiKey())
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .build();
+
+        if (config.getProxy() != null && config.getProxy().isConfigured()) {
+            log.info("Dify HTTP 客户端已启用代理: {}:{}", config.getProxy().getHost(), config.getProxy().getPort());
+        } else {
+            log.info("Dify HTTP 客户端未配置代理（直连 {}）", config.getApiUrl());
+        }
+    }
+
+    /** 构建带超时/可选代理的 JDK RestClient 请求工厂 */
+    private static JdkClientHttpRequestFactory buildRequestFactory(DifyConfig config) {
+        DifyConfig.ProxyConfig proxy = config.getProxy() != null ? config.getProxy() : new DifyConfig.ProxyConfig();
+        int connectMs = Math.max(3000, proxy.getConnectTimeoutMs());
+
+        java.net.http.HttpClient.Builder builder = java.net.http.HttpClient.newBuilder()
+            .connectTimeout(Duration.ofMillis(connectMs));
+
+        if (proxy.isConfigured()) {
+            builder.proxy(ProxySelector.of(new InetSocketAddress(proxy.getHost().trim(), proxy.getPort())));
+        }
+
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(builder.build());
+        // 读写超时略长于连接超时，避免大文档同步中途断开
+        factory.setReadTimeout(Duration.ofMillis(Math.max(connectMs * 4L, 60000L)));
+        return factory;
+    }
+
+    /** 构建 WebClient 用的 Reactor Netty HttpClient（同样支持代理） */
+    private static HttpClient buildReactorHttpClient(DifyConfig config) {
+        DifyConfig.ProxyConfig proxy = config.getProxy() != null ? config.getProxy() : new DifyConfig.ProxyConfig();
+        int connectMs = Math.max(3000, proxy.getConnectTimeoutMs());
+
+        HttpClient httpClient = HttpClient.create()
+            .responseTimeout(Duration.ofMillis(Math.max(connectMs * 4L, 60000L)));
+
+        if (proxy.isConfigured()) {
+            String host = proxy.getHost().trim();
+            int port = proxy.getPort();
+            httpClient = httpClient.proxy(typeSpec ->
+                typeSpec.type(ProxyProvider.Proxy.HTTP).host(host).port(port));
+        }
+        return httpClient;
     }
 
     /**
