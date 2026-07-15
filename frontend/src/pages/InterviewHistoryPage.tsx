@@ -131,7 +131,11 @@ function getStatusText(interview: InterviewWithResume): string {
     return '评估失败';
   }
   if (isEvaluating(interview)) {
-    return interview.evaluateStatus === 'PROCESSING' ? '评估中（生成报告）' : '等待评估';
+    const pct = resolveEvaluatePercent(interview);
+    if (interview.evaluateStatus === 'PROCESSING') {
+      return pct != null ? `评估中 ${pct}%` : '评估中（生成报告）';
+    }
+    return pct != null && pct > 0 ? `等待评估 ${pct}%` : '等待评估';
   }
   if (isEvaluateCompleted(interview)) {
     return '已完成';
@@ -143,6 +147,18 @@ function getStatusText(interview: InterviewWithResume): string {
     return '已提交，等待评估';
   }
   return '已创建';
+}
+
+/** 解析评估进度百分比；完成固定 100，处理中缺省为 5 */
+function resolveEvaluatePercent(interview: InterviewWithResume): number | null {
+  if (isEvaluateCompleted(interview)) return 100;
+  if (!isEvaluating(interview) && !isCompletedStatus(interview.status)) return null;
+  if (typeof interview.evaluateProgress === 'number') {
+    return Math.min(100, Math.max(0, interview.evaluateProgress));
+  }
+  if (interview.evaluateStatus === 'PROCESSING') return 5;
+  if (interview.evaluateStatus === 'PENDING' || isCompletedStatus(interview.status)) return 0;
+  return null;
 }
 
 // 获取分数颜色
@@ -441,8 +457,20 @@ export default function InterviewHistoryPage({
                           </div>
                             <span className="font-bold text-slate-800 dark:text-white">{interview.overallScore}</span>
                         </div>
-                      ) : isEvaluating(interview) ? (
-                          <span className="text-blue-500 dark:text-blue-400 text-sm">生成中...</span>
+                      ) : isEvaluating(interview) || (isCompletedStatus(interview.status) && !isEvaluateFailed(interview) && !isEvaluateCompleted(interview)) ? (
+                          <div className="flex items-center gap-2 min-w-[7rem]">
+                            <div className="w-16 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                              <motion.div
+                                className="h-full bg-blue-500 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${resolveEvaluatePercent(interview) ?? 5}%` }}
+                                transition={{ duration: 0.4 }}
+                              />
+                            </div>
+                            <span className="text-blue-500 dark:text-blue-400 text-sm tabular-nums">
+                              {resolveEvaluatePercent(interview) ?? 5}%
+                            </span>
+                          </div>
                       ) : isEvaluateFailed(interview) ? (
                           <span className="text-red-500 dark:text-red-400 text-sm"
                                 title={interview.evaluateError}>失败</span>

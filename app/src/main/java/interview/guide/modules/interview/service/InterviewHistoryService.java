@@ -60,6 +60,7 @@ public class InterviewHistoryService {
             session.getStatus() != null ? session.getStatus().name() : null,
             session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null,
             session.getEvaluateError(),
+            session.getEvaluateProgress(),
             session.getOverallScore(),
             session.getOverallFeedback(),
             session.getCreatedAt(),

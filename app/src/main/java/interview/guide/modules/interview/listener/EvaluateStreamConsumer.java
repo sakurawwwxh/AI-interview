@@ -189,8 +189,17 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
             sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
                 session.setEvaluateStatus(status);
                 session.setEvaluateError(error);
+                if (status == AsyncTaskStatus.PENDING) {
+                    session.setEvaluateProgress(0);
+                } else if (status == AsyncTaskStatus.PROCESSING
+                    && (session.getEvaluateProgress() == null || session.getEvaluateProgress() < 5)) {
+                    session.setEvaluateProgress(5);
+                } else if (status == AsyncTaskStatus.COMPLETED) {
+                    session.setEvaluateProgress(100);
+                }
                 sessionRepository.save(session);
-                log.debug("评估状态已更新: sessionId={}, status={}", sessionId, status);
+                log.debug("评估状态已更新: sessionId={}, status={}, progress={}",
+                    sessionId, status, session.getEvaluateProgress());
             });
         } catch (Exception e) {
             log.error("更新评估状态失败: sessionId={}, status={}, error={}", sessionId, status, e.getMessage(), e);

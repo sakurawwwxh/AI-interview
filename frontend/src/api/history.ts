@@ -44,6 +44,8 @@ export interface InterviewItem {
   status: string;
   evaluateStatus?: EvaluateStatus;
   evaluateError?: string;
+  /** 评估进度 0-100 */
+  evaluateProgress?: number | null;
   overallScore: number | null;
   overallFeedback: string | null;
   createdAt: string;
@@ -58,6 +60,8 @@ export interface InterviewItem {
 export interface InterviewHistoryItem extends InterviewItem {
   resumeId: number;
   resumeFilename: string;
+  /** 评估进度 0-100 */
+  evaluateProgress?: number | null;
 }
 
 export interface AnswerItem {
