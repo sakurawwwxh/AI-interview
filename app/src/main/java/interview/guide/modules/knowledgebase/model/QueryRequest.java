@@ -2,6 +2,7 @@ package interview.guide.modules.knowledgebase.model;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
@@ -10,7 +11,7 @@ import java.util.List;
  */
 public record QueryRequest(
     @NotEmpty(message = "至少选择一个知识库")
-    List<Long> knowledgeBaseIds,  // 支持多个知识库
+    List<@NotNull(message = "知识库ID不能为空") Long> knowledgeBaseIds,  // 支持多个知识库
     
     @NotBlank(message = "问题不能为空")
     String question

@@ -1,5 +1,6 @@
 package interview.guide.modules.knowledgebase;
 
+import interview.guide.common.ai.AiUsageRecorder;
 import interview.guide.common.result.Result;
 import interview.guide.modules.knowledgebase.model.RagChatDTO.*;
 import interview.guide.modules.knowledgebase.service.RagChatSessionService;
@@ -8,10 +9,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * RAG 聊天控制器
@@ -22,6 +25,7 @@ import java.util.List;
 public class RagChatController {
 
     private final RagChatSessionService sessionService;
+    private final AiUsageRecorder usageRecorder;
 
     /**
      * 创建新会话
@@ -106,11 +110,15 @@ public class RagChatController {
 
         log.info("收到 RAG 聊天流式请求: sessionId={}, question={}", sessionId, request.question());
 
+        // 在写入用户消息和 AI 占位前检查，避免配额不足时留下半成品会话。
+        usageRecorder.checkQuota();
+
         // 1. 准备消息（保存用户消息，创建 AI 消息占位）
         Long messageId = sessionService.prepareStreamMessage(sessionId, request.question());
 
         // 2. 获取流式响应，收集内容用于落库
         StringBuffer fullContent = new StringBuffer();
+        AtomicLong lastStreamTouch = new AtomicLong(System.currentTimeMillis());
         boolean[] completed = {false};
 
         // 3. 心跳事件（防止检索期间客户端超时）
@@ -121,24 +129,27 @@ public class RagChatController {
 
         // 4. 主流式内容
         Flux<ServerSentEvent<String>> contentFlux = sessionService.getStreamAnswer(sessionId, request.question())
-            .doOnNext(fullContent::append)
+            .doOnNext(chunk -> {
+                fullContent.append(chunk);
+                touchStreamMessagePeriodically(messageId, lastStreamTouch);
+            })
             .map(chunk -> ServerSentEvent.<String>builder()
                 .data(chunk.replace("\n", "\\n").replace("\r", "\\r"))
                 .build())
             .doOnComplete(() -> {
                 completed[0] = true;
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), null);
                 log.info("RAG 聊天流式完成: sessionId={}, messageId={}", sessionId, messageId);
             })
             .doOnCancel(() -> {
                 // 用户中断时落库已收内容
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), null);
                 log.info("RAG 聊天流式被中断: sessionId={}, messageId={}, contentLength={}",
                     sessionId, messageId, fullContent.length());
             })
             .onErrorResume(e -> {
                 // 错误时只保存已收的部分内容，不把错误文案存入数据库
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), null);
                 log.error("RAG 聊天流式错误: sessionId={}", sessionId, e);
                 // 向客户端发送 error 事件
                 return Flux.just(ServerSentEvent.<String>builder()
@@ -158,17 +169,22 @@ public class RagChatController {
      */
     @PostMapping(value = "/api/rag-chat/sessions/{sessionId}/messages/dify-stream",
                  produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
     public Flux<ServerSentEvent<String>> sendDifyMessageStream(
             @PathVariable Long sessionId,
             @Valid @RequestBody SendMessageRequest request) {
 
         log.info("收到 Dify 聊天流式请求: sessionId={}, question={}", sessionId, request.question());
 
-// 1. 准备消息（保存用户消息，创建 AI 消息占位）
+        // 在写入用户消息和 AI 占位前检查，避免配额不足时留下半成品会话。
+        usageRecorder.checkQuota();
+
+        // 1. 准备消息（保存用户消息，创建 AI 消息占位）
         Long messageId = sessionService.prepareStreamMessage(sessionId, request.question());
 
         // 2. 获取 Dify 流式响应，并通过回调捕获 Dify 返回的 conversation_id
         StringBuffer fullContent = new StringBuffer();
+        AtomicLong lastStreamTouch = new AtomicLong(System.currentTimeMillis());
         java.util.concurrent.atomic.AtomicReference<String> capturedConvId = new java.util.concurrent.atomic.AtomicReference<>();
 
         // 3. 心跳事件
@@ -181,30 +197,25 @@ public class RagChatController {
         //    Dify 返回新 conversation_id 时通过回调捕获
         Flux<ServerSentEvent<String>> contentFlux = sessionService
             .getDifyStreamAnswer(sessionId, request.question(), capturedConvId::set)
-            .doOnNext(fullContent::append)
+            .doOnNext(chunk -> {
+                fullContent.append(chunk);
+                touchStreamMessagePeriodically(messageId, lastStreamTouch);
+            })
             .map(chunk -> ServerSentEvent.<String>builder()
                 .data(chunk.replace("\n", "\\n").replace("\r", "\\r"))
                 .build())
             .doOnComplete(() -> {
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
-                // 持久化捕获到的 conversation_id，后续多轮对话可恢复上下文
-                String convId = capturedConvId.get();
-                if (convId != null && !convId.isBlank()) {
-                    sessionService.updateDifyConversationId(sessionId, convId);
-                }
+                // 消息完成和 conversation_id 在同一个事务中持久化。
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), capturedConvId.get());
                 log.info("Dify 聊天流式完成: sessionId={}, messageId={}", sessionId, messageId);
             })
             .doOnCancel(() -> {
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
-                String convId = capturedConvId.get();
-                if (convId != null && !convId.isBlank()) {
-                    sessionService.updateDifyConversationId(sessionId, convId);
-                }
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), capturedConvId.get());
                 log.info("Dify 聊天流式被中断: sessionId={}, messageId={}, contentLength={}",
                     sessionId, messageId, fullContent.length());
             })
             .onErrorResume(e -> {
-                sessionService.completeStreamMessage(messageId, fullContent.toString());
+                sessionService.completeStreamMessage(messageId, fullContent.toString(), capturedConvId.get());
                 log.error("Dify 聊天流式错误: sessionId={}", sessionId, e);
                 return Flux.just(ServerSentEvent.<String>builder()
                     .event("error")
@@ -213,5 +224,13 @@ public class RagChatController {
             });
 
         return Flux.concat(Flux.just(heartbeat), contentFlux);
+    }
+
+    private void touchStreamMessagePeriodically(Long messageId, AtomicLong lastTouch) {
+        long now = System.currentTimeMillis();
+        long previous = lastTouch.get();
+        if (now - previous >= 30_000 && lastTouch.compareAndSet(previous, now)) {
+            sessionService.touchStreamMessage(messageId);
+        }
     }
 }

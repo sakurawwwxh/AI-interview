@@ -344,6 +344,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       const onComplete = () => {
         setLoading(false);
         abortRef.current = null;
+        window.dispatchEvent(new Event('ai-usage-updated'));
         loadSessions();
       };
       const onError = (error: Error) => {
@@ -351,6 +352,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
         updateAssistantMessage(fullContent || error.message || '回答失败，请重试');
         setLoading(false);
         abortRef.current = null;
+        window.dispatchEvent(new Event('ai-usage-updated'));
       };
 
       if (useDifyWorkflow) {
@@ -369,6 +371,7 @@ export default function KnowledgeBaseQueryPage({ onBack, onUpload }: KnowledgeBa
       updateAssistantMessage(err instanceof Error ? err.message : '回答失败，请重试');
       setLoading(false);
       abortRef.current = null;
+      window.dispatchEvent(new Event('ai-usage-updated'));
     }
   };
 

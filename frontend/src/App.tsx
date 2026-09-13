@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import { useAuthStore } from './stores/authStore';
 import { useEffect, useState, Suspense, lazy } from 'react';
 import { historyApi } from './api/history';
@@ -19,6 +20,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const PracticeCenterPage = lazy(() => import('./pages/PracticeCenterPage'));
 const PracticeSessionPage = lazy(() => import('./pages/PracticeSessionPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const DifyManagementPage = lazy(() => import('./pages/DifyManagementPage'));
 const KnowledgeBaseQueryPage = lazy(() => import('./pages/KnowledgeBaseQueryPage'));
 const KnowledgeBaseUploadPage = lazy(() => import('./pages/KnowledgeBaseUploadPage'));
 const KnowledgeBaseManagePage = lazy(() => import('./pages/KnowledgeBaseManagePage'));
@@ -233,7 +235,8 @@ function App() {
 
             <Route path="profile" element={<ProfilePage />} />
 
-            <Route path="admin/users" element={<AdminUsersPage />} />
+            <Route path="admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+            <Route path="admin/dify" element={<AdminRoute><DifyManagementPage /></AdminRoute>} />
 
             <Route path="practice" element={<PracticeCenterPage />} />
             <Route path="practice/:taskId" element={<PracticeSessionPage />} />

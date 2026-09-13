@@ -27,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +41,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class RagChatSessionService {
+
+    private static final Duration STALE_STREAM_TIMEOUT = Duration.ofMinutes(10);
 
     private final RagChatSessionRepository sessionRepository;
     private final RagChatMessageRepository messageRepository;
@@ -116,10 +120,30 @@ public class RagChatSessionService {
      */
     @Transactional
     public Long prepareStreamMessage(Long sessionId, String question) {
-        RagChatSessionEntity session = requireOwnedSessionWithKnowledgeBases(sessionId);
+        // 锁定会话行：并发请求必须依次检查并分配 messageOrder。
+        RagChatSessionEntity session = requireOwnedSessionForStreamWrite(sessionId);
+
+        // 一个会话只能同时生成一个回答，否则历史上下文和 Dify conversation_id 都会互相串写。
+        // 进程异常退出时，旧的占位消息需要自动收敛，否则会话会永久锁死。
+        List<RagChatMessageEntity> pendingMessages =
+            messageRepository.findBySessionIdAndCompletedFalse(sessionId);
+        List<RagChatMessageEntity> activePendingMessages = new ArrayList<>();
+        for (RagChatMessageEntity pending : pendingMessages) {
+            if (isStaleStream(pending)) {
+                pending.setCompleted(true);
+                messageRepository.save(pending);
+                log.warn("清理超时的 RAG 流式占位消息: sessionId={}, messageId={}",
+                    sessionId, pending.getId());
+            } else {
+                activePendingMessages.add(pending);
+            }
+        }
+        if (!activePendingMessages.isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "当前会话正在生成回答，请等待完成后再发送");
+        }
 
         // 获取当前消息数量作为起始顺序
-        int nextOrder = session.getMessageCount();
+        int nextOrder = session.getMessageCount() == null ? 0 : session.getMessageCount();
 
         // 保存用户消息
         RagChatMessageEntity userMessage = new RagChatMessageEntity();
@@ -153,14 +177,42 @@ public class RagChatSessionService {
      */
     @Transactional
     public void completeStreamMessage(Long messageId, String content) {
-        RagChatMessageEntity message = messageRepository.findById(messageId)
+        completeStreamMessage(messageId, content, null);
+    }
+
+    /**
+     * 原子完成流式消息，并在 Dify 模式下一并保存 conversation_id。
+     */
+    @Transactional
+    public void completeStreamMessage(Long messageId, String content, String conversationId) {
+        RagChatMessageEntity message = messageRepository.findByIdForUpdate(messageId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "消息不存在"));
+
+        // 超时回收后，旧请求的完成回调只能被忽略，不能覆盖新请求的回答。
+        if (Boolean.TRUE.equals(message.getCompleted())) {
+            log.info("忽略已回收或已完成的流式回调: messageId={}", messageId);
+            return;
+        }
 
         message.setContent(content);
         message.setCompleted(true);
         messageRepository.save(message);
 
+        if (conversationId != null && !conversationId.isBlank()) {
+            RagChatSessionEntity session = message.getSession();
+            session.setDifyConversationId(conversationId);
+            sessionRepository.save(session);
+        }
+
         log.info("完成流式消息: messageId={}, contentLength={}", messageId, content.length());
+    }
+
+    /**
+     * 续期流式消息，供长时间生成的响应定期调用。
+     */
+    @Transactional
+    public void touchStreamMessage(Long messageId) {
+        messageRepository.touchIfPending(messageId, LocalDateTime.now());
     }
 
     /**
@@ -215,17 +267,11 @@ public class RagChatSessionService {
         if (sessionId == null || conversationId == null || conversationId.isBlank()) {
             return;
         }
-        try {
-            sessionRepository.findById(sessionId).ifPresent(session -> {
-                session.setDifyConversationId(conversationId);
-                sessionRepository.save(session);
-                log.info("持久化 Dify conversation_id: sessionId={}, conversationId={}",
-                    sessionId, conversationId);
-            });
-        } catch (Exception e) {
-            log.warn("持久化 Dify conversation_id 失败: sessionId={}, error={}",
-                sessionId, e.getMessage());
-        }
+        RagChatSessionEntity session = requireOwnedSession(sessionId);
+        session.setDifyConversationId(conversationId);
+        sessionRepository.save(session);
+        log.info("持久化 Dify conversation_id: sessionId={}, conversationId={}",
+            sessionId, conversationId);
     }
 
     /**
@@ -346,6 +392,20 @@ public class RagChatSessionService {
         Long userId = UserContext.getCurrentUserIdOrThrow();
         return sessionRepository.findByIdWithKnowledgeBasesAndUserId(sessionId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在"));
+    }
+
+    private RagChatSessionEntity requireOwnedSessionForStreamWrite(Long sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return sessionRepository.findByIdAndUserIdForUpdate(sessionId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "会话不存在"));
+    }
+
+    private boolean isStaleStream(RagChatMessageEntity message) {
+        LocalDateTime lastUpdated = message.getUpdatedAt() != null
+            ? message.getUpdatedAt()
+            : message.getCreatedAt();
+        return lastUpdated != null
+            && lastUpdated.isBefore(LocalDateTime.now().minus(STALE_STREAM_TIMEOUT));
     }
 
     private String generateTitle(List<KnowledgeBaseEntity> knowledgeBases) {

@@ -185,6 +185,20 @@ class InterviewPersistenceServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("已完成面试拒绝暂存答案")
+    void shouldRejectDraftAnswerAfterInterviewCompleted() {
+        InterviewSessionEntity session = new InterviewSessionEntity();
+        session.setSessionId("session-1");
+        session.setStatus(InterviewSessionEntity.SessionStatus.COMPLETED);
+        when(sessionRepository.findBySessionIdAndUserId("session-1", 1L))
+            .thenReturn(Optional.of(session));
+
+        assertThrows(BusinessException.class, () ->
+            service.persistDraftAnswer("session-1", 0, "Q", "cat", "answer", 5));
+        verify(answerRepository, never()).save(any());
+    }
+
     @Nested
     @DisplayName("updateEvaluateStatus 评估状态更新")
     class UpdateEvaluateStatus {

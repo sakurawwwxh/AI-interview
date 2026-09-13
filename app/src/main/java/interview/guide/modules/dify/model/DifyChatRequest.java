@@ -1,5 +1,7 @@
 package interview.guide.modules.dify.model;
 
+import jakarta.validation.constraints.NotBlank;
+
 import java.util.List;
 import java.util.Map;
 
@@ -8,7 +10,7 @@ import java.util.Map;
  */
 public record DifyChatRequest(
     /** 用户问题 */
-    String query,
+    @NotBlank(message = "query 不能为空") String query,
     /** 会话 ID（可选） */
     String conversationId,
     /** 知识库 ID 列表 */

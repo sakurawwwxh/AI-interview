@@ -4,7 +4,6 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,7 +99,7 @@ public class StructuredOutputInvoker {
                     .chatResponse();
 
                 // 记录 token 用量
-                recordUsage(response, logContext, log);
+                usageRecorder.recordUsage(response, logContext);
 
                 // 手动用 outputConverter 解析响应内容
                 String content = response.getResult().getOutput().getText();
@@ -124,24 +123,6 @@ public class StructuredOutputInvoker {
             errorCode,
             errorPrefix + (lastError != null ? lastError.getMessage() : "unknown")
         );
-    }
-
-    /**
-     * 从 ChatResponse 中提取 Usage 并记录到 AiUsageRecorder
-     */
-    private void recordUsage(ChatResponse response, String logContext, Logger log) {
-        if (response == null || response.getMetadata() == null) {
-            return;
-        }
-        Usage usage = response.getMetadata().getUsage();
-        if (usage == null) {
-            return;
-        }
-        int promptTokens = usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
-        int completionTokens = usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-        if (promptTokens > 0 || completionTokens > 0) {
-            usageRecorder.recordUsage(promptTokens, completionTokens, logContext);
-        }
     }
 
     private String buildRetrySystemPrompt(String systemPromptWithFormat, Exception lastError) {

@@ -3,6 +3,8 @@ package interview.guide.modules.knowledgebase.repository;
 import interview.guide.modules.knowledgebase.model.RagChatMessageEntity;
 import interview.guide.modules.knowledgebase.model.RagChatMessageEntity.MessageType;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 /**
  * RAG聊天消息Repository
@@ -43,6 +46,22 @@ public interface RagChatMessageRepository extends JpaRepository<RagChatMessageEn
      * 查找未完成的消息（流式响应中断时清理用）
      */
     List<RagChatMessageEntity> findBySessionIdAndCompletedFalse(Long sessionId);
+
+    /**
+     * 锁定消息行，避免超时回收与旧流式回调同时更新同一条消息。
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM RagChatMessageEntity m WHERE m.id = :messageId")
+    Optional<RagChatMessageEntity> findByIdForUpdate(@Param("messageId") Long messageId);
+
+    /**
+     * 仅续期仍处于生成中的消息，避免旧回调把已回收的消息重新变成活动状态。
+     */
+    @Modifying
+    @Query("UPDATE RagChatMessageEntity m SET m.updatedAt = :updatedAt "
+        + "WHERE m.id = :messageId AND m.completed = false")
+    int touchIfPending(@Param("messageId") Long messageId,
+                       @Param("updatedAt") java.time.LocalDateTime updatedAt);
 
     /**
      * 删除会话的所有消息

@@ -40,6 +40,19 @@ public class InterviewPersistenceService {
     private final ResumeRepository resumeRepository;
     private final ObjectMapper objectMapper;
     private final PracticeTaskService practiceTaskService;
+
+    /**
+     * 校验当前用户拥有指定简历。
+     *
+     * <p>创建会话、读取历史题目等所有依赖 resumeId 的流程都必须先调用此方法，
+     * 不能只把归属校验放在某个可被跳过的分支里。</p>
+     */
+    public void requireOwnedResume(Long resumeId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        if (resumeRepository.findByIdAndUserId(resumeId, userId).isEmpty()) {
+            throw new BusinessException(ErrorCode.RESUME_NOT_FOUND);
+        }
+    }
     
     /**
      * 保存新的面试会话
@@ -170,6 +183,7 @@ public class InterviewPersistenceService {
             throw e;
         } catch (JacksonException e) {
             log.error("序列化问题列表失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存问题列表失败");
         }
     }
     
@@ -208,6 +222,112 @@ public class InterviewPersistenceService {
                 sessionId, questionIndex, score);
         
         return saved;
+    }
+
+    /**
+     * 在同一个事务中保存答题结果及会话进度。
+     *
+     * <p>答题会同时修改答案、当前题目索引、会话状态和题目 JSON。
+     * 这些数据必须一起提交，否则其中一步失败时数据库会留下无法恢复的半成品。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void persistSubmittedAnswer(String sessionId, int questionIndex,
+                                       String question, String category,
+                                       String userAnswer, Integer answerDurationSeconds,
+                                       List<InterviewQuestionDTO> questions,
+                                       int newIndex, boolean completed) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        InterviewSessionEntity session = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+        if (session.getStatus() == InterviewSessionEntity.SessionStatus.COMPLETED
+            || session.getStatus() == InterviewSessionEntity.SessionStatus.EVALUATED) {
+            throw new BusinessException(ErrorCode.INTERVIEW_ALREADY_COMPLETED);
+        }
+
+        InterviewAnswerEntity answer = answerRepository
+            .findBySession_SessionIdAndQuestionIndex(sessionId, questionIndex)
+            .orElseGet(() -> {
+                InterviewAnswerEntity created = new InterviewAnswerEntity();
+                created.setSession(session);
+                created.setQuestionIndex(questionIndex);
+                return created;
+            });
+        answer.setQuestion(question);
+        answer.setCategory(category);
+        answer.setUserAnswer(userAnswer);
+        answer.setScore(0);
+        answer.setFeedback(null);
+        answer.setAnswerDurationSeconds(answerDurationSeconds);
+        answerRepository.save(answer);
+
+        try {
+            session.setCurrentQuestionIndex(newIndex);
+            session.setStatus(completed
+                ? InterviewSessionEntity.SessionStatus.COMPLETED
+                : InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+            if (completed) {
+                session.setCompletedAt(LocalDateTime.now());
+                session.setEvaluateStatus(AsyncTaskStatus.PENDING);
+                session.setEvaluateProgress(0);
+                session.setEvaluateError(null);
+            }
+            session.setQuestionsJson(objectMapper.writeValueAsString(questions));
+            session.setTotalQuestions(questions.size());
+            sessionRepository.save(session);
+        } catch (JacksonException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存面试进度失败");
+        }
+    }
+
+    /**
+     * 在同一个事务中保存暂存答案及进行中状态。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void persistDraftAnswer(String sessionId, int questionIndex,
+                                   String question, String category,
+                                   String userAnswer, Integer answerDurationSeconds) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        InterviewSessionEntity session = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+        if (session.getStatus() == InterviewSessionEntity.SessionStatus.COMPLETED
+            || session.getStatus() == InterviewSessionEntity.SessionStatus.EVALUATED) {
+            throw new BusinessException(ErrorCode.INTERVIEW_ALREADY_COMPLETED);
+        }
+
+        InterviewAnswerEntity answer = answerRepository
+            .findBySession_SessionIdAndQuestionIndex(sessionId, questionIndex)
+            .orElseGet(() -> {
+                InterviewAnswerEntity created = new InterviewAnswerEntity();
+                created.setSession(session);
+                created.setQuestionIndex(questionIndex);
+                return created;
+            });
+        answer.setQuestion(question);
+        answer.setCategory(category);
+        answer.setUserAnswer(userAnswer);
+        answer.setScore(0);
+        answer.setFeedback(null);
+        answer.setAnswerDurationSeconds(answerDurationSeconds);
+        answerRepository.save(answer);
+
+        session.setStatus(InterviewSessionEntity.SessionStatus.IN_PROGRESS);
+        sessionRepository.save(session);
+    }
+
+    /**
+     * 原子地标记面试完成并创建待评估状态。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void markCompletedForEvaluation(String sessionId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        InterviewSessionEntity session = sessionRepository.findBySessionIdAndUserId(sessionId, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND));
+        session.setStatus(InterviewSessionEntity.SessionStatus.COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+        session.setEvaluateStatus(AsyncTaskStatus.PENDING);
+        session.setEvaluateProgress(0);
+        session.setEvaluateError(null);
+        sessionRepository.save(session);
     }
     
     /**
@@ -306,6 +426,7 @@ public class InterviewPersistenceService {
 
         } catch (JacksonException e) {
             log.error("序列化报告失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存面试报告失败");
         }
     }
     

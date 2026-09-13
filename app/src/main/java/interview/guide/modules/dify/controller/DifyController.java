@@ -1,10 +1,13 @@
 package interview.guide.modules.dify.controller;
 
+import interview.guide.common.annotation.RateLimit;
 import interview.guide.common.result.Result;
 import interview.guide.modules.dify.client.DifyApiClient;
 import interview.guide.modules.dify.model.*;
 import interview.guide.modules.dify.service.DifyChatService;
+import interview.guide.modules.dify.service.DifyKnowledgeBaseAdminService;
 import interview.guide.modules.dify.service.DifySyncService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -27,6 +30,7 @@ import java.util.Map;
 public class DifyController {
 
     private final DifySyncService syncService;
+    private final DifyKnowledgeBaseAdminService knowledgeBaseAdminService;
     private final DifyChatService chatService;
     private final DifyApiClient difyApiClient;
 
@@ -61,11 +65,31 @@ public class DifyController {
         return Result.success(syncService.getSyncLogs(knowledgeBaseId, limit));
     }
 
+    /** 将单个本地知识库推送到 Dify，可用于手动重试失败项。 */
+    @PostMapping("/knowledge-bases/{knowledgeBaseId}/sync-to-dify")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> syncKnowledgeBaseToDify(@PathVariable Long knowledgeBaseId) {
+        knowledgeBaseAdminService.syncKnowledgeBaseToDify(knowledgeBaseId);
+        return Result.success(null);
+    }
+
+    /** 管理本地知识库归属；归属决定本地 RAG 可见性。 */
+    @PutMapping("/knowledge-bases/{knowledgeBaseId}/owner")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> transferKnowledgeBaseOwner(
+            @PathVariable Long knowledgeBaseId,
+            @Valid @RequestBody DifyKnowledgeBaseOwnerRequest request) {
+        knowledgeBaseAdminService.transferKnowledgeBaseOwner(knowledgeBaseId, request.userId());
+        return Result.success(null);
+    }
+
     /**
      * 基于 Dify 对话
      */
     @PostMapping("/chat")
-    public Result<DifyChatResponse> chat(@RequestBody DifyChatRequest request) {
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 10)
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<DifyChatResponse> chat(@Valid @RequestBody DifyChatRequest request) {
         log.info("Dify 对话请求: query={}, kbIds={}", request.query(), request.knowledgeBaseIds());
         return Result.success(chatService.chat(
             request.query(),
@@ -82,7 +106,9 @@ public class DifyController {
      * Dify 聊天助手应用已关联知识库，可在 Dify 控制台查看召回率。
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> difyChatStream(@RequestBody DifyChatRequest request) {
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 5)
+    @PreAuthorize("hasRole('ADMIN')")
+    public Flux<ServerSentEvent<String>> difyChatStream(@Valid @RequestBody DifyChatRequest request) {
         log.info("流式运行 Dify 聊天: query={}",
             request.query().length() > 50 ? request.query().substring(0, 50) + "..." : request.query());
 

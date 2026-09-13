@@ -47,7 +47,12 @@ public class InterviewSessionService {
      */
     public InterviewSessionDTO createSession(CreateInterviewRequest request) {
         Long userId = UserContext.getCurrentUserIdOrThrow();
-        // 如果指定了resumeId且未强制创建，检查是否有未完成的会话
+        // 无论是否强制创建，都必须先校验 resumeId 归属；forceCreate 只影响是否复用会话。
+        if (request.resumeId() != null) {
+            persistenceService.requireOwnedResume(request.resumeId());
+        }
+
+        // 如果指定了 resumeId 且未强制创建，检查是否有未完成的会话
         if (request.resumeId() != null && !Boolean.TRUE.equals(request.forceCreate())) {
             Optional<InterviewSessionDTO> unfinishedOpt = findUnfinishedSession(request.resumeId());
             if (unfinishedOpt.isPresent()) {
@@ -90,7 +95,13 @@ public class InterviewSessionService {
             log.warn("会话 {} 使用默认题库出题", sessionId);
         }
 
-        // 保存到 Redis 缓存
+        // 先持久化；数据库失败时不写 Redis，避免向客户端返回无法恢复的“成功会话”。
+        if (request.resumeId() != null) {
+            persistenceService.saveSession(sessionId, request.resumeId(),
+                questions.size(), questions, template);
+        }
+
+        // 数据库成功后再保存到 Redis 缓存。
         sessionCache.saveSession(
             userId,
             sessionId,
@@ -100,16 +111,6 @@ public class InterviewSessionService {
             0,
             SessionStatus.CREATED
         );
-
-        // 保存到数据库
-        if (request.resumeId() != null) {
-            try {
-                persistenceService.saveSession(sessionId, request.resumeId(),
-                    questions.size(), questions, template);
-            } catch (Exception e) {
-                log.warn("保存面试会话到数据库失败: {}", e.getMessage());
-            }
-        }
 
         return new InterviewSessionDTO(
             sessionId,
@@ -170,8 +171,11 @@ public class InterviewSessionService {
             if (restoredSession != null) {
                 return Optional.of(toDTO(restoredSession));
             }
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("恢复未完成会话失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "恢复未完成面试会话失败");
         }
         return Optional.empty();
     }
@@ -269,22 +273,16 @@ public class InterviewSessionService {
         CachedSession session = getOrRestoreSession(sessionId);
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
 
-        if (session.getCurrentIndex() >= questions.size()) {
+        if (session.getCurrentIndex() < 0 || session.getCurrentIndex() >= questions.size()) {
             return null; // 所有问题已回答完
         }
 
         // 更新状态为进行中
         if (session.getStatus() == SessionStatus.CREATED) {
-            session.setStatus(SessionStatus.IN_PROGRESS);
+            // 先更新数据库；失败则不改变缓存状态，也不向客户端伪造成功。
+            persistenceService.updateSessionStatus(sessionId,
+                InterviewSessionEntity.SessionStatus.IN_PROGRESS);
             sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.IN_PROGRESS);
-
-            // 同步到数据库
-            try {
-                persistenceService.updateSessionStatus(sessionId,
-                    InterviewSessionEntity.SessionStatus.IN_PROGRESS);
-            } catch (Exception e) {
-                log.warn("更新会话状态失败: {}", e.getMessage());
-            }
         }
 
         return questions.get(session.getCurrentIndex());
@@ -298,7 +296,8 @@ public class InterviewSessionService {
         // 分布式锁防止同一会话并发提交导致 Redis 状态覆盖
         String lockKey = "interview:session:lock:" + request.sessionId();
         try {
-            return redisService.executeWithLock(lockKey, 3, 10, java.util.concurrent.TimeUnit.SECONDS,
+            // leaseTime=-1 使用 Redisson 看门狗续期，避免 AI 追问超过固定租期后并发提交。
+            return redisService.executeWithLock(lockKey, 3, -1, java.util.concurrent.TimeUnit.SECONDS,
                 () -> doSubmitAnswer(request));
         } catch (RuntimeException e) {
             if (e.getMessage() != null && e.getMessage().contains("获取锁失败")) {
@@ -337,39 +336,24 @@ public class InterviewSessionService {
 
         SessionStatus newStatus = hasNextQuestion ? SessionStatus.IN_PROGRESS : SessionStatus.COMPLETED;
 
-        // 更新 Redis 缓存
+        // 先持久化关键状态；任一步失败都向客户端返回失败，缓存保持可从数据库恢复的旧状态。
+        persistenceService.persistSubmittedAnswer(
+            request.sessionId(), index,
+            question.question(), question.category(),
+            request.answer(), request.answerDurationSeconds(),
+            questions, newIndex, !hasNextQuestion
+        );
+
+        // 所有持久化成功后再更新 Redis 缓存。
         sessionCache.updateQuestions(userId, request.sessionId(), questions);
         sessionCache.updateCurrentIndex(userId, request.sessionId(), newIndex);
         if (newStatus == SessionStatus.COMPLETED) {
             sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.COMPLETED);
         }
 
-        // 保存答案到数据库
-        try {
-            persistenceService.saveAnswer(
-                request.sessionId(), index,
-                question.question(), question.category(),
-                request.answer(), 0, null, request.answerDurationSeconds()  // 分数在报告生成时更新
-            );
-            persistenceService.updateCurrentQuestionIndex(request.sessionId(), newIndex);
-            persistenceService.updateSessionStatus(request.sessionId(),
-                newStatus == SessionStatus.COMPLETED
-                    ? InterviewSessionEntity.SessionStatus.COMPLETED
-                    : InterviewSessionEntity.SessionStatus.IN_PROGRESS);
-
-            // 动态追问生成后回写 questionsJson，保证异步评估能读到追问
-            if (dynamicFollowUp.isPresent()) {
-                persistenceService.updateQuestionsJson(request.sessionId(), questions);
-            }
-
-            // 如果是最后一题，设置评估状态为 PENDING 并触发异步评估
-            if (!hasNextQuestion) {
-                persistenceService.updateEvaluateStatus(request.sessionId(), AsyncTaskStatus.PENDING, null);
-                evaluateStreamProducer.sendEvaluateTask(userId, request.sessionId());
-                log.info("会话 {} 已完成所有问题，评估任务已入队", request.sessionId());
-            }
-        } catch (Exception e) {
-            log.warn("保存答案到数据库失败: {}", e.getMessage());
+        if (!hasNextQuestion) {
+            evaluateStreamProducer.sendEvaluateTask(userId, request.sessionId());
+            log.info("会话 {} 已完成所有问题，评估任务已入队", request.sessionId());
         }
 
         log.info("会话 {} 提交答案: 问题{}, 剩余{}题",
@@ -448,25 +432,16 @@ public class InterviewSessionService {
         InterviewQuestionDTO answeredQuestion = question.withAnswer(request.answer());
         questions.set(index, answeredQuestion);
 
-        // 更新 Redis 缓存
-        sessionCache.updateQuestions(userId, request.sessionId(), questions);
+        // 保存答案到数据库（不更新 currentIndex）；失败时不更新缓存。
+        persistenceService.persistDraftAnswer(
+            request.sessionId(), index,
+            question.question(), question.category(),
+            request.answer(), request.answerDurationSeconds()
+        );
 
-        // 更新状态为进行中
+        sessionCache.updateQuestions(userId, request.sessionId(), questions);
         if (session.getStatus() == SessionStatus.CREATED) {
             sessionCache.updateSessionStatus(userId, request.sessionId(), SessionStatus.IN_PROGRESS);
-        }
-
-        // 保存答案到数据库（不更新currentIndex）
-        try {
-            persistenceService.saveAnswer(
-                request.sessionId(), index,
-                question.question(), question.category(),
-                request.answer(), 0, null, request.answerDurationSeconds()
-            );
-            persistenceService.updateSessionStatus(request.sessionId(),
-                InterviewSessionEntity.SessionStatus.IN_PROGRESS);
-        } catch (Exception e) {
-            log.warn("暂存答案到数据库失败: {}", e.getMessage());
         }
 
         log.info("会话 {} 暂存答案: 问题{}", request.sessionId(), index);
@@ -483,18 +458,10 @@ public class InterviewSessionService {
             throw new BusinessException(ErrorCode.INTERVIEW_ALREADY_COMPLETED);
         }
 
-        // 更新 Redis 缓存
-        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
+        // 先更新数据库状态；失败时不更新缓存、不投递评估任务。
+        persistenceService.markCompletedForEvaluation(sessionId);
 
-        // 更新数据库状态
-        try {
-            persistenceService.updateSessionStatus(sessionId,
-                InterviewSessionEntity.SessionStatus.COMPLETED);
-            // 设置评估状态为 PENDING
-            persistenceService.updateEvaluateStatus(sessionId, AsyncTaskStatus.PENDING, null);
-        } catch (Exception e) {
-            log.warn("更新会话状态失败: {}", e.getMessage());
-        }
+        sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.COMPLETED);
 
         // 发送评估任务到 Redis Stream
         evaluateStreamProducer.sendEvaluateTask(userId, sessionId);
@@ -602,15 +569,9 @@ public class InterviewSessionService {
             questions
         );
 
-        // 更新 Redis 缓存状态
+        // 先保存报告，确保缓存中的“已评估”状态可从数据库恢复。
+        persistenceService.saveReport(sessionId, report);
         sessionCache.updateSessionStatus(userId, sessionId, SessionStatus.EVALUATED);
-
-        // 保存报告到数据库
-        try {
-            persistenceService.saveReport(sessionId, report);
-        } catch (Exception e) {
-            log.warn("保存报告到数据库失败: {}", e.getMessage());
-        }
 
         return report;
     }

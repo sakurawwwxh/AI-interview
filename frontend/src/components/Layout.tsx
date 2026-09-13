@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   BarChart3, BookOpen, BriefcaseBusiness, BrainCircuit, FileStack, LogOut,
   Menu, MessageSquare, Moon, Sun, Upload, UserRound, Users, Dumbbell,
-  Shield, X, Home,
+  Shield, X, Home, CloudCog,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useAuthStore } from '../stores/authStore';
@@ -35,8 +35,13 @@ export default function Layout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    aiUsageApi.getUsage().then(setUsage).catch(() => setUsage(null));
-  }, []);
+    const refreshUsage = () => {
+      aiUsageApi.getUsage().then(setUsage).catch(() => setUsage(null));
+    };
+    refreshUsage();
+    window.addEventListener('ai-usage-updated', refreshUsage);
+    return () => window.removeEventListener('ai-usage-updated', refreshUsage);
+  }, [location.pathname]);
   useEffect(() => setMobileNavOpen(false), [location.pathname]);
 
   const handleLogout = async () => {
@@ -64,8 +69,11 @@ export default function Layout() {
     { id: 'library', title: '资料', items: [
       { id: 'knowledgebase', path: '/knowledgebase', label: '面试百科', icon: BookOpen },
       { id: 'chat', path: '/knowledgebase/chat', label: '知识问答', icon: MessageSquare },
+      ...(user?.role === 'ADMIN' ? [
+        { id: 'admin-dify', path: '/admin/dify', label: 'Dify 知识库', icon: CloudCog },
+        { id: 'admin-users', path: '/admin/users', label: '用户管理', icon: Shield },
+      ] : []),
       { id: 'profile', path: '/profile', label: '个人中心', icon: UserRound },
-      ...(user?.role === 'ADMIN' ? [{ id: 'admin-users', path: '/admin/users', label: '用户管理', icon: Shield }] : []),
     ] },
   ];
 

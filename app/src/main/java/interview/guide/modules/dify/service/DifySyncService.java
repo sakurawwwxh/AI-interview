@@ -13,6 +13,8 @@ import interview.guide.modules.knowledgebase.model.VectorStatus;
 import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import interview.guide.modules.knowledgebase.service.KnowledgeBasePersistenceService;
 import interview.guide.modules.knowledgebase.service.KnowledgeBaseVectorService;
+import interview.guide.modules.user.model.UserEntity;
+import interview.guide.modules.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -24,7 +26,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Dify 同步服务
@@ -44,6 +50,7 @@ public class DifySyncService {
     private final KnowledgeBasePersistenceService persistenceService;
     private final VectorizeStreamProducer vectorizeStreamProducer;
     private final KnowledgeBaseVectorService vectorService;
+    private final UserRepository userRepository;
 
     /**
      * 同步知识库到 Dify（本地 → Dify）
@@ -415,10 +422,20 @@ public class DifySyncService {
      */
     @Transactional(readOnly = true)
     public List<DifySyncStatusDTO> getSyncStatus() {
-        return knowledgeBaseRepository.findAll().stream()
+        List<KnowledgeBaseEntity> knowledgeBases = knowledgeBaseRepository.findAll();
+        Set<Long> ownerIds = knowledgeBases.stream()
+            .map(KnowledgeBaseEntity::getUserId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Map<Long, String> ownerNames = userRepository.findAllById(ownerIds).stream()
+            .collect(Collectors.toMap(UserEntity::getId, UserEntity::getUsername, (left, right) -> left));
+
+        return knowledgeBases.stream()
             .map(entity -> new DifySyncStatusDTO(
                 entity.getId(),
                 entity.getName(),
+                entity.getUserId(),
+                ownerNames.get(entity.getUserId()),
                 entity.getDifyDocumentId(),
                 entity.getDifySyncStatus(),
                 entity.getDifySyncTime(),

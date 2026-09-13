@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public record DifySyncStatusDTO(
     Long knowledgeBaseId,
     String name,
+    Long ownerUserId,
+    String ownerUsername,
     String difyDocumentId,
     DifySyncStatus syncStatus,
     LocalDateTime lastSyncTime,

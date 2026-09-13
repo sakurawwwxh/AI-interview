@@ -17,7 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -90,6 +92,28 @@ public class KnowledgeBaseListService {
     public Optional<KnowledgeBaseEntity> getKnowledgeBaseEntity(Long id) {
         Long userId = UserContext.getCurrentUserIdOrThrow();
         return knowledgeBaseRepository.findByIdAndUserId(id, userId);
+    }
+
+    /**
+     * 验证知识库 ID 均归当前用户所有，并返回去重后的 ID 列表。
+     *
+     * <p>不能只验证记录存在：查询、删除等操作一旦接受客户端传入的 ID，
+     * 必须在执行向量检索或外部删除前完成用户归属校验。</p>
+     */
+    public List<Long> requireOwnedKnowledgeBaseIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty() || ids.stream().anyMatch(Objects::isNull)) {
+            throw new BusinessException(ErrorCode.KNOWLEDGE_BASE_NOT_FOUND, "知识库不存在或无权访问");
+        }
+
+        List<Long> uniqueIds = List.copyOf(new LinkedHashSet<>(ids));
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        List<KnowledgeBaseEntity> knowledgeBases = knowledgeBaseRepository
+            .findAllByIdInAndUserId(uniqueIds, userId);
+
+        if (knowledgeBases.size() != uniqueIds.size()) {
+            throw new BusinessException(ErrorCode.KNOWLEDGE_BASE_NOT_FOUND, "知识库不存在或无权访问");
+        }
+        return uniqueIds;
     }
 
     /**

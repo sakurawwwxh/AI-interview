@@ -9,6 +9,7 @@ import interview.guide.modules.interview.service.InterviewSessionService;
 import interview.guide.modules.interview.service.InterviewStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,7 @@ public class InterviewController {
      */
     @PostMapping("/api/interview/sessions")
     @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP}, count = 5)
-    public Result<InterviewSessionDTO> createSession(@RequestBody CreateInterviewRequest request) {
+    public Result<InterviewSessionDTO> createSession(@Valid @RequestBody CreateInterviewRequest request) {
         log.info("创建面试会话，题目数量: {}", request.questionCount());
         InterviewSessionDTO session = sessionService.createSession(request);
         return Result.success(session);
@@ -68,13 +69,10 @@ public class InterviewController {
     @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL}, count = 10)
     public Result<SubmitAnswerResponse> submitAnswer(
             @PathVariable String sessionId,
-            @RequestBody Map<String, Object> body) {
-        Integer questionIndex = (Integer) body.get("questionIndex");
-        String answer = (String) body.get("answer");
-        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
-            ? duration.intValue() : null;
-        log.info("提交答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
+            @Valid @RequestBody InterviewAnswerRequest body) {
+        log.info("提交答案: 会话{}, 问题{}", sessionId, body.questionIndex());
+        SubmitAnswerRequest request = new SubmitAnswerRequest(
+            sessionId, body.questionIndex(), body.answer(), body.answerDurationSeconds());
         SubmitAnswerResponse response = sessionService.submitAnswer(request);
         return Result.success(response);
     }
@@ -105,13 +103,10 @@ public class InterviewController {
     @PutMapping("/api/interview/sessions/{sessionId}/answers")
     public Result<Void> saveAnswer(
             @PathVariable String sessionId,
-            @RequestBody Map<String, Object> body) {
-        Integer questionIndex = (Integer) body.get("questionIndex");
-        String answer = (String) body.get("answer");
-        Integer answerDurationSeconds = body.get("answerDurationSeconds") instanceof Number duration
-            ? duration.intValue() : null;
-        log.info("暂存答案: 会话{}, 问题{}", sessionId, questionIndex);
-        SubmitAnswerRequest request = new SubmitAnswerRequest(sessionId, questionIndex, answer, answerDurationSeconds);
+            @Valid @RequestBody InterviewAnswerRequest body) {
+        log.info("暂存答案: 会话{}, 问题{}", sessionId, body.questionIndex());
+        SubmitAnswerRequest request = new SubmitAnswerRequest(
+            sessionId, body.questionIndex(), body.answer(), body.answerDurationSeconds());
         sessionService.saveAnswer(request);
         return Result.success(null);
     }
@@ -148,8 +143,12 @@ public class InterviewController {
 
     /**
      * 获取本地全部已评分面试的能力统计。
+     * 令牌桶策略限流示例：允许短时突发请求，配额按速率平滑恢复。
      */
     @GetMapping("/api/interview/statistics")
+    @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP},
+            count = 20, interval = 1, timeUnit = RateLimit.TimeUnit.SECONDS,
+            strategy = RateLimit.Strategy.TOKEN_BUCKET)
     public Result<InterviewStatisticsDTO> getInterviewStatistics() {
         return Result.success(statisticsService.getStatistics());
     }

@@ -1,5 +1,6 @@
 package interview.guide.modules.dify.client;
 
+import interview.guide.common.ai.AiUsageRecorder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import interview.guide.modules.dify.config.DifyConfig;
@@ -47,10 +48,12 @@ public class DifyApiClient {
     private final WebClient appWebClient;
     private final DifyConfig config;
     private final ObjectMapper objectMapper;
+    private final AiUsageRecorder usageRecorder;
 
-    public DifyApiClient(DifyConfig config, ObjectMapper objectMapper) {
+    public DifyApiClient(DifyConfig config, ObjectMapper objectMapper, AiUsageRecorder usageRecorder) {
         this.config = config;
         this.objectMapper = objectMapper;
+        this.usageRecorder = usageRecorder;
 
         JdkClientHttpRequestFactory requestFactory = buildRequestFactory(config);
         // 知识库 API 用的 RestClient（dataset-xxx key）
@@ -353,6 +356,7 @@ public class DifyApiClient {
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("query 不能为空");
         }
+        usageRecorder.checkQuota();
 
         // 日志脱敏：截断 query 内容，只记录前 50 个字符
         String truncatedQuery = query.length() > 50 ? query.substring(0, 50) + "..." : query;
@@ -380,6 +384,7 @@ public class DifyApiClient {
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode responseBody = response.getBody();
+                recordDifyUsage(responseBody, "dify-chat");
                 return DifyChatResponse.builder()
                     .answer(safeAsText(responseBody, "answer"))
                     .conversationId(safeAsText(responseBody, "conversation_id"))
@@ -478,6 +483,7 @@ public class DifyApiClient {
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("query 不能为空");
         }
+        usageRecorder.checkQuota();
 
         String truncatedQuery = query.length() > 50 ? query.substring(0, 50) + "..." : query;
         log.info("流式运行 Dify 聊天: query={}, conversationId={}", truncatedQuery, conversationId);
@@ -511,6 +517,7 @@ public class DifyApiClient {
                     }
                     // message_end 事件：捕获 conversation_id 供多轮对话使用
                     if ("message_end".equals(event)) {
+                        recordDifyUsage(node, "dify-chat-stream");
                         if (conversationIdSink != null) {
                             String convId = safeAsText(node, "conversation_id");
                             if (!convId.isBlank()) {
@@ -523,7 +530,7 @@ public class DifyApiClient {
                     // error 事件
                     if ("error".equals(event)) {
                         String errorMsg = safeAsText(node, "message");
-                        return "【错误】" + (errorMsg.isBlank() ? "Dify 调用失败" : errorMsg);
+                        throw new DifyApiException(errorMsg.isBlank() ? "Dify 调用失败" : errorMsg);
                     }
                     // 其他事件（workflow_started/node_finished 等）忽略
                     return null;
@@ -537,7 +544,8 @@ public class DifyApiClient {
                 answer.substring(0, Math.min(answer.length(), 80))))
             .onErrorResume(e -> {
                 log.error("Dify 聊天流式失败: {}", e.getMessage());
-                return Flux.just("【错误】Dify 聊天调用失败，请稍后重试。");
+                // 保留错误信号，由控制器转换为 SSE error 事件，避免把错误伪装成正常回答。
+                return Flux.error(e);
             });
     }
 
@@ -788,6 +796,25 @@ public class DifyApiClient {
             return "";
         }
         return child.asText();
+    }
+
+    /** 记录 Dify 返回的 token 用量；不同 Dify 版本可能把 usage 放在 metadata 或顶层。 */
+    private void recordDifyUsage(JsonNode response, String operation) {
+        if (response == null || response.isMissingNode() || response.isNull()) {
+            return;
+        }
+        JsonNode usage = response.path("metadata").path("usage");
+        if (usage.isMissingNode() || usage.isNull()) {
+            usage = response.path("usage");
+        }
+        if (usage.isMissingNode() || usage.isNull()) {
+            return;
+        }
+        int promptTokens = usage.path("prompt_tokens").asInt(0);
+        int completionTokens = usage.path("completion_tokens").asInt(0);
+        if (promptTokens > 0 || completionTokens > 0) {
+            usageRecorder.recordUsage(promptTokens, completionTokens, operation);
+        }
     }
 
     /**

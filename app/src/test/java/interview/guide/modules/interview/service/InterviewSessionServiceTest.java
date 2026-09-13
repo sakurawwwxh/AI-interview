@@ -6,11 +6,14 @@ import interview.guide.infrastructure.redis.InterviewSessionCache;
 import interview.guide.infrastructure.redis.InterviewSessionCache.CachedSession;
 import interview.guide.infrastructure.redis.RedisService;
 import interview.guide.modules.interview.listener.EvaluateStreamProducer;
+import interview.guide.modules.interview.model.CreateInterviewRequest;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
+import interview.guide.modules.interview.model.QuestionGenerationResult;
 import interview.guide.modules.interview.model.SubmitAnswerRequest;
 import interview.guide.modules.interview.model.SubmitAnswerResponse;
 import interview.guide.modules.interview.model.InterviewSessionDTO.SessionStatus;
 import interview.guide.modules.target.service.JobTargetService;
+import org.mockito.InOrder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -98,9 +101,9 @@ class InterviewSessionServiceTest {
             assertEquals(1, response.currentIndex());
             verify(sessionCache).updateQuestions(eq(1L), eq(SESSION_ID), anyList());
             verify(sessionCache).updateCurrentIndex(1L, SESSION_ID, 1);
-            verify(persistenceService).saveAnswer(eq(SESSION_ID), eq(0), anyString(), anyString(),
-                eq("my answer"), eq(0), isNull(), eq(30));
-            verify(persistenceService).updateCurrentQuestionIndex(SESSION_ID, 1);
+            verify(persistenceService).persistSubmittedAnswer(eq(SESSION_ID), eq(0), anyString(), anyString(),
+                eq("my answer"), eq(30), anyList(), eq(1), eq(false));
+            verify(redisService).executeWithLock(eq(LOCK_KEY), eq(3L), eq(-1L), eq(TimeUnit.SECONDS), any());
         }
 
         @Test
@@ -124,7 +127,8 @@ class InterviewSessionServiceTest {
             SubmitAnswerResponse response = service.submitAnswer(request);
 
             assertFalse(response.hasNextQuestion());
-            verify(persistenceService).updateEvaluateStatus(SESSION_ID, AsyncTaskStatus.PENDING, null);
+            verify(persistenceService).persistSubmittedAnswer(eq(SESSION_ID), eq(1), anyString(), anyString(),
+                eq("final answer"), eq(20), anyList(), eq(-1), eq(true));
             verify(evaluateStreamProducer).sendEvaluateTask(1L, SESSION_ID);
         }
 
@@ -149,7 +153,8 @@ class InterviewSessionServiceTest {
             // 验证追问被生成且 questionsJson 被回写
             assertTrue(response.hasNextQuestion());
             assertEquals(2, response.currentIndex());
-            verify(persistenceService).updateQuestionsJson(eq(SESSION_ID), anyList());
+            verify(persistenceService).persistSubmittedAnswer(eq(SESSION_ID), eq(0), anyString(), anyString(),
+                eq("answer"), eq(10), anyList(), eq(2), eq(false));
         }
 
         @Test
@@ -161,6 +166,71 @@ class InterviewSessionServiceTest {
 
             SubmitAnswerRequest request = new SubmitAnswerRequest(SESSION_ID, 5, "answer", 10);
             assertThrows(BusinessException.class, () -> service.submitAnswer(request));
+        }
+
+        @Test
+        @DisplayName("数据库保存答案失败时不更新 Redis，避免返回无法恢复的成功状态")
+        void shouldNotUpdateCacheWhenAnswerPersistenceFails() {
+            CachedSession cached = buildSession(0, SessionStatus.IN_PROGRESS);
+            when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+            doNothing().when(sessionCache).refreshSessionTTL(1L, SESSION_ID);
+            when(questionService.generateDynamicFollowUp(any(), anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(Optional.empty());
+            doThrow(new RuntimeException("database unavailable"))
+                .when(persistenceService)
+                .persistSubmittedAnswer(eq(SESSION_ID), eq(0), anyString(), anyString(),
+                    eq("my answer"), eq(30), anyList(), eq(1), eq(false));
+
+            SubmitAnswerRequest request = new SubmitAnswerRequest(SESSION_ID, 0, "my answer", 30);
+
+            assertThrows(RuntimeException.class, () -> service.submitAnswer(request));
+            verify(sessionCache, never()).updateQuestions(eq(1L), eq(SESSION_ID), anyList());
+            verify(sessionCache, never()).updateCurrentIndex(anyLong(), anyString(), anyInt());
+        }
+    }
+
+    @Nested
+    @DisplayName("createSession 创建会话")
+    class CreateSession {
+
+        @Test
+        @DisplayName("forceCreate 仍校验简历归属，并在持久化成功后才写缓存")
+        void shouldValidateResumeOwnershipBeforeForceCreating() {
+            when(questionService.getDefaultFollowUpCount()).thenReturn(1);
+            InterviewQuestionDTO question = InterviewQuestionDTO.create(
+                0, "Q1", InterviewQuestionDTO.QuestionType.JAVA_BASIC, "Java基础");
+            when(questionService.generateQuestionsWithSource(anyString(), anyInt(), anyList(), any(), isNull()))
+                .thenReturn(QuestionGenerationResult.ai(List.of(question)));
+
+            CreateInterviewRequest request = new CreateInterviewRequest(
+                "resume text", 3, 99L, true, null, null);
+
+            service.createSession(request);
+
+            InOrder order = inOrder(persistenceService, sessionCache);
+            order.verify(persistenceService).requireOwnedResume(99L);
+            order.verify(persistenceService).saveSession(anyString(), eq(99L), eq(1), anyList(), any());
+            order.verify(sessionCache).saveSession(eq(1L), anyString(), eq("resume text"), eq(99L),
+                anyList(), eq(0), eq(SessionStatus.CREATED));
+        }
+
+        @Test
+        @DisplayName("创建会话持久化失败时不写 Redis 缓存")
+        void shouldNotCacheSessionWhenPersistenceFails() {
+            when(questionService.getDefaultFollowUpCount()).thenReturn(1);
+            InterviewQuestionDTO question = InterviewQuestionDTO.create(
+                0, "Q1", InterviewQuestionDTO.QuestionType.JAVA_BASIC, "Java基础");
+            when(questionService.generateQuestionsWithSource(anyString(), anyInt(), anyList(), any(), isNull()))
+                .thenReturn(QuestionGenerationResult.ai(List.of(question)));
+            when(persistenceService.saveSession(anyString(), eq(99L), eq(1), anyList(), any()))
+                .thenThrow(new RuntimeException("database unavailable"));
+
+            CreateInterviewRequest request = new CreateInterviewRequest(
+                "resume text", 3, 99L, true, null, null);
+
+            assertThrows(RuntimeException.class, () -> service.createSession(request));
+            verify(sessionCache, never()).saveSession(anyLong(), anyString(), anyString(), anyLong(),
+                anyList(), anyInt(), any());
         }
     }
 
@@ -188,9 +258,20 @@ class InterviewSessionServiceTest {
             service.completeInterview(SESSION_ID);
 
             verify(sessionCache).updateSessionStatus(1L, SESSION_ID, SessionStatus.COMPLETED);
-            verify(persistenceService).updateSessionStatus(eq(SESSION_ID), any());
-            verify(persistenceService).updateEvaluateStatus(SESSION_ID, AsyncTaskStatus.PENDING, null);
+            verify(persistenceService).markCompletedForEvaluation(SESSION_ID);
             verify(evaluateStreamProducer).sendEvaluateTask(1L, SESSION_ID);
         }
+    }
+
+    @Test
+    @DisplayName("完成后的负索引返回已完成，而不是访问负下标")
+    void shouldReturnCompletedWhenCurrentIndexIsNegative() {
+        CachedSession cached = buildSession(-1, SessionStatus.COMPLETED);
+        when(sessionCache.getSession(1L, SESSION_ID)).thenReturn(Optional.of(cached));
+
+        var response = service.getCurrentQuestionResponse(SESSION_ID);
+
+        assertEquals(true, response.get("completed"));
+        verify(sessionCache, never()).updateSessionStatus(anyLong(), anyString(), any());
     }
 }

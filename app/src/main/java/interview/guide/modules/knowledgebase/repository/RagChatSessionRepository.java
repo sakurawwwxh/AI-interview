@@ -1,7 +1,9 @@
 package interview.guide.modules.knowledgebase.repository;
 
+import jakarta.persistence.LockModeType;
 import interview.guide.modules.knowledgebase.model.RagChatSessionEntity;
 import interview.guide.modules.knowledgebase.model.RagChatSessionEntity.SessionStatus;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,16 @@ import java.util.Optional;
 public interface RagChatSessionRepository extends JpaRepository<RagChatSessionEntity, Long> {
 
     Optional<RagChatSessionEntity> findByIdAndUserId(Long id, Long userId);
+
+    /**
+     * 为流式消息写入锁定会话行，串行化消息序号分配和未完成回答检查。
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM RagChatSessionEntity s WHERE s.id = :id AND s.userId = :userId")
+    Optional<RagChatSessionEntity> findByIdAndUserIdForUpdate(
+        @Param("id") Long id,
+        @Param("userId") Long userId
+    );
 
     /**
      * 按更新时间倒序获取所有活跃会话

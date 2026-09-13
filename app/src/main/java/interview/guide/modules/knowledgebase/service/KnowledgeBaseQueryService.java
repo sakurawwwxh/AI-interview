@@ -4,11 +4,13 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.knowledgebase.model.QueryRequest;
 import interview.guide.modules.knowledgebase.model.QueryResponse;
+import interview.guide.common.ai.AiUsageRecorder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 知识库查询服务
@@ -54,6 +57,7 @@ public class KnowledgeBaseQueryService {
     private final KnowledgeBaseVectorService vectorService;
     private final KnowledgeBaseListService listService;
     private final KnowledgeBaseCountService countService;
+    private final AiUsageRecorder usageRecorder;
     private final PromptTemplate systemPromptTemplate;
     private final PromptTemplate userPromptTemplate;
     private final PromptTemplate rewritePromptTemplate;
@@ -70,6 +74,7 @@ public class KnowledgeBaseQueryService {
             KnowledgeBaseVectorService vectorService,
             KnowledgeBaseListService listService,
             KnowledgeBaseCountService countService,
+            AiUsageRecorder usageRecorder,
             @Value("classpath:prompts/knowledgebase-query-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/knowledgebase-query-user.st") Resource userPromptResource,
             @Value("classpath:prompts/knowledgebase-query-rewrite.st") Resource rewritePromptResource,
@@ -84,6 +89,7 @@ public class KnowledgeBaseQueryService {
         this.vectorService = vectorService;
         this.listService = listService;
         this.countService = countService;
+        this.usageRecorder = usageRecorder;
         this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
         this.rewritePromptTemplate = new PromptTemplate(rewritePromptResource.getContentAsString(StandardCharsets.UTF_8));
@@ -119,24 +125,26 @@ public class KnowledgeBaseQueryService {
      * @return AI 回答
      */
     public String answerQuestion(List<Long> knowledgeBaseIds, String question, List<Message> history) {
-        log.info("收到知识库提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, history.size());
+        List<Message> safeHistory = history != null ? history : List.of();
+        log.info("收到知识库提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, safeHistory.size());
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
             return NO_RESULT_RESPONSE;
         }
+        List<Long> ownedKnowledgeBaseIds = listService.requireOwnedKnowledgeBaseIds(knowledgeBaseIds);
 
         // 1. 验证知识库是否存在并更新问题计数
-        countService.updateQuestionCounts(knowledgeBaseIds);
+        countService.updateQuestionCounts(ownedKnowledgeBaseIds);
 
         // 2. Query rewrite + 动态参数检索
         QueryContext queryContext = buildQueryContext(question);
-        List<Document> relevantDocs = retrieveRelevantDocs(queryContext, knowledgeBaseIds);
+        List<Document> relevantDocs = retrieveRelevantDocs(queryContext, ownedKnowledgeBaseIds);
 
         if (!hasEffectiveHit(question, relevantDocs)) {
             return NO_RESULT_RESPONSE;
         }
 
         // 3. 构建上下文（带来源标注 + 长度裁剪）
-        String context = buildContextWithSources(relevantDocs, knowledgeBaseIds);
+        String context = buildContextWithSources(relevantDocs, ownedKnowledgeBaseIds);
 
         log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
 
@@ -144,18 +152,21 @@ public class KnowledgeBaseQueryService {
         String systemPrompt = buildSystemPrompt();
         String userPrompt = buildUserPrompt(context, question);
 
+        usageRecorder.checkQuota();
         try {
             // 5. 调用AI生成回答（注入历史消息）
             var promptBuilder = chatClient.prompt()
                     .system(systemPrompt)
                     .user(userPrompt);
-            if (history != null && !history.isEmpty()) {
-                promptBuilder.messages(history);
+            if (!safeHistory.isEmpty()) {
+                promptBuilder.messages(safeHistory);
             }
-            String answer = promptBuilder.call().content();
+            ChatResponse response = promptBuilder.call().chatResponse();
+            usageRecorder.recordUsage(response, "rag-chat");
+            String answer = extractResponseText(response);
             answer = normalizeAnswer(answer);
 
-            log.info("知识库问答完成: kbIds={}", knowledgeBaseIds);
+            log.info("知识库问答完成: kbIds={}", ownedKnowledgeBaseIds);
             return answer;
 
         } catch (Exception e) {
@@ -253,25 +264,27 @@ public class KnowledgeBaseQueryService {
      * @return 流式响应
      */
     public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question, List<Message> history) {
-        log.info("收到知识库流式提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, history.size());
+        List<Message> safeHistory = history != null ? history : List.of();
+        log.info("收到知识库流式提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, safeHistory.size());
         if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
             return Flux.just(NO_RESULT_RESPONSE);
         }
+        List<Long> ownedKnowledgeBaseIds = listService.requireOwnedKnowledgeBaseIds(knowledgeBaseIds);
 
         try {
             // 1. 验证知识库是否存在并更新问题计数
-            countService.updateQuestionCounts(knowledgeBaseIds);
+            countService.updateQuestionCounts(ownedKnowledgeBaseIds);
 
             // 2. Query rewrite + 动态参数检索
             QueryContext queryContext = buildQueryContext(question);
-            List<Document> relevantDocs = retrieveRelevantDocs(queryContext, knowledgeBaseIds);
+            List<Document> relevantDocs = retrieveRelevantDocs(queryContext, ownedKnowledgeBaseIds);
 
             if (!hasEffectiveHit(question, relevantDocs)) {
                 return Flux.just(NO_RESULT_RESPONSE);
             }
 
             // 3. 构建上下文（带来源标注 + 长度裁剪）
-            String context = buildContextWithSources(relevantDocs, knowledgeBaseIds);
+            String context = buildContextWithSources(relevantDocs, ownedKnowledgeBaseIds);
 
             log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
 
@@ -279,20 +292,30 @@ public class KnowledgeBaseQueryService {
             String systemPrompt = buildSystemPrompt();
             String userPrompt = buildUserPrompt(context, question);
 
+            usageRecorder.checkQuota();
             // 5. 流式调用（注入历史消息）+ 探测窗口归一化
             var promptBuilder = chatClient.prompt()
                     .system(systemPrompt)
                     .user(userPrompt);
-            if (history != null && !history.isEmpty()) {
-                promptBuilder.messages(history);
+            if (!safeHistory.isEmpty()) {
+                promptBuilder.messages(safeHistory);
             }
-            Flux<String> responseFlux = promptBuilder.stream().content();
+            AtomicReference<ChatResponse> responseWithUsage = new AtomicReference<>();
+            Flux<String> responseFlux = promptBuilder.stream()
+                .chatResponse()
+                .doOnNext(response -> {
+                    if (hasUsage(response)) {
+                        responseWithUsage.set(response);
+                    }
+                })
+                .map(this::extractResponseText)
+                .doFinally(signal -> usageRecorder.recordUsage(responseWithUsage.get(), "rag-chat-stream"));
 
-            log.info("开始流式输出知识库回答(探测窗口): kbIds={}", knowledgeBaseIds);
+            log.info("开始流式输出知识库回答(探测窗口): kbIds={}", ownedKnowledgeBaseIds);
             return normalizeStreamOutput(responseFlux)
-                .doOnComplete(() -> log.info("流式输出完成: kbIds={}", knowledgeBaseIds))
+                .doOnComplete(() -> log.info("流式输出完成: kbIds={}", ownedKnowledgeBaseIds))
                 .onErrorResume(e -> {
-                    log.error("流式输出失败: kbIds={}, error={}", knowledgeBaseIds, e.getMessage(), e);
+                    log.error("流式输出失败: kbIds={}, error={}", ownedKnowledgeBaseIds, e.getMessage(), e);
                     return Flux.just(ERROR_RESPONSE);
                 });
 
@@ -351,14 +374,18 @@ public class KnowledgeBaseQueryService {
         if (!rewriteEnabled || question.isBlank()) {
             return question;
         }
+        // 配额异常必须在兜底 try/catch 外抛出，不能因为改写失败而绕过配额限制。
+        usageRecorder.checkQuota();
         try {
             Map<String, Object> variables = new HashMap<>();
             variables.put("question", question);
             String rewritePrompt = rewritePromptTemplate.render(variables);
-            String rewritten = chatClient.prompt()
+            ChatResponse response = chatClient.prompt()
                 .user(rewritePrompt)
                 .call()
-                .content();
+                .chatResponse();
+            usageRecorder.recordUsage(response, "rag-query-rewrite");
+            String rewritten = extractResponseText(response);
             if (rewritten == null || rewritten.isBlank()) {
                 return question;
             }
@@ -369,6 +396,20 @@ public class KnowledgeBaseQueryService {
             log.warn("Query rewrite 失败，使用原问题继续检索: {}", e.getMessage());
             return question;
         }
+    }
+
+    private boolean hasUsage(ChatResponse response) {
+        return response != null
+            && response.getMetadata() != null
+            && response.getMetadata().getUsage() != null;
+    }
+
+    private String extractResponseText(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        String text = response.getResult().getOutput().getText();
+        return text == null ? "" : text;
     }
 
     /**

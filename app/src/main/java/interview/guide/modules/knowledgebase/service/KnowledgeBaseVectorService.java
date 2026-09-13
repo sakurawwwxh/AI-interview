@@ -32,7 +32,7 @@ public class KnowledgeBaseVectorService {
     public KnowledgeBaseVectorService(VectorStore vectorStore, VectorRepository vectorRepository) {
         this.vectorStore = vectorStore;
         this.vectorRepository = vectorRepository;
-        // 使用TokenTextSplitter，每个chunk约500 tokens，重叠50 tokens
+        // 使用Spring AI TokenTextSplitter默认配置（每个chunk约800 tokens，无chunk重叠）
         this.textSplitter = new TokenTextSplitter();
     }
     /**
