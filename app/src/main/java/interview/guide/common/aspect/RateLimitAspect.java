@@ -21,12 +21,15 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
  * 限流 AOP 切面
- * 基于滑动时间窗口实现的多维度原子限流
+ * 基于滑动时间窗口 / 令牌桶实现的多维度原子限流
+ * 根据 {@link RateLimit#strategy()} 选择对应算法的 Lua 脚本执行
  */
 @Slf4j
 @Aspect
@@ -37,18 +40,31 @@ public class RateLimitAspect {
     private final RedissonClient redissonClient;
 
     /**
-     * Lua 脚本缓存
+     * 滑动窗口 Lua 脚本
      */
-    private static String LUA_SCRIPT;
-    private String luaScriptSha;
+    private static String SLIDING_WINDOW_SCRIPT;
+    /**
+     * 令牌桶 Lua 脚本
+     */
+    private static String TOKEN_BUCKET_SCRIPT;
+
+    /**
+     * 各策略脚本预加载后的 SHA1 缓存
+     */
+    private final Map<RateLimit.Strategy, String> scriptShaCache = new EnumMap<>(RateLimit.Strategy.class);
 
     static {
         try {
-            ClassPathResource resource = new ClassPathResource("scripts/rate_limit.lua");
-            LUA_SCRIPT = new String(resource.getContentAsByteArray(), StandardCharsets.UTF_8);
+            SLIDING_WINDOW_SCRIPT = loadScript("scripts/rate_limit.lua");
+            TOKEN_BUCKET_SCRIPT = loadScript("scripts/token_bucket.lua");
         } catch (IOException e) {
             throw new RuntimeException("加载限流 Lua 脚本失败", e);
         }
+    }
+
+    private static String loadScript(String path) throws IOException {
+        ClassPathResource resource = new ClassPathResource(path);
+        return new String(resource.getContentAsByteArray(), StandardCharsets.UTF_8);
     }
 
     /**
@@ -56,8 +72,12 @@ public class RateLimitAspect {
      */
     @jakarta.annotation.PostConstruct
     public void init() {
-        this.luaScriptSha = redissonClient.getScript(StringCodec.INSTANCE).scriptLoad(LUA_SCRIPT);
-        log.info("限流 Lua 脚本加载完成, SHA1: {}", luaScriptSha);
+        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+        scriptShaCache.put(RateLimit.Strategy.SLIDING_WINDOW,
+                script.scriptLoad(SLIDING_WINDOW_SCRIPT));
+        scriptShaCache.put(RateLimit.Strategy.TOKEN_BUCKET,
+                script.scriptLoad(TOKEN_BUCKET_SCRIPT));
+        log.info("限流 Lua 脚本加载完成, SHA1: {}", scriptShaCache);
     }
 
     /**
@@ -76,23 +96,27 @@ public class RateLimitAspect {
         // 2. 根据配置维度动态生成 Redis Keys
         List<String> keys = generateKeys(className, methodName, rateLimit.dimensions());
 
-        // 3. 调用 Lua 脚本执行原子限流
+        // 3. 根据限流策略选择对应的 Lua 脚本执行原子限流
         // 使用 StringCodec 确保参数正确传递为字符串
         RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+        String scriptSha = scriptShaCache.get(rateLimit.strategy());
+        if (scriptSha == null) {
+            throw new IllegalStateException("限流脚本未加载: " + rateLimit.strategy());
+        }
 
-        // 准备参数
+        // 准备参数（两种策略脚本共用同一签名）
         List<Object> keysList = new ArrayList<>(keys);
         Object[] args = {
                 String.valueOf(System.currentTimeMillis()), // ARGV[1]: 当前时间戳
                 String.valueOf(1),                          // ARGV[2]: 申请令牌数（默认1个）
                 String.valueOf(intervalMs),                 // ARGV[3]: 时间窗口
-                String.valueOf(rateLimit.count()),          // ARGV[4]: 最大令牌数
+                String.valueOf(rateLimit.count()),          // ARGV[4]: 最大令牌数/桶容量
                 UUID.randomUUID().toString()               // ARGV[5]: 请求唯一标识
         };
 
         Object resultObj = script.evalSha(
                 RScript.Mode.READ_WRITE,
-                luaScriptSha,
+                scriptSha,
                 RScript.ReturnType.VALUE,
                 keysList,
                 args

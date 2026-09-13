@@ -25,6 +25,7 @@ class RateLimitScriptTest {
                 RateLimit.class.getAnnotation(Target.class).value());
         assertEquals(3, RateLimit.Dimension.values().length);
         assertEquals(5, RateLimit.TimeUnit.values().length);
+        assertEquals(2, RateLimit.Strategy.values().length);
     }
 
     @Test
@@ -37,6 +38,7 @@ class RateLimitScriptTest {
         assertEquals(1, ann.interval());
         assertEquals(RateLimit.TimeUnit.SECONDS, ann.timeUnit());
         assertEquals("", ann.fallback());
+        assertEquals(RateLimit.Strategy.SLIDING_WINDOW, ann.strategy());
     }
 
     @Test
@@ -52,6 +54,17 @@ class RateLimitScriptTest {
         assertEquals(3, ann.dimensions().length);
     }
 
+    @Test
+    @DisplayName("验证令牌桶策略配置")
+    void testTokenBucketStrategy() throws NoSuchMethodException {
+        RateLimit ann = TestClass.class.getMethod("tokenBucketMethod").getAnnotation(RateLimit.class);
+
+        assertEquals(RateLimit.Strategy.TOKEN_BUCKET, ann.strategy());
+        assertEquals(10.0, ann.count(), 0.001);
+        assertArrayEquals(new RateLimit.Dimension[]{RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP},
+                ann.dimensions());
+    }
+
     static class TestClass {
         @RateLimit(count = 10)
         public void defaultMethod() {}
@@ -59,5 +72,9 @@ class RateLimitScriptTest {
         @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP, RateLimit.Dimension.USER},
                 count = 100, interval = 2, timeout = 2, timeUnit = RateLimit.TimeUnit.SECONDS, fallback = "fallback")
         public void customMethod() {}
+
+        @RateLimit(dimensions = {RateLimit.Dimension.GLOBAL, RateLimit.Dimension.IP},
+                count = 10, strategy = RateLimit.Strategy.TOKEN_BUCKET)
+        public void tokenBucketMethod() {}
     }
 }

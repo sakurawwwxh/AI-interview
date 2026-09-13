@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
+import org.redisson.api.RMap;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
@@ -40,11 +41,15 @@ class RateLimitIntegrationTest {
 
     private RedissonClient redissonClient;
     private String luaScript;
+    private String tokenBucketScript;
 
     @BeforeEach
     void setUp() throws Exception {
         ClassPathResource resource = new ClassPathResource("scripts/rate_limit.lua");
         luaScript = new String(resource.getContentAsByteArray(), StandardCharsets.UTF_8);
+
+        ClassPathResource tokenBucketResource = new ClassPathResource("scripts/token_bucket.lua");
+        tokenBucketScript = new String(tokenBucketResource.getContentAsByteArray(), StandardCharsets.UTF_8);
 
         Config config = new Config();
         config.useSingleServer()
@@ -90,6 +95,65 @@ class RateLimitIntegrationTest {
         // 第一次成功，第二次被维度2限制
         assertEquals(1L, executeLuaScript(List.of(key1, key2), maxCount));
         assertEquals(0L, executeLuaScript(List.of(key1, key2), maxCount));
+    }
+
+    @Test
+    @DisplayName("验证令牌桶限流：突发耗尽后拒绝，按速率恢复")
+    void testTokenBucket() {
+        String key = "ratelimit:test:tb";
+        long capacity = 2;
+
+        // 首次访问由脚本初始化为满桶（capacity 个令牌）
+        // 前两次请求应成功（突发消耗）
+        assertEquals(1L, executeTokenBucketScript(List.of(key), capacity));
+        assertEquals(1L, executeTokenBucketScript(List.of(key), capacity));
+
+        // 第三次请求令牌耗尽应被拒绝
+        assertEquals(0L, executeTokenBucketScript(List.of(key), capacity));
+    }
+
+    @Test
+    @DisplayName("验证令牌桶多维度限流：任一维度令牌不足即拒绝")
+    void testTokenBucketMultiDimension() {
+        String key1 = "ratelimit:test:tbm1";
+        String key2 = "ratelimit:test:tbm2";
+        long capacity = 10;
+
+        // 维度1 满桶（由脚本首次访问初始化），维度2 只剩 1 个令牌
+        RMap<String, String> dim2 = redissonClient.getMap(key2, StringCodec.INSTANCE);
+        dim2.put("tokens", "1");
+        dim2.put("ts", String.valueOf(System.currentTimeMillis()));
+
+        // 第一次成功，第二次被维度2限制
+        assertEquals(1L, executeTokenBucketScript(List.of(key1, key2), capacity));
+        assertEquals(0L, executeTokenBucketScript(List.of(key1, key2), capacity));
+    }
+
+    private Object executeTokenBucketScript(List<String> keys, long capacity) {
+        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+
+        Object[] args = {
+                String.valueOf(System.currentTimeMillis()),
+                String.valueOf(1),
+                String.valueOf(1000),
+                String.valueOf(capacity),
+                java.util.UUID.randomUUID().toString()
+        };
+
+        Object result = script.eval(
+                RScript.Mode.READ_WRITE,
+                tokenBucketScript,
+                RScript.ReturnType.VALUE,
+                new ArrayList<>(keys),
+                args
+        );
+
+        if (result instanceof Number) {
+            return ((Number) result).longValue();
+        } else if (result instanceof String) {
+            return Long.parseLong((String) result);
+        }
+        return result;
     }
 
     private Object executeLuaScript(String key, long maxCount) {

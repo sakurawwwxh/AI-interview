@@ -36,6 +36,30 @@ public @interface RateLimit {
     }
 
     /**
+     * 限流策略枚举
+     */
+    enum Strategy {
+        /**
+         * 滑动时间窗口：统计窗口内的请求数，随窗口滑动回收配额，严格控制窗口内总量
+         * 适合上传、提交等写操作场景
+         */
+        SLIDING_WINDOW,
+        /**
+         * 令牌桶：按固定速率补充令牌，桶满时可承受突发流量
+         * 适合查询类接口的平滑限流
+         */
+        TOKEN_BUCKET
+    }
+
+    /**
+     * 限流策略
+     * 默认滑动时间窗口
+     *
+     * @return 限流策略
+     */
+    Strategy strategy() default Strategy.SLIDING_WINDOW;
+
+    /**
      * 限流维度配置
      * 支持多维度组合，只有所有维度都满足条件时才允许请求通过
      * 例如：{Dimension.GLOBAL, Dimension.USER} 表示同时进行全局限流和用户级限流
