@@ -54,6 +54,58 @@ AI-Interview（本仓库 `interview-guide`）是一个面向求职训练的智�
 └────────────┘ └────────────┘ └────────────┘
 ```
 
+## 技术设计亮点
+
+### 1. 异步任务框架(Redis Stream + Java 21 虚拟线程)
+
+- **模板方法抽象** [`AbstractStreamConsumer`](app/src/main/java/interview/guide/common/async/AbstractStreamConsumer.java):
+  子类只实现业务方法,框架统一处理消费组、ACK、失败重试(重新 XADD 入队 + ACK 原消息)、毒消息丢弃
+- **并发消费**:消费循环单平台线程阻塞读(XREADGROUP),每条消息提交独立虚拟线程处理,
+  `Semaphore` 限制并发形成背压,天然适配 AI 调用这类 I/O 密集场景
+- **宕机恢复** [`StreamPendingMessageReclaimer`](app/src/main/java/interview/guide/common/async/StreamPendingMessageReclaimer.java):
+  每 30s 用 `XAUTOCLAIM` 回收 idle 超 60s 的 PEL 滞留消息,消费者崩溃不丢任务;
+  in-flight 集合去重防止回收与正常消费重复分发
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API(提交接口)
+    participant R as Redis Stream
+    participant W as 消费者(虚拟线程)
+    participant AI as LLM
+    C->>A: POST /api/resumes/upload
+    A->>A: Tika 解析 + S3 上传 + 落库 PENDING
+    A->>R: XADD resume:analyze:stream
+    A-->>C: 200 任务ID(百毫秒级)
+    R->>W: XREADGROUP(never-delivered)
+    W->>AI: 简历分析(十几秒)
+    AI-->>W: 分析结果
+    W->>W: 落库 COMPLETED + XACK
+    C->>A: 轮询任务状态
+    A-->>C: COMPLETED → 获取报告
+```
+
+### 2. 分布式限流组件(Redis + Lua,双策略)
+
+- **滑动窗口**(ZSET + 过期配额回收)与**令牌桶**(HASH 惰性补币)两种算法,
+  [`@RateLimit.strategy`](app/src/main/java/interview/guide/common/annotation/RateLimit.java) 切换
+- 多维度 GLOBAL/IP/USER **两阶段原子执行**:先全维度预检查再统一扣减,杜绝部分扣减
+- Hash Tag `{类名:方法名}` 适配 Redis Cluster 同槽;`scriptLoad` 预加载 + `evalSha`;
+  支持 fallback 降级方法
+
+### 3. RAG 反幻觉链路
+
+- pgvector HNSW + 余弦距离;`FilterExpression` 前置过滤(失败降级为 topK×3 本地过滤)
+- Query Rewrite 改写检索问句(失败回退原问题);按查询长度分档的动态检索参数矩阵
+  (短查询高 topK + 低阈值 + 原文包含确认)
+- 生成侧:context 截断 + 来源标注、流式输出 120 字符拒答探测窗、固化拒答话术
+
+### 4. 其他工程化
+
+- **BYOK**:用户自带模型 Key,AES-256-GCM 加密落库,按用户构建 ChatClient
+- **AI 配额**:Redis 原子计数实现用户级日 token 限额,配额校验前置
+- **SSE 生命周期**:心跳保活、客户端取消/异常时落库半截回答
+
 ## 技术栈
 
 ### 后端
@@ -171,7 +223,7 @@ interview-guide/
 | pnpm | 10+ | 前端包管理 |
 | PostgreSQL | 14+（建议 16） | 需安装 `vector` 扩展 |
 | Redis | 6+ | 缓存与 Stream |
-| S3 兼容存储 | - | 如 MinIO |
+| S3 兼容存储 | - | 如 MinIO / RustFS(任意 S3 协议兼容实现) |
 
 ## 快速开始
 
