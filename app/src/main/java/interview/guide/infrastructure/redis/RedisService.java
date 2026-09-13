@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.*;
 import org.redisson.api.options.KeysScanOptions;
+import org.redisson.api.stream.AutoClaimResult;
 import org.redisson.api.stream.StreamAddArgs;
 import org.redisson.api.stream.StreamCreateGroupArgs;
 import org.redisson.api.stream.StreamMessageId;
@@ -307,6 +308,29 @@ public class RedisService {
     public void streamAck(String streamKey, String groupName, StreamMessageId... ids) {
         RStream<String, String> stream = redissonClient.getStream(streamKey, StringCodec.INSTANCE);
         stream.ack(groupName, ids);
+    }
+
+    /**
+     * 自动认领 PEL 中空闲超过指定时长的消息（XAUTOCLAIM）
+     * 用于消费者宕机/重启后回收已投递但未 ACK 的滞留消息，认领到的消息交付给指定消费者处理
+     *
+     * @param streamKey    Stream 键
+     * @param groupName    消费者组名
+     * @param consumerName 认领消息的目标消费者名
+     * @param idleTimeMs   消息最小空闲时长（毫秒），仅回收空闲超过该时长的消息
+     * @param startId      扫描起始消息 ID
+     * @param count        单次最多认领数量
+     * @return 认领结果（消息体 + 下次扫描游标 + 已被删除的消息 ID）
+     */
+    public AutoClaimResult<String, String> streamAutoClaim(
+            String streamKey,
+            String groupName,
+            String consumerName,
+            long idleTimeMs,
+            StreamMessageId startId,
+            int count) {
+        RStream<String, String> stream = redissonClient.getStream(streamKey, StringCodec.INSTANCE);
+        return stream.autoClaim(groupName, consumerName, idleTimeMs, TimeUnit.MILLISECONDS, startId, count);
     }
 
     /**

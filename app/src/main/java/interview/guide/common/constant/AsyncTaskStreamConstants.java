@@ -45,9 +45,27 @@ public final class AsyncTaskStreamConstants {
     public static final long POLL_INTERVAL_MS = 1000;
 
     /**
+     * 消费者默认最大并发数（同时处理的任务数上限，虚拟线程并发消费时控制对 AI 接口/DB 的压力）
+     */
+    public static final int DEFAULT_MAX_CONCURRENCY = 8;
+
+    /**
      * Stream 最大长度（自动裁剪旧消息，防止无限增长）
      */
     public static final int STREAM_MAX_LEN = 1000;
+
+    // ========== PEL 滞留消息回收配置 ==========
+
+    /**
+     * PEL 消息回收的 idle 阈值（毫秒）
+     * 已投递但未 ACK 的消息空闲超过该时长，视为原消费者已宕机/失联，可被回收重新处理
+     */
+    public static final long PENDING_IDLE_THRESHOLD_MS = 60_000L;
+
+    /**
+     * 单次 PEL 回收最多扫描的轮数（XAUTOCLAIM 游标推进上限，防止游标异常导致死循环）
+     */
+    public static final int PENDING_RECLAIM_MAX_ROUNDS = 10;
 
     // ========== 知识库向量化 Stream 配置 ==========
 
