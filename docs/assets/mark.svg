@@ -9,9 +9,9 @@
     </linearGradient>
   </defs>
   <g transform="translate(48 48)"><g>
-    <animateTransform attributeName="transform" type="scale" values="0.8;1.02" dur="2.8s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="scale" values="0.78;1.02" dur="2.8s" repeatCount="indefinite"/>
     <g transform="translate(-48 -48)">
-      <circle cx="48" cy="48" r="46" fill="none" stroke="#a78bfa" stroke-width="2.2">
+      <circle cx="48" cy="48" r="46" fill="none" stroke="#e0dbff" stroke-width="3.4">
         <animate attributeName="opacity" values="0.95;0" dur="2.8s" repeatCount="indefinite"/>
       </circle>
     </g>
