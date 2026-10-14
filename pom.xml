@@ -55,7 +55,10 @@
         <aws-sdk.version>2.29.51</aws-sdk.version>
         <itext.version>8.0.5</itext.version>
         <pinyin4j.version>2.5.0</pinyin4j.version>
-        <junit-jupiter.version>5.12.0</junit-jupiter.version>
+        <!-- junit-jupiter.version 交由 spring-boot-dependencies 管理（4.0.1 -> 6.0.1）。
+             覆盖为 5.12.0 会让 spring-boot-starter-test 拉入的 JUnit 6 平台与 5.12 的 api 混用，
+             Spring Test 7 调用 Store.computeIfAbsent(5.13+) 抛 NoSuchMethodError，
+             所有 @SpringBootTest 都无法启动。 -->
     </properties>
 
     <!-- 依赖管理（子模块继承） -->
