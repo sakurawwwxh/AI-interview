@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "corpus": [
+    "docs/knowledge-base/database.md",
+    "docs/knowledge-base/java-basics.md",
+    "docs/knowledge-base/spring-boot.md",
+    "docs/knowledge-base/system-design.md"
+  ],
+  "topK": 8,
+  "minScore": 0.28,
+  "cases": [
+    {
+      "name": "mvcc-原理",
+      "question": "数据库的 MVCC 是怎么实现的？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["MVCC 原理"]
+    },
+    {
+      "name": "索引失效场景",
+      "question": "什么情况下索引会失效？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["索引失效的场景"]
+    },
+    {
+      "name": "事务隔离级别",
+      "question": "事务的隔离级别都有哪些？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["事务隔离级别"]
+    },
+    {
+      "name": "分库分表",
+      "question": "数据量大到什么时候该做分库分表？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["分库分表策略"]
+    },
+    {
+      "name": "redis-持久化",
+      "question": "Redis 的持久化机制是怎样的，RDB 和 AOF 怎么选？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["持久化"]
+    },
+    {
+      "name": "redis-缓存问题",
+      "question": "缓存穿透、击穿、雪崩分别是什么，怎么解决？",
+      "expectedDoc": "docs/knowledge-base/database.md",
+      "expectedMarkers": ["缓存问题"]
+    },
+    {
+      "name": "springboot-自动配置",
+      "question": "Spring Boot 的自动配置是怎么生效的？",
+      "expectedDoc": "docs/knowledge-base/spring-boot.md",
+      "expectedMarkers": ["自动配置原理"]
+    },
+    {
+      "name": "springboot-bean生命周期",
+      "question": "Spring 里一个 Bean 从创建到销毁经历了哪些阶段？",
+      "expectedDoc": "docs/knowledge-base/spring-boot.md",
+      "expectedMarkers": ["Bean 的生命周期"]
+    },
+    {
+      "name": "springboot-配置加载顺序",
+      "question": "多个配置文件同时存在时，优先级是怎么定的？",
+      "expectedDoc": "docs/knowledge-base/spring-boot.md",
+      "expectedMarkers": ["配置文件加载顺序"]
+    },
+    {
+      "name": "spring-ioc",
+      "question": "什么是 IoC，依赖注入又有哪几种方式？",
+      "expectedDoc": "docs/knowledge-base/spring-boot.md",
+      "expectedMarkers": ["什么是 IoC"]
+    },
+    {
+      "name": "高并发设计",
+      "question": "一个高并发系统应该从哪些方面去设计？",
+      "expectedDoc": "docs/knowledge-base/system-design.md",
+      "expectedMarkers": ["高并发"]
+    },
+    {
+      "name": "缓存策略",
+      "question": "系统设计时缓存应该怎么用？",
+      "expectedDoc": "docs/knowledge-base/system-design.md",
+      "expectedMarkers": ["缓存策略"]
+    },
+    {
+      "name": "消息队列场景",
+      "question": "消息队列适合用在什么场景？",
+      "expectedDoc": "docs/knowledge-base/system-design.md",
+      "expectedMarkers": ["消息队列的使用场景"]
+    },
+    {
+      "name": "分布式事务",
+      "question": "跨服务的分布式事务一般有哪些解决方案？",
+      "expectedDoc": "docs/knowledge-base/system-design.md",
+      "expectedMarkers": ["分布式事务解决方案"]
+    },
+    {
+      "name": "秒杀设计",
+      "question": "如果让你设计一个秒杀系统，你会怎么做？",
+      "expectedDoc": "docs/knowledge-base/system-design.md",
+      "expectedMarkers": ["设计一个秒杀系统"]
+    }
+  ]
+}

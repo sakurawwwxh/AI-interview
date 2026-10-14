@@ -22,3 +22,6 @@ qodana.yaml
 app/src/main/resources/application-dev.yml
 app/src/main/resources/application.yml
 /docs
+
+# RAG 评估的观测数据：内容为语料分块正文，随语料一起留在本地
+/evals/retrieval-golden/observed/

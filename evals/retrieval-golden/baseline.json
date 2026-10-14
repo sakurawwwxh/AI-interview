@@ -1,0 +1,9 @@
+{
+  "recordedAt" : "2026-10-14T08:48:16.783651200Z",
+  "topK" : 8,
+  "minScore" : 0.28,
+  "total" : 15,
+  "observed" : 15,
+  "hitRate" : 0.9333,
+  "mrr" : 0.8
+}
