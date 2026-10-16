@@ -58,9 +58,17 @@ public final class AsyncTaskStreamConstants {
 
     /**
      * PEL 消息回收的 idle 阈值（毫秒）
-     * 已投递但未 ACK 的消息空闲超过该时长，视为原消费者已宕机/失联，可被回收重新处理
+     * 已投递但未 ACK 的消息空闲超过该时长，视为原消费者已宕机/失联，可被回收重新处理。
+     *
+     * <p><b>必须大于最长任务的处理时长</b>：本项目的任务是「答完一场面试后评估」这类 AI 批量调用，
+     * 正常要跑几十秒到几分钟。阈值若小于它，多实例部署时正在处理的消息会被别的实例按 idle
+     * 认领走并重跑一遍（重复消耗模型配额、重复写结果），而 {@code inFlightMessages} 只挡得住
+     * 同一实例内的重复分发。这里取 5 分钟留出余量。
+     *
+     * <p>唯一的代价是实例崩溃后，滞留在 PEL 里的消息要等这么久才会被回收；正常重试不受影响
+     * （重试是把消息重新入队的新消息，立刻会被读到）。
      */
-    public static final long PENDING_IDLE_THRESHOLD_MS = 60_000L;
+    public static final long PENDING_IDLE_THRESHOLD_MS = 300_000L;
 
     /**
      * 单次 PEL 回收最多扫描的轮数（XAUTOCLAIM 游标推进上限，防止游标异常导致死循环）
