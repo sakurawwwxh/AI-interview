@@ -39,6 +39,12 @@ export default function KnowledgeBaseUploadPage({ onUploadComplete, onBack }: Kn
       showNameInput={true}
       nameLabel="知识库名称（可选）"
       namePlaceholder="留空则使用文件名"
+      steps={[
+        ['01', '上传文档', '原文保存到对象存储'],
+        ['02', '切片与向量化', '按语义分块并写入向量索引'],
+        ['03', '开始问答', '在知识问答里带来源检索作答'],
+      ]}
+      footnote="文件仅用于知识库检索与问答，不会用于其它用途。上传成功后可在知识库管理中继续维护。"
       error={error}
       onUpload={handleUpload}
       onBack={onBack}

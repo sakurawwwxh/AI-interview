@@ -260,7 +260,7 @@ function InterviewItemCard({
       <motion.button
         onClick={(e) => { e.stopPropagation(); onExport(); }}
         disabled={exporting}
-        className="px-3 py-2 text-slate-400 hover:text-primary-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-all"
+        className="px-3 py-2 text-slate-400 hover:text-primary-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
@@ -288,7 +288,7 @@ function InterviewItemCard({
 
       {/* 箭头 */}
       <ChevronRight
-          className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-all flex-shrink-0"/>
+          className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 group-hover:translate-x-1 transition-[color,transform] flex-shrink-0"/>
     </motion.div>
   );
 }

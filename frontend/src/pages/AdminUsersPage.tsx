@@ -145,6 +145,8 @@ export default function AdminUsersPage() {
       ) : (
         <>
           <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            {/* 窄屏下表格比容器宽：外层保留圆角裁切，这里负责横向滚动，否则「操作」列不可达 */}
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500 dark:border-slate-700">
@@ -216,6 +218,7 @@ export default function AdminUsersPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {page.total > page.size && (

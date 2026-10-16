@@ -416,6 +416,8 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
             </button>
           </div>
         ) : (
+          /* 窄屏下表格比容器宽：外层保留圆角裁切，这里负责横向滚动，否则「操作」列不可达 */
+          <div className="overflow-x-auto">
           <table className="w-full">
               <thead className="bg-slate-50 dark:bg-slate-700 border-b border-slate-100 dark:border-slate-600">
               <tr>
@@ -595,6 +597,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

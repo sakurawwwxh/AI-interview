@@ -7,6 +7,23 @@ import { adminApi, type UserListItem } from '../api/admin';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useAuthStore } from '../stores/authStore';
 
+/**
+ * 同步失败时后端会存下原始 Java 异常（含内网 IP:端口、英文堆栈片段），
+ * 直接展示既难读也暴露内网信息。这里做一次可读化映射并隐藏地址。
+ */
+function formatSyncError(raw?: string | null): string {
+  if (!raw) {
+    return '—';
+  }
+  const masked = raw.replace(/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g, '（内网地址已隐藏）');
+  const summary = /timed out|timeout/i.test(raw) ? '连接超时'
+    : /UnknownHost|Name or service not known/i.test(raw) ? '域名解析失败'
+      : /401|403|Unauthorized|Forbidden/i.test(raw) ? '鉴权失败（请检查 Dify API Key）'
+        : '';
+  const body = masked.length > 180 ? `${masked.slice(0, 180)}…` : masked;
+  return summary ? `${summary}：${body}` : body;
+}
+
 const statusMeta: Record<DifySyncStatus, { label: string; className: string }> = {
   SYNCED: { label: '已同步', className: 'bg-emerald-500/10 text-emerald-700 ring-emerald-600/15 dark:text-emerald-300' },
   SUCCESS: { label: '成功', className: 'bg-emerald-500/10 text-emerald-700 ring-emerald-600/15 dark:text-emerald-300' },
@@ -232,7 +249,7 @@ export default function DifyManagementPage() {
             <table className="w-full min-w-[940px] text-left text-sm">
               <thead className="bg-[var(--shell-hover)]/60 text-xs text-[var(--shell-muted)]"><tr><th className="px-5 py-3 font-medium sm:px-6">知识库</th><th className="px-5 py-3 font-medium">本地归属</th><th className="px-5 py-3 font-medium">状态</th><th className="px-5 py-3 font-medium">最近同步</th><th className="px-5 py-3 font-medium">异常信息</th><th className="px-5 py-3 text-right font-medium sm:px-6">操作</th></tr></thead>
               <tbody className="divide-y divide-[var(--shell-border)]">
-                {statuses.map((item) => <tr key={item.knowledgeBaseId} className="align-top"><td className="px-5 py-4 font-medium text-[var(--shell-text)] sm:px-6"><p>{item.name}</p><p className="mt-1 text-xs font-normal text-[var(--shell-subtle)]">ID #{item.knowledgeBaseId}</p></td><td className="px-5 py-4"><div className="inline-flex items-center gap-1.5 text-xs text-[var(--shell-muted)]"><UserRound className="h-3.5 w-3.5" aria-hidden />{item.ownerUsername || '未归属'}</div></td><td className="px-5 py-4"><StatusBadge status={item.syncStatus} /></td><td className="whitespace-nowrap px-5 py-4 text-xs text-[var(--shell-muted)]">{formatTime(item.lastSyncTime)}</td><td className="max-w-56 px-5 py-4 text-xs leading-5 text-red-700 dark:text-red-300">{item.errorMessage || '—'}</td><td className="px-5 py-4 sm:px-6"><div className="flex justify-end gap-2"><button type="button" onClick={() => syncKnowledgeBase(item)} disabled={syncingKnowledgeBaseId !== null} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs">{syncingKnowledgeBaseId === item.knowledgeBaseId ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <RotateCw className="h-3.5 w-3.5" aria-hidden />}{item.syncStatus === 'FAILED' ? '重试同步' : '推送 Dify'}</button><button type="button" onClick={() => openOwnerDialog(item)} disabled={syncingKnowledgeBaseId !== null} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs"><ArrowRightLeft className="h-3.5 w-3.5" aria-hidden />转交</button><button type="button" onClick={() => setSelectedLogKnowledgeBaseId(item.knowledgeBaseId)} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs">记录</button></div></td></tr>)}
+                {statuses.map((item) => <tr key={item.knowledgeBaseId} className="align-top"><td className="px-5 py-4 font-medium text-[var(--shell-text)] sm:px-6"><p>{item.name}</p><p className="mt-1 text-xs font-normal text-[var(--shell-subtle)]">ID #{item.knowledgeBaseId}</p></td><td className="px-5 py-4"><div className="inline-flex items-center gap-1.5 text-xs text-[var(--shell-muted)]"><UserRound className="h-3.5 w-3.5" aria-hidden />{item.ownerUsername || '未归属'}</div></td><td className="px-5 py-4"><StatusBadge status={item.syncStatus} /></td><td className="whitespace-nowrap px-5 py-4 text-xs text-[var(--shell-muted)]">{formatTime(item.lastSyncTime)}</td><td className="max-w-56 px-5 py-4 text-xs leading-5 text-red-700 dark:text-red-300">{formatSyncError(item.errorMessage)}</td><td className="px-5 py-4 sm:px-6"><div className="flex justify-end gap-2"><button type="button" onClick={() => syncKnowledgeBase(item)} disabled={syncingKnowledgeBaseId !== null} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs">{syncingKnowledgeBaseId === item.knowledgeBaseId ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <RotateCw className="h-3.5 w-3.5" aria-hidden />}{item.syncStatus === 'FAILED' ? '重试同步' : '推送 Dify'}</button><button type="button" onClick={() => openOwnerDialog(item)} disabled={syncingKnowledgeBaseId !== null} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs"><ArrowRightLeft className="h-3.5 w-3.5" aria-hidden />转交</button><button type="button" onClick={() => setSelectedLogKnowledgeBaseId(item.knowledgeBaseId)} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs">记录</button></div></td></tr>)}
               </tbody>
             </table>
           </div>
@@ -242,7 +259,7 @@ export default function DifyManagementPage() {
       <section className="ui-panel overflow-hidden" aria-labelledby="dify-log-title">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--shell-border)] px-5 py-4 sm:px-6"><div><h2 id="dify-log-title" className="font-semibold text-[var(--shell-text)]">最近同步记录</h2>{selectedLogKnowledgeBase && <p className="mt-1 text-sm text-[var(--shell-muted)]">仅显示「{selectedLogKnowledgeBase.name}」的记录</p>}</div>{selectedLogKnowledgeBaseId !== null && <button type="button" onClick={() => setSelectedLogKnowledgeBaseId(null)} className="ui-btn-secondary !min-h-8 !px-2.5 !py-1 !text-xs">查看全部</button>}</div>
         {logs.length === 0 && !loading ? <p className="px-6 py-10 text-center text-sm text-[var(--shell-muted)]">暂无同步记录</p> : (
-          <div className="divide-y divide-[var(--shell-border)]">{logs.map((log) => <div key={log.id} className="flex gap-3 px-5 py-4 sm:px-6"><StatusBadge status={log.syncStatus} /><div className="min-w-0 flex-1"><p className="text-sm text-[var(--shell-text)]">{log.syncDirection === 'TO_DIFY' ? '本地 → Dify' : 'Dify → 本地'} · {log.syncAction} · 知识库 #{log.knowledgeBaseId ?? '—'}</p>{log.errorMessage && <p className="mt-1 break-words text-xs leading-5 text-red-700 dark:text-red-300">{log.errorMessage}</p>}</div><time className="shrink-0 text-xs text-[var(--shell-subtle)]">{formatTime(log.createdAt)}</time></div>)}</div>
+          <div className="divide-y divide-[var(--shell-border)]">{logs.map((log) => <div key={log.id} className="flex gap-3 px-5 py-4 sm:px-6"><StatusBadge status={log.syncStatus} /><div className="min-w-0 flex-1"><p className="text-sm text-[var(--shell-text)]">{log.syncDirection === 'TO_DIFY' ? '本地 → Dify' : 'Dify → 本地'} · {log.syncAction} · 知识库 #{log.knowledgeBaseId ?? '—'}</p>{log.errorMessage && <p className="mt-1 break-words text-xs leading-5 text-red-700 dark:text-red-300">{formatSyncError(log.errorMessage)}</p>}</div><time className="shrink-0 text-xs text-[var(--shell-subtle)]">{formatTime(log.createdAt)}</time></div>)}</div>
         )}
       </section>
 

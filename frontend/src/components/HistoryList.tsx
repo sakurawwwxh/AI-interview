@@ -254,7 +254,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
         </div>
 
         <motion.div
-          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all"
+          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-w-[280px] focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-[color,background-color,border-color,box-shadow]"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
         >
@@ -368,10 +368,10 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                         <div className="flex items-center gap-3">
                           <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
                             <motion.div
-                              className={`h-full ${getScoreColor(resume.latestScore).split(' ')[0]} rounded-full`}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${resume.latestScore}%` }}
-                              transition={{ duration: 0.8, delay: index * 0.05 }}
+                              className={`h-full w-full origin-left ${getScoreColor(resume.latestScore).split(' ')[0]} rounded-full`}
+                              initial={{ transform: 'scaleX(0)' }}
+                              animate={{ transform: `scaleX(${Math.min(Math.max(resume.latestScore, 0), 100) / 100})` }}
+                              transition={{ duration: 0.4, delay: Math.min(index, 6) * 0.05, ease: [0.22, 1, 0.36, 1] }}
                             />
                           </div>
                           <span className="font-bold text-slate-800">{resume.latestScore}</span>
@@ -426,7 +426,7 @@ export default function HistoryList({ onSelectResume }: HistoryListProps) {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
+                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-[color,transform]" />
                       </div>
                     </td>
                   </motion.tr>

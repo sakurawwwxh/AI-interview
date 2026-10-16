@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, CheckCircle2, CircleDashed, Loader2, RotateCcw
 import { getErrorMessage } from '../api/request';
 import { practiceApi, PracticeSummary, PracticeTaskItem, PracticeTaskStatus } from '../api/practice';
 import PageHeader from '../components/PageHeader';
+import InlineCode from '../components/InlineCode';
 
 const labels: Record<PracticeTaskStatus, string> = {
   TODO: '待复练',
@@ -175,7 +176,7 @@ export default function PracticeCenterPage() {
                     <span className="h-3 w-px bg-[var(--shell-border)]" aria-hidden />
                     <span className="text-xs text-[var(--shell-muted)]">已练 {task.attemptCount} 次</span>
                   </div>
-                  <h2 className="mt-3 text-base font-medium leading-7 text-[var(--shell-text)]">{task.question}</h2>
+                  <h2 className="mt-3 text-base font-medium leading-7 text-[var(--shell-text)]"><InlineCode text={task.question} /></h2>
                   <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--shell-muted)]">
                     <span>
                       原分 <b className="ml-1 text-amber-600 dark:text-amber-400">{task.originalScore}</b>

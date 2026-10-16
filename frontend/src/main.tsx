@@ -1,5 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { MotionConfig } from 'framer-motion'
 import App from './App'
 import './index.css'
 
@@ -15,6 +16,10 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {/* reducedMotion="user"：跟随系统「减少动效」偏好——
+        位移/缩放类动画关闭，透明度与颜色过渡保留（有助于理解状态变化）。 */}
+    <MotionConfig reducedMotion="user">
+      <App />
+    </MotionConfig>
   </React.StrictMode>,
 )

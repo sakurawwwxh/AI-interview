@@ -14,10 +14,22 @@ export interface FileUploadCardProps {
   namePlaceholder?: string;
   nameLabel?: string;
   error?: string;
+  /** 右侧「处理流程」三步；默认是简历上传的文案，知识库上传需传自己的。 */
+  steps?: Array<[string, string, string]>;
+  /** 右侧底部说明；默认是简历上传的文案。 */
+  footnote?: string;
   onFileSelect?: (file: File) => void;
   onUpload: (file: File, name?: string) => void;
   onBack?: () => void;
 }
+
+const DEFAULT_STEPS: Array<[string, string, string]> = [
+  ['01', '上传资料', '安全保存原始文件'],
+  ['02', 'AI 提取内容', '识别经历、技能与项目'],
+  ['03', '开始训练', '生成贴合背景的面试题'],
+];
+
+const DEFAULT_FOOTNOTE = '文件仅用于你的简历分析和训练资料库。上传成功后可在对应模块继续管理。';
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -38,6 +50,8 @@ export default function FileUploadCard({
   namePlaceholder = '留空则使用文件名',
   nameLabel = '名称（可选）',
   error,
+  steps = DEFAULT_STEPS,
+  footnote = DEFAULT_FOOTNOTE,
   onFileSelect,
   onUpload,
   onBack,
@@ -142,18 +156,14 @@ export default function FileUploadCard({
         <aside className="border border-[var(--shell-border)] bg-[var(--shell-panel)] p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--shell-subtle)]">处理流程</p>
           <ol className="mt-5 space-y-5">
-            {[
-              ['01', '上传资料', '安全保存原始文件'],
-              ['02', 'AI 提取内容', '识别经历、技能与项目'],
-              ['03', '开始训练', '生成贴合背景的面试题'],
-            ].map(([number, heading, detail], index) => (
+            {steps.map(([number, heading, detail], index) => (
               <li key={number} className="flex gap-3">
                 <span className={`mt-0.5 text-xs font-semibold ${index === 0 ? 'text-primary-600 dark:text-primary-400' : 'text-[var(--shell-subtle)]'}`}>{number}</span>
                 <div><p className="text-sm font-medium text-[var(--shell-text)]">{heading}</p><p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">{detail}</p></div>
               </li>
             ))}
           </ol>
-          <div className="mt-7 border-t border-[var(--shell-border)] pt-4 text-xs leading-5 text-[var(--shell-muted)]">文件仅用于你的简历分析和训练资料库。上传成功后可在对应模块继续管理。</div>
+          <div className="mt-7 border-t border-[var(--shell-border)] pt-4 text-xs leading-5 text-[var(--shell-muted)]">{footnote}</div>
         </aside>
       </div>
     </div>

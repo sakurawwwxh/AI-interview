@@ -3,6 +3,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* 统一 UI 过渡缓动：Tailwind 默认的 ease-out 偏弱（起步不够果断），
+   换成更强的曲线；JS 侧（framer-motion）一直用的是同一族曲线 [0.22,1,0.36,1]。 */
+@theme {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* ═══════════════════════════════════════════
    设计系统 · Ink & Signal Studio
    编辑室纸张 × 深夜墨色 × 青绿信号灯
@@ -243,28 +249,28 @@
   }
 
   .ui-btn-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-800/20 transition duration-200 hover:from-teal-400 hover:to-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:cursor-not-allowed disabled:opacity-55;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-800/20 transition duration-150 ease-out active:scale-[0.97] hover:from-teal-400 hover:to-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/40 disabled:cursor-not-allowed disabled:opacity-55;
   }
 
   .ui-btn-ghost {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)];
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--shell-border)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--shell-muted)] transition duration-150 ease-out active:scale-[0.97] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)];
   }
 
   /* 图标按钮最小触控 44×44 */
   .ui-icon-btn {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-150 ease-out active:scale-[0.94] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .ui-icon-btn-danger {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-red-500/10 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-red-400;
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-150 ease-out active:scale-[0.94] hover:bg-red-500/10 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-red-400;
   }
 
   .ui-icon-btn-accent {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-primary-500/10 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-primary-400;
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-150 ease-out active:scale-[0.94] hover:bg-primary-500/10 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-primary-400;
   }
 
   .ui-icon-btn-warn {
-    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-200 hover:bg-amber-500/10 hover:text-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-400;
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--shell-muted)] transition duration-150 ease-out active:scale-[0.94] hover:bg-amber-500/10 hover:text-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-amber-400;
   }
 
   /* 列表/工具栏搜索框 */

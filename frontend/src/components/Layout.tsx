@@ -77,9 +77,17 @@ export default function Layout() {
     ] },
   ];
 
-  const isActive = (path: string) => path === '/'
-    ? location.pathname === '/'
-    : location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const navPaths = navGroups.flatMap((group) => group.items.map((item) => item.path));
+
+  // 只点亮「命中的最长路径」那一项。直接用 startsWith 判定会让父路径与子路径同时命中
+  // （例如 /knowledgebase 与 /knowledgebase/chat），侧栏两项一起高亮。
+  const activePath = navPaths
+    .filter((path) => path === '/'
+      ? location.pathname === '/'
+      : location.pathname === path || location.pathname.startsWith(`${path}/`))
+    .sort((a, b) => b.length - a.length)[0];
+
+  const isActive = (path: string) => path === activePath;
   const usagePercent = usage && usage.dailyLimit > 0
     ? Math.min(100, Math.round((usage.dailyTokens / usage.dailyLimit) * 100)) : 0;
 
@@ -190,8 +198,8 @@ export default function Layout() {
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[var(--shell-border)]" aria-hidden>
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-teal-600 via-teal-400 to-amber-400 transition-all duration-500"
-                  style={{ width: `${usagePercent}%` }}
+                  className="h-full w-full origin-left rounded-full bg-gradient-to-r from-teal-600 via-teal-400 to-amber-400 transition-transform duration-200 ease-out"
+                  style={{ transform: `scaleX(${Math.min(Math.max(usagePercent, 0), 100) / 100})` }}
                 />
               </div>
             </div>

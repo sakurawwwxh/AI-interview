@@ -11,19 +11,31 @@ export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
   const [growthPlan, setGrowthPlan] = useState<GrowthPlan | null>(null);
   const [practiceSummary, setPracticeSummary] = useState<PracticeSummary | null>(null);
+  // 「还没取到」与「确实没有目标岗位」必须分开：否则首屏会把加载中显示成「尚未设置」，
+  // 用户明明已设过岗位，却看到空状态文案。
+  const [planLoading, setPlanLoading] = useState(true);
   useEffect(() => {
-    growthApi.getPlan().then(setGrowthPlan).catch(() => setGrowthPlan(null));
+    growthApi.getPlan().then(setGrowthPlan).catch(() => setGrowthPlan(null)).finally(() => setPlanLoading(false));
     practiceApi.getSummary().then(setPracticeSummary).catch(() => setPracticeSummary(null));
   }, []);
 
   const steps = useMemo<Step[]>(() => {
     const firstAction = growthPlan?.actions?.[0];
+    const hasTarget = Boolean(growthPlan?.targetRole);
     return [
-      { order: '01', title: '确认目标岗位', detail: growthPlan?.targetRole ? `当前聚焦：${growthPlan.targetRole}` : '添加一个岗位目标，让训练更有方向。', status: growthPlan?.targetRole ? 'done' : 'current', link: '/job-targets' },
-      { order: '02', title: firstAction?.title || '完成一次针对性练习', detail: firstAction?.description || '从一场模拟面试或一组专项复练开始。', status: growthPlan?.targetRole ? 'current' : 'upcoming', link: firstAction?.link || '/practice' },
+      {
+        order: '01',
+        title: '确认目标岗位',
+        detail: planLoading ? '正在读取当前目标…'
+          : hasTarget ? `当前聚焦：${growthPlan?.targetRole}`
+            : '添加一个岗位目标，让训练更有方向。',
+        status: planLoading ? 'upcoming' : hasTarget ? 'done' : 'current',
+        link: '/job-targets',
+      },
+      { order: '02', title: firstAction?.title || '完成一次针对性练习', detail: firstAction?.description || '从一场模拟面试或一组专项复练开始。', status: hasTarget ? 'current' : 'upcoming', link: firstAction?.link || '/practice' },
       { order: '03', title: '复盘并沉淀能力画像', detail: practiceSummary?.todoCount ? `还有 ${practiceSummary.todoCount} 道待复练题，完成后更新能力趋势。` : '每一次评分都会成为下一次训练的依据。', status: 'upcoming', link: '/interview-statistics' },
     ];
-  }, [growthPlan, practiceSummary]);
+  }, [growthPlan, practiceSummary, planLoading]);
 
   const currentStep = steps.find((step) => step.status === 'current') || steps[1];
   const hasPractice = (practiceSummary?.todoCount ?? 0) > 0;
@@ -42,7 +54,12 @@ export default function DashboardPage() {
           </span>
           <span className="text-[var(--shell-subtle)]">·</span>
           <span>目标岗位</span>
-          <span className="font-semibold text-[var(--shell-text)]">{growthPlan?.targetRole || '尚未设置'}</span>
+          {planLoading ? (
+            <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-[var(--shell-hover)] align-middle"
+              role="status" aria-label="正在读取目标岗位" />
+          ) : (
+            <span className="font-semibold text-[var(--shell-text)]">{growthPlan?.targetRole || '尚未设置'}</span>
+          )}
           <span className="hidden text-[var(--shell-subtle)] sm:inline">·</span>
           <span className="hidden sm:inline">{greeting} 的训练空间</span>
         </div>

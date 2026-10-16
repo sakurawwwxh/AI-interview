@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Mic2, Sparkles, Target } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../stores/authStore';
@@ -85,7 +85,7 @@ export default function LoginPage() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.12 + i * 0.06, duration: 0.4 }}
-                  className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur-md transition hover:border-teal-400/30 hover:bg-white/[0.06]"
+                  className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur-md"
                 >
                   <Icon className={`h-5 w-5 ${tone}`} />
                   <p className="mt-4 text-sm font-semibold tracking-tight">{title}</p>
@@ -128,9 +128,15 @@ export default function LoginPage() {
             </div>
 
             {notice && (
-              <div role="status" className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-sm text-emerald-200">
+              <motion.div
+                role="status"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-sm text-emerald-200"
+              >
                 {notice}
-              </div>
+              </motion.div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -142,10 +148,11 @@ export default function LoginPage() {
                   id="login-username"
                   type="text"
                   autoComplete="username"
+                  autoFocus
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="请输入用户名"
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
+                  className="w-full rounded-xl border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
                   disabled={loading}
                   required
                 />
@@ -162,14 +169,14 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="请输入密码"
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/55 py-3 pl-4 pr-12 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/55 py-3 pl-4 pr-12 text-sm text-white outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-slate-500 focus:border-teal-400/60 focus:ring-4 focus:ring-teal-500/15"
                     disabled={loading}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-1.5 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-slate-200"
+                    className="absolute right-1 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition duration-150 ease-out active:scale-[0.94] hover:bg-white/5 hover:text-slate-200"
                     aria-label={showPassword ? '隐藏密码' : '显示密码'}
                     aria-pressed={showPassword}
                     tabIndex={0}
@@ -179,19 +186,29 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {error && (
-                <div role="alert" aria-live="assertive" className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200">
-                  {error}
-                </div>
-              )}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    key="login-error"
+                    role="alert"
+                    aria-live="assertive"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2.5 text-sm text-red-200"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <motion.button
                 type="submit"
                 disabled={loading || !username.trim() || !password.trim()}
                 aria-busy={loading}
                 className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 via-teal-600 to-cyan-700 px-4 py-3.5 font-semibold text-white shadow-lg shadow-teal-700/30 transition duration-200 hover:from-teal-400 hover:via-teal-500 hover:to-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
-                whileHover={{ scale: loading ? 1 : 1.01 }}
-                whileTap={{ scale: loading ? 1 : 0.99 }}
+                whileTap={{ scale: loading ? 1 : 0.97 }}
               >
                 {loading ? (
                   <>
