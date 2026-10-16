@@ -11,6 +11,8 @@ import interview.guide.modules.resume.model.ResumeAnalysisEntity;
 import interview.guide.modules.resume.model.ResumeDetailDTO;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.model.ResumeListItemDTO;
+import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,7 @@ import java.util.Optional;
 public class ResumeHistoryService {
 
     private final ResumePersistenceService resumePersistenceService;
+    private final ResumeRepository resumeRepository;
     private final InterviewPersistenceService interviewPersistenceService;
     private final PdfExportService pdfExportService;
     private final ObjectMapper objectMapper;
@@ -41,34 +44,18 @@ public class ResumeHistoryService {
      * 获取所有简历列表
      */
     public List<ResumeListItemDTO> getAllResumes() {
-        List<ResumeEntity> resumes = resumePersistenceService.findAllResumes();
-
-        return resumes.stream().map(resume -> {
-            // 获取最新分析结果的分数
-            Integer latestScore = null;
-            java.time.LocalDateTime lastAnalyzedAt = null;
-            Optional<ResumeAnalysisEntity> analysisOpt = resumePersistenceService.getLatestAnalysis(resume.getId());
-            if (analysisOpt.isPresent()) {
-                ResumeAnalysisEntity analysis = analysisOpt.get();
-                latestScore = analysis.getOverallScore();
-                lastAnalyzedAt = analysis.getAnalyzedAt();
-            }
-
-            // 获取面试次数
-            int interviewCount = interviewPersistenceService.findByResumeId(resume.getId()).size();
-
-            // 使用 MapStruct 映射
-            return new ResumeListItemDTO(
-                resume.getId(),
-                resume.getOriginalFilename(),
-                resume.getFileSize(),
-                resume.getUploadedAt(),
-                resume.getAccessCount(),
-                latestScore,
-                lastAnalyzedAt,
-                interviewCount
-            );
-        }).toList();
+        return resumeRepository.findListRowsByUserId(UserContext.getCurrentUserIdOrThrow()).stream()
+            .map(row -> new ResumeListItemDTO(
+                row.getId(),
+                row.getFilename(),
+                row.getFileSize(),
+                row.getUploadedAt(),
+                row.getAccessCount(),
+                row.getLatestScore(),
+                row.getLastAnalyzedAt(),
+                Math.toIntExact(row.getInterviewCount())
+            ))
+            .toList();
     }
 
     /**

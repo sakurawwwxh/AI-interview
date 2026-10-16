@@ -20,7 +20,7 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
 
     private final ResumeRepository resumeRepository;
 
-    record AnalyzeTaskPayload(Long resumeId, String content) {}
+    record AnalyzeTaskPayload(Long resumeId, Long userId, String content) {}
 
     public AnalyzeStreamProducer(RedisService redisService, ResumeRepository resumeRepository) {
         super(redisService);
@@ -33,8 +33,8 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
      * @param resumeId 简历ID
      * @param content  简历内容
      */
-    public void sendAnalyzeTask(Long resumeId, String content) {
-        sendTask(new AnalyzeTaskPayload(resumeId, content));
+    public void sendAnalyzeTask(Long resumeId, Long userId, String content) {
+        sendTask(new AnalyzeTaskPayload(resumeId, userId, content));
     }
 
     @Override
@@ -51,6 +51,7 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
     protected Map<String, String> buildMessage(AnalyzeTaskPayload payload) {
         return Map.of(
             AsyncTaskStreamConstants.FIELD_RESUME_ID, payload.resumeId().toString(),
+            AsyncTaskStreamConstants.FIELD_USER_ID, payload.userId().toString(),
             AsyncTaskStreamConstants.FIELD_CONTENT, payload.content(),
             AsyncTaskStreamConstants.FIELD_RETRY_COUNT, "0"
         );
@@ -58,7 +59,7 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
 
     @Override
     protected String payloadIdentifier(AnalyzeTaskPayload payload) {
-        return "resumeId=" + payload.resumeId();
+        return "resumeId=" + payload.resumeId() + ",userId=" + payload.userId();
     }
 
     @Override

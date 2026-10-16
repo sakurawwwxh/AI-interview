@@ -119,9 +119,13 @@ public class ResumeGradingService {
             
             return result;
             
+        } catch (BusinessException e) {
+            // Let the Stream consumer retry or mark the task FAILED. Turning this into a
+            // zero-score response would incorrectly make an unavailable AI service look successful.
+            throw e;
         } catch (Exception e) {
             log.error("简历分析失败: {}", e.getMessage(), e);
-            return createErrorResponse(resumeText, e.getMessage());
+            throw new BusinessException(ErrorCode.RESUME_ANALYSIS_FAILED, "简历分析失败：" + e.getMessage());
         }
     }
     
@@ -151,22 +155,4 @@ public class ResumeGradingService {
         );
     }
     
-    /**
-     * 创建错误响应
-     */
-    private ResumeAnalysisResponse createErrorResponse(String originalText, String errorMessage) {
-        return new ResumeAnalysisResponse(
-            0,
-            new ScoreDetail(0, 0, 0, 0, 0),
-            "分析过程中出现错误: " + errorMessage,
-            List.of(),
-            List.of(new Suggestion(
-                "系统",
-                "高",
-                "AI分析服务暂时不可用",
-                "请稍后重试，或检查AI服务是否正常运行"
-            )),
-            originalText
-        );
-    }
 }

@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "resumes", indexes = {
-    @Index(name = "idx_resume_user_hash", columnList = "userId, fileHash", unique = true)
+    @Index(name = "idx_resume_user_hash", columnList = "userId, fileHash", unique = true),
+    @Index(name = "idx_resume_user_uploaded", columnList = "userId, uploadedAt")
 })
 public class ResumeEntity {
     

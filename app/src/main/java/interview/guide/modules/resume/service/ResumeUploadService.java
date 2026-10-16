@@ -10,6 +10,7 @@ import interview.guide.modules.interview.model.ResumeAnalysisResponse;
 import interview.guide.modules.resume.listener.AnalyzeStreamProducer;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
+import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -76,7 +77,7 @@ public class ResumeUploadService {
         ResumeEntity savedResume = persistenceService.saveResume(file, resumeText, fileKey, fileUrl);
 
         // 7. 发送分析任务到 Redis Stream（异步处理）
-        analyzeStreamProducer.sendAnalyzeTask(savedResume.getId(), resumeText);
+        analyzeStreamProducer.sendAnalyzeTask(savedResume.getId(), savedResume.getUserId(), resumeText);
 
         log.info("简历上传完成，分析任务已入队: {}, resumeId={}", fileName, savedResume.getId());
 
@@ -149,8 +150,15 @@ public class ResumeUploadService {
      */
     @Transactional
     public void reanalyze(Long resumeId) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
         ResumeEntity resume = persistenceService.findById(resumeId)
             .orElseThrow(() -> new BusinessException(ErrorCode.RESUME_NOT_FOUND, "简历不存在"));
+
+        AsyncTaskStatus currentStatus = resume.getAnalyzeStatus();
+        if (currentStatus == AsyncTaskStatus.PENDING || currentStatus == AsyncTaskStatus.PROCESSING) {
+            throw new BusinessException(ErrorCode.RESUME_ANALYSIS_IN_PROGRESS,
+                "简历分析任务正在进行中，请等待当前任务完成");
+        }
 
         log.info("开始重新分析简历: resumeId={}, filename={}", resumeId, resume.getOriginalFilename());
 
@@ -165,13 +173,26 @@ public class ResumeUploadService {
             resume.setResumeText(resumeText);
         }
 
-        // 更新状态为 PENDING
-        resume.setAnalyzeStatus(AsyncTaskStatus.PENDING);
-        resume.setAnalyzeError(null);
-        resumeRepository.save(resume);
+        // Conditional update closes the check-then-set race between concurrent retry requests.
+        int claimed = resumeRepository.claimForReanalysis(
+            resumeId,
+            userId,
+            AsyncTaskStatus.PENDING,
+            java.util.List.of(AsyncTaskStatus.FAILED, AsyncTaskStatus.COMPLETED)
+        );
+        if (claimed != 1) {
+            throw new BusinessException(ErrorCode.RESUME_ANALYSIS_IN_PROGRESS,
+                "简历分析任务已被其他请求提交，请勿重复操作");
+        }
+
+        // Persist text recovered from storage after the claim succeeds.
+        if (!resumeText.equals(resume.getResumeText())) {
+            resume.setResumeText(resumeText);
+            resumeRepository.save(resume);
+        }
 
         // 发送分析任务到 Stream
-        analyzeStreamProducer.sendAnalyzeTask(resumeId, resumeText);
+        analyzeStreamProducer.sendAnalyzeTask(resumeId, resume.getUserId(), resumeText);
 
         log.info("重新分析任务已发送: resumeId={}", resumeId);
     }

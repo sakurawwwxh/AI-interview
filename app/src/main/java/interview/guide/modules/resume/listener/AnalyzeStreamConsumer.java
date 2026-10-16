@@ -1,6 +1,7 @@
 package interview.guide.modules.resume.listener;
 
 import interview.guide.common.async.AbstractStreamConsumer;
+import interview.guide.common.config.AsyncTaskProperties;
 import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.redis.RedisService;
@@ -33,15 +34,16 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
         RedisService redisService,
         ResumeGradingService gradingService,
         ResumePersistenceService persistenceService,
-        ResumeRepository resumeRepository
+        ResumeRepository resumeRepository,
+        AsyncTaskProperties asyncTaskProperties
     ) {
-        super(redisService);
+        super(redisService, asyncTaskProperties.getMaxConcurrency());
         this.gradingService = gradingService;
         this.persistenceService = persistenceService;
         this.resumeRepository = resumeRepository;
     }
 
-    record AnalyzePayload(Long resumeId, String content) {}
+    record AnalyzePayload(Long resumeId, Long userId, String content) {}
 
     @Override
     protected String taskDisplayName() {
@@ -71,17 +73,32 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
     @Override
     protected AnalyzePayload parsePayload(StreamMessageId messageId, Map<String, String> data) {
         String resumeIdStr = data.get(AsyncTaskStreamConstants.FIELD_RESUME_ID);
+        String userIdStr = data.get(AsyncTaskStreamConstants.FIELD_USER_ID);
         String content = data.get(AsyncTaskStreamConstants.FIELD_CONTENT);
         if (resumeIdStr == null || content == null) {
             log.warn("消息格式错误，跳过: messageId={}", messageId);
             return null;
         }
-        return new AnalyzePayload(Long.parseLong(resumeIdStr), content);
+        try {
+            Long resumeId = Long.parseLong(resumeIdStr);
+            // Messages created before userId was added remain processable during a rolling restart.
+            Long userId = userIdStr == null
+                ? resumeRepository.findById(resumeId).map(ResumeEntity::getUserId).orElse(null)
+                : Long.parseLong(userIdStr);
+            if (userId == null) {
+                log.warn("简历或所属用户不存在，跳过: messageId={}, resumeId={}", messageId, resumeId);
+                return null;
+            }
+            return new AnalyzePayload(resumeId, userId, content);
+        } catch (NumberFormatException e) {
+            log.warn("简历分析任务 ID 格式错误，跳过: messageId={}", messageId);
+            return null;
+        }
     }
 
     @Override
     protected String payloadIdentifier(AnalyzePayload payload) {
-        return "resumeId=" + payload.resumeId();
+        return "resumeId=" + payload.resumeId() + ",userId=" + payload.userId();
     }
 
     @Override
@@ -92,18 +109,27 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
     @Override
     protected void processBusiness(AnalyzePayload payload) {
         Long resumeId = payload.resumeId();
-        if (!resumeRepository.existsById(resumeId)) {
+        ResumeEntity resume = resumeRepository.findById(resumeId).orElse(null);
+        if (resume == null) {
             log.warn("简历已被删除，跳过分析任务: resumeId={}", resumeId);
             return;
         }
-
-        ResumeAnalysisResponse analysis = gradingService.analyzeResume(payload.content());
-        ResumeEntity resume = resumeRepository.findById(resumeId).orElse(null);
-        if (resume == null) {
-            log.warn("简历在分析期间被删除，跳过保存结果: resumeId={}", resumeId);
+        if (!resume.getUserId().equals(payload.userId())) {
+            log.warn("简历分析任务归属不匹配，跳过: resumeId={}, msgUserId={}, resumeUserId={}",
+                resumeId, payload.userId(), resume.getUserId());
             return;
         }
-        persistenceService.saveAnalysis(resume, analysis);
+
+        var securityContext = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var previousAuthentication = securityContext.getAuthentication();
+        securityContext.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+            payload.userId(), "async-resume-analysis", java.util.List.of()));
+        try {
+            ResumeAnalysisResponse analysis = gradingService.analyzeResume(payload.content());
+            persistenceService.saveAnalysis(resume, analysis);
+        } finally {
+            securityContext.setAuthentication(previousAuthentication);
+        }
     }
 
     @Override
@@ -123,6 +149,7 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
         try {
             Map<String, String> message = Map.of(
                 AsyncTaskStreamConstants.FIELD_RESUME_ID, resumeId.toString(),
+                AsyncTaskStreamConstants.FIELD_USER_ID, payload.userId().toString(),
                 AsyncTaskStreamConstants.FIELD_CONTENT, content,
                 AsyncTaskStreamConstants.FIELD_RETRY_COUNT, String.valueOf(retryCount)
             );

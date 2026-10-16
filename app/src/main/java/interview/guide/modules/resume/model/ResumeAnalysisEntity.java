@@ -9,7 +9,9 @@ import java.time.LocalDateTime;
  * Resume Analysis Entity
  */
 @Entity
-@Table(name = "resume_analyses")
+@Table(name = "resume_analyses", indexes = {
+    @Index(name = "idx_resume_analysis_resume_analyzed", columnList = "resume_id, analyzed_at")
+})
 public class ResumeAnalysisEntity {
     
     @Id
