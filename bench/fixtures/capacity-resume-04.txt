@@ -1,0 +1,4 @@
+并发容量测试简历 04
+候选人：容量测试用户四。目标岗位：云原生工程师。
+技能：Java、Spring Cloud、Redis、Prometheus、Kubernetes。
+项目：完成微服务发布流程、熔断降级配置和告警看板建设。

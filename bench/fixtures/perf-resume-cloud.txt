@@ -1,0 +1,7 @@
+性能压测合成简历（四）
+
+候选人：测试用户四
+目标岗位：云原生后端工程师
+技能：Java、Spring Boot、Docker、Kubernetes、Redis Stream、PostgreSQL、OpenTelemetry。
+项目：开发 AI 面试服务，上传接口异步入队，消费者通过虚拟线程处理 I/O，使用 Semaphore 控制模型并发。
+经历：负责容量压测、限流方案、链路追踪、稳定性优化与发布流程。

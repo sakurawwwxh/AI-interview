@@ -4,12 +4,16 @@ import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.modules.knowledgebase.model.QueryRequest;
 import interview.guide.modules.knowledgebase.model.QueryResponse;
+import interview.guide.common.ai.AiRequestLimiter;
 import interview.guide.common.ai.AiUsageRecorder;
+import interview.guide.common.ai.LimitedChatModel;
+import interview.guide.modules.user.security.UserContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
@@ -53,7 +57,8 @@ public class KnowledgeBaseQueryService {
     /** 多轮对话注入的历史消息条数（3 轮 = 6 条） */
     private static final int MAX_HISTORY_MESSAGES = 6;
 
-    private final ChatClient chatClient;
+    private final ChatModel platformChatModel;
+    private final AiRequestLimiter requestLimiter;
     private final KnowledgeBaseVectorService vectorService;
     private final KnowledgeBaseListService listService;
     private final KnowledgeBaseCountService countService;
@@ -70,11 +75,12 @@ public class KnowledgeBaseQueryService {
     private final double minScoreDefault;
 
     public KnowledgeBaseQueryService(
-            ChatClient.Builder chatClientBuilder,
+            ChatModel platformChatModel,
             KnowledgeBaseVectorService vectorService,
             KnowledgeBaseListService listService,
             KnowledgeBaseCountService countService,
             AiUsageRecorder usageRecorder,
+            AiRequestLimiter requestLimiter,
             @Value("classpath:prompts/knowledgebase-query-system.st") Resource systemPromptResource,
             @Value("classpath:prompts/knowledgebase-query-user.st") Resource userPromptResource,
             @Value("classpath:prompts/knowledgebase-query-rewrite.st") Resource rewritePromptResource,
@@ -85,7 +91,8 @@ public class KnowledgeBaseQueryService {
             @Value("${app.ai.rag.search.topk-long:8}") int topkLong,
             @Value("${app.ai.rag.search.min-score-short:0.18}") double minScoreShort,
             @Value("${app.ai.rag.search.min-score-default:0.28}") double minScoreDefault) throws IOException {
-        this.chatClient = chatClientBuilder.build();
+        this.platformChatModel = platformChatModel;
+        this.requestLimiter = requestLimiter;
         this.vectorService = vectorService;
         this.listService = listService;
         this.countService = countService;
@@ -155,7 +162,7 @@ public class KnowledgeBaseQueryService {
         usageRecorder.checkQuota();
         try {
             // 5. 调用AI生成回答（注入历史消息）
-            var promptBuilder = chatClient.prompt()
+            var promptBuilder = chatClient().prompt()
                     .system(systemPrompt)
                     .user(userPrompt);
             if (!safeHistory.isEmpty()) {
@@ -294,7 +301,7 @@ public class KnowledgeBaseQueryService {
 
             usageRecorder.checkQuota();
             // 5. 流式调用（注入历史消息）+ 探测窗口归一化
-            var promptBuilder = chatClient.prompt()
+            var promptBuilder = chatClient().prompt()
                     .system(systemPrompt)
                     .user(userPrompt);
             if (!safeHistory.isEmpty()) {
@@ -380,7 +387,7 @@ public class KnowledgeBaseQueryService {
             Map<String, Object> variables = new HashMap<>();
             variables.put("question", question);
             String rewritePrompt = rewritePromptTemplate.render(variables);
-            ChatResponse response = chatClient.prompt()
+            ChatResponse response = chatClient().prompt()
                 .user(rewritePrompt)
                 .call()
                 .chatResponse();
@@ -396,6 +403,11 @@ public class KnowledgeBaseQueryService {
             log.warn("Query rewrite 失败，使用原问题继续检索: {}", e.getMessage());
             return question;
         }
+    }
+
+    private ChatClient chatClient() {
+        return ChatClient.create(new LimitedChatModel(
+            platformChatModel, requestLimiter, "platform", UserContext.getCurrentUserId()));
     }
 
     private boolean hasUsage(ChatResponse response) {

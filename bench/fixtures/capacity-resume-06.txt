@@ -1,0 +1,4 @@
+并发容量测试简历 06
+候选人：容量测试用户六。目标岗位：测试开发工程师。
+技能：Java、JUnit、Testcontainers、JMeter、GitLab CI。
+项目：构建接口回归体系，维护压测场景和发布质量门禁。

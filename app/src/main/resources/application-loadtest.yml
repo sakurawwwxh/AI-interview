@@ -1,0 +1,9 @@
+# 仅用于排障与基准测试：通过 SPRING_PROFILES_ACTIVE=loadtest 启用。
+spring:
+  threads:
+    virtual:
+      enabled: false
+
+dify:
+  sync:
+    enabled: false

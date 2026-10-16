@@ -1,6 +1,7 @@
 package interview.guide.modules.interview.listener;
 
 import interview.guide.common.async.AbstractStreamConsumer;
+import interview.guide.common.config.AsyncTaskProperties;
 import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.common.model.AsyncTaskStatus;
 import interview.guide.infrastructure.redis.RedisService;
@@ -40,9 +41,10 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
         InterviewSessionRepository sessionRepository,
         AnswerEvaluationService evaluationService,
         InterviewPersistenceService persistenceService,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        AsyncTaskProperties asyncTaskProperties
     ) {
-        super(redisService);
+        super(redisService, asyncTaskProperties.getMaxConcurrency());
         this.sessionRepository = sessionRepository;
         this.evaluationService = evaluationService;
         this.persistenceService = persistenceService;

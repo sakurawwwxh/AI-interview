@@ -8,6 +8,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
  * 统一封装结构化输出调用与重试策略。
@@ -109,6 +110,10 @@ public class StructuredOutputInvoker {
                 throw e;
             } catch (Exception e) {
                 lastError = e;
+                if (isNonRetryableClientError(e)) {
+                    log.warn("{}调用被服务端拒绝，不重试: attempt={}, error={}", logContext, attempt, e.getMessage());
+                    break;
+                }
                 log.warn("{}结构化解析失败，准备重试: attempt={}, error={}", logContext, attempt, e.getMessage());
             }
         }
@@ -144,5 +149,30 @@ public class StructuredOutputInvoker {
             return oneLine.substring(0, 200) + "...";
         }
         return oneLine;
+    }
+
+    /**
+     * Authentication and invalid-request failures cannot become successful through a retry.
+     * Keep 429 retryable: it is normally transient and governed by the caller's backpressure.
+     */
+    private boolean isNonRetryableClientError(Exception error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof RestClientResponseException responseException) {
+                int status = responseException.getStatusCode().value();
+                return status >= 400 && status < 500 && status != 429;
+            }
+            current = current.getCause();
+        }
+        String message = error.getMessage();
+        if (message == null) {
+            return false;
+        }
+        String normalized = message.toLowerCase();
+        return normalized.contains("http 400")
+            || normalized.contains("http 401")
+            || normalized.contains("http 403")
+            || normalized.contains("http 404")
+            || normalized.contains("invalid_api_key");
     }
 }

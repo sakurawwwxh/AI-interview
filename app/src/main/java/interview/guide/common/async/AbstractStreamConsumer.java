@@ -231,7 +231,7 @@ public abstract class AbstractStreamConsumer<T> {
             log.info("{}任务完成: {}", taskDisplayName(), payloadIdentifier(payload));
         } catch (Exception e) {
             log.error("{}任务失败: {}, error={}", taskDisplayName(), payloadIdentifier(payload), e.getMessage(), e);
-            if (retryCount < AsyncTaskStreamConstants.MAX_RETRY_COUNT) {
+            if (retryCount < AsyncTaskStreamConstants.MAX_RETRY_COUNT && shouldRetry(e)) {
                 retryMessage(payload, retryCount + 1);
             } else {
                 markFailed(payload, truncateError(
@@ -332,6 +332,24 @@ public abstract class AbstractStreamConsumer<T> {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /**
+     * Determines whether a failed task may become successful on a later delivery.
+     * Provider-side authentication and malformed-request failures are permanent;
+     * retrying them only consumes quota and keeps the user waiting. 429 remains retryable.
+     */
+    protected boolean shouldRetry(Exception error) {
+        String message = error.getMessage();
+        if (message == null) {
+            return true;
+        }
+        String normalized = message.toLowerCase();
+        return !(normalized.contains("http 400")
+            || normalized.contains("http 401")
+            || normalized.contains("http 403")
+            || normalized.contains("http 404")
+            || normalized.contains("invalid_api_key"));
     }
 
     protected String truncateError(String error) {
