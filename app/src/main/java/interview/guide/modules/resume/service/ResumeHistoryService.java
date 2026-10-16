@@ -3,9 +3,9 @@ package interview.guide.modules.resume.service;
 import interview.guide.common.exception.BusinessException;
 import interview.guide.common.exception.ErrorCode;
 import interview.guide.infrastructure.export.PdfExportService;
-import interview.guide.infrastructure.mapper.InterviewMapper;
 import interview.guide.infrastructure.mapper.ResumeMapper;
 import interview.guide.modules.interview.model.ResumeAnalysisResponse;
+import interview.guide.modules.interview.repository.InterviewSessionRepository.ResumeInterviewRow;
 import interview.guide.modules.interview.service.InterviewPersistenceService;
 import interview.guide.modules.resume.model.ResumeAnalysisEntity;
 import interview.guide.modules.resume.model.ResumeDetailDTO;
@@ -20,7 +20,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -38,7 +40,6 @@ public class ResumeHistoryService {
     private final PdfExportService pdfExportService;
     private final ObjectMapper objectMapper;
     private final ResumeMapper resumeMapper;
-    private final InterviewMapper interviewMapper;
 
     /**
      * 获取所有简历列表
@@ -77,10 +78,11 @@ public class ResumeHistoryService {
             this::extractSuggestions
         );
 
-        // 使用 InterviewMapper 转换面试历史
-        List<Object> interviewHistory = interviewMapper.toInterviewHistoryList(
-            interviewPersistenceService.findByResumeId(id)
-        );
+        // 面试历史只取展示需要的标量列：此前走实体查询会把每场的题目/点评等大文本一起拉回来
+        List<Object> interviewHistory = interviewPersistenceService.findResumeInterviewRows(id).stream()
+            .map(ResumeHistoryService::toInterviewHistoryItem)
+            .map(item -> (Object) item)
+            .toList();
 
         return new ResumeDetailDTO(
             resume.getId(),
@@ -96,6 +98,24 @@ public class ResumeHistoryService {
             analysisHistory,
             interviewHistory
         );
+    }
+
+    /**
+     * 面试历史项的字段名与前端约定，集中在这里维护。
+     * 取值与原先的实体路径一致：status 库里就是枚举名，evaluateStatus 为空时保持 null。
+     */
+    private static Map<String, Object> toInterviewHistoryItem(ResumeInterviewRow row) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", row.getId());
+        item.put("sessionId", row.getSessionId());
+        item.put("totalQuestions", row.getTotalQuestions());
+        item.put("status", row.getStatus());
+        item.put("evaluateStatus", row.getEvaluateStatus());
+        item.put("evaluateError", row.getEvaluateError());
+        item.put("overallScore", row.getOverallScore());
+        item.put("createdAt", row.getCreatedAt());
+        item.put("completedAt", row.getCompletedAt());
+        return item;
     }
 
     /**

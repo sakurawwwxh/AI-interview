@@ -182,4 +182,46 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
         order by s.created_at desc
         """, nativeQuery = true)
     List<InterviewListRow> findListRowsByUserId(@Param("userId") Long userId);
+
+    /**
+     * 简历详情里的面试历史行。同一份详情页只需要 9 个标量，
+     * 此前走实体查询会把每场的 questions_json / template_json / 点评等大 TEXT 一起取回
+     * （按简历下会话数累加，多的能到几百 KB），在远端库上要好几秒——与列表页同一病根。
+     */
+    interface ResumeInterviewRow {
+        Long getId();
+
+        String getSessionId();
+
+        Integer getTotalQuestions();
+
+        /** 实体上是 {@code @Enumerated(EnumType.STRING)}，库里存的就是枚举名 */
+        String getStatus();
+
+        String getEvaluateStatus();
+
+        String getEvaluateError();
+
+        Integer getOverallScore();
+
+        LocalDateTime getCreatedAt();
+
+        LocalDateTime getCompletedAt();
+    }
+
+    @Query(value = """
+        select s.id as "id",
+               s.session_id as "sessionId",
+               s.total_questions as "totalQuestions",
+               s.status as "status",
+               s.evaluate_status as "evaluateStatus",
+               s.evaluate_error as "evaluateError",
+               s.overall_score as "overallScore",
+               s.created_at as "createdAt",
+               s.completed_at as "completedAt"
+        from interview_sessions s
+        where s.resume_id = :resumeId
+        order by s.created_at desc
+        """, nativeQuery = true)
+    List<ResumeInterviewRow> findResumeInterviewRowsByResumeId(@Param("resumeId") Long resumeId);
 }

@@ -451,6 +451,13 @@ public class InterviewPersistenceService {
     public List<InterviewSessionEntity> findByResumeId(Long resumeId) {
         return sessionRepository.findByResumeIdOrderByCreatedAtDesc(resumeId);
     }
+
+    /**
+     * 简历详情页用的面试历史：只取展示需要的 9 个标量列，不把每场的大文本一起拉回来。
+     */
+    public List<InterviewSessionRepository.ResumeInterviewRow> findResumeInterviewRows(Long resumeId) {
+        return sessionRepository.findResumeInterviewRowsByResumeId(resumeId);
+    }
     
     /**
      * 删除简历的所有面试会话

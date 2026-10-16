@@ -103,35 +103,6 @@ public interface InterviewMapper {
     @Mapping(target = "completedAt", ignore = true)
     void updateSessionFromReport(InterviewReportDTO report, @MappingTarget InterviewSessionEntity session);
 
-    // ========== 面试历史列表项映射 ==========
-
-    /**
-     * InterviewSessionEntity 转换为简要信息 Map
-     * 用于 ResumeDetailDTO 中的面试历史列表
-     */
-    default java.util.Map<String, Object> toInterviewHistoryItem(InterviewSessionEntity session) {
-        java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
-        map.put("id", session.getId());
-        map.put("sessionId", session.getSessionId());
-        map.put("totalQuestions", session.getTotalQuestions());
-        map.put("status", session.getStatus().toString());
-        map.put("evaluateStatus", session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null);
-        map.put("evaluateError", session.getEvaluateError());
-        map.put("overallScore", session.getOverallScore());
-        map.put("createdAt", session.getCreatedAt());
-        map.put("completedAt", session.getCompletedAt());
-        return map;
-    }
-
-    /**
-     * 批量转换面试历史
-     */
-    default List<Object> toInterviewHistoryList(List<InterviewSessionEntity> sessions) {
-        return sessions.stream()
-            .map(this::toInterviewHistoryItem)
-            .map(m -> (Object) m)
-            .toList();
-    }
 
     // ========== 工具方法 ==========
 

@@ -6,6 +6,7 @@ import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.model.InterviewSessionEntity.SessionStatus;
 import interview.guide.modules.interview.repository.InterviewAnswerRepository;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.interview.repository.InterviewSessionRepository.ResumeInterviewRow;
 import interview.guide.modules.interview.service.InterviewHistoryService;
 import interview.guide.modules.resume.model.ResumeEntity;
 import interview.guide.modules.resume.repository.ResumeRepository;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
@@ -121,6 +123,38 @@ class InterviewHistoryIntegrationTest {
         List<InterviewListItemDTO> items = historyService.listCurrentUserInterviews();
 
         assertEquals(List.of("mine-1"), items.stream().map(InterviewListItemDTO::sessionId).toList());
+    }
+
+    @Test
+    @DisplayName("简历详情里的面试历史：只取标量列，取值与实体路径一致且按创建时间倒序")
+    void resumeDetailInterviewRowsCarryTheSameValuesAsEntities() {
+        ResumeEntity resume = saveResume("detail.pdf");
+        InterviewSessionEntity older = saveSession(resume, "detail-old", 6, LocalDateTime.now().minusDays(2),
+            SessionStatus.CREATED, null, null);
+        InterviewSessionEntity newer = saveSession(resume, "detail-new", 22, LocalDateTime.now().minusHours(1),
+            SessionStatus.EVALUATED, AsyncTaskStatus.COMPLETED, 71);
+
+        List<ResumeInterviewRow> rows = sessionRepository.findResumeInterviewRowsByResumeId(resume.getId());
+
+        assertEquals(List.of("detail-new", "detail-old"),
+            rows.stream().map(ResumeInterviewRow::getSessionId).toList());
+
+        ResumeInterviewRow newest = rows.getFirst();
+        assertEquals(newer.getId(), newest.getId());
+        assertEquals(22, newest.getTotalQuestions());
+        // 枚举以字符串读取，取值与实体的 getStatus().toString() 一致
+        assertEquals("EVALUATED", newest.getStatus());
+        assertEquals("COMPLETED", newest.getEvaluateStatus());
+        assertEquals(71, newest.getOverallScore());
+        // createdAt 能正确映射（跨库往返会截到微秒精度）；completedAt 本用例没设置，投影应如实返回 null
+        assertNotNull(newest.getCreatedAt());
+        assertNull(newest.getCompletedAt());
+
+        ResumeInterviewRow oldest = rows.get(1);
+        assertEquals(older.getId(), oldest.getId());
+        assertEquals("CREATED", oldest.getStatus());
+        assertNull(oldest.getEvaluateStatus());
+        assertNull(oldest.getOverallScore());
     }
 
     private ResumeEntity saveResume(String filename) {
