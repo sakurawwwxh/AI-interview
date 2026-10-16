@@ -19,8 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 知识库查询服务
@@ -117,14 +119,22 @@ public class KnowledgeBaseListService {
     }
 
     /**
-     * 根据ID列表获取知识库名称列表
+     * 根据ID列表获取知识库名称列表。
+     *
+     * <p>用一条批量查询取回后按 id 映射：此前是逐个查，而每次 RAG 提问都会调到这里，
+     * 在远端库（单次往返约 100~300ms）上等于多出 N×0.2s；入参顺序与「取不到就回退成
+     * 未知知识库」的原语义保持不变。
      */
     public List<String> getKnowledgeBaseNames(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
         Long userId = UserContext.getCurrentUserIdOrThrow();
+        Map<Long, String> nameById = knowledgeBaseRepository
+            .findAllByIdInAndUserId(List.copyOf(new LinkedHashSet<>(ids)), userId).stream()
+            .collect(Collectors.toMap(KnowledgeBaseEntity::getId, KnowledgeBaseEntity::getName));
         return ids.stream()
-            .map(id -> knowledgeBaseRepository.findByIdAndUserId(id, userId)
-                .map(KnowledgeBaseEntity::getName)
-                .orElse("未知知识库"))
+            .map(id -> nameById.getOrDefault(id, "未知知识库"))
             .toList();
     }
 
