@@ -26,6 +26,12 @@ spring:
   ai:
     openai:
       api-key: ${DASHSCOPE_API_KEY}
+      chat:
+        options:
+          # 让 AI_MODEL 真的生效：此前 compose 传了它，但没有任何配置读它，
+          # 改这个变量不换模型（一直是基础配置里的 qwen-plus），排障时容易被误导。
+          # 不设该变量时取 qwen-plus，与现状一致。
+          model: ${AI_MODEL:qwen-plus}
 
 async:
   task:
