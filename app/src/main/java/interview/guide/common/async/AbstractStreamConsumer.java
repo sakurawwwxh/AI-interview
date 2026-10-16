@@ -1,5 +1,6 @@
 package interview.guide.common.async;
 
+import interview.guide.common.ai.ProviderErrorClassifier;
 import interview.guide.common.constant.AsyncTaskStreamConstants;
 import interview.guide.infrastructure.redis.RedisService;
 import jakarta.annotation.PostConstruct;
@@ -335,21 +336,12 @@ public abstract class AbstractStreamConsumer<T> {
     }
 
     /**
-     * Determines whether a failed task may become successful on a later delivery.
-     * Provider-side authentication and malformed-request failures are permanent;
-     * retrying them only consumes quota and keeps the user waiting. 429 remains retryable.
+     * 判断失败的任务再投递一次有没有可能成功。
+     * 供应商侧的认证/请求非法属于永久失败，重试只会白耗配额并让用户干等；429 仍可重试。
+     * 判定口径与结构化输出重试共用 {@link ProviderErrorClassifier}，避免两处跑偏。
      */
     protected boolean shouldRetry(Exception error) {
-        String message = error.getMessage();
-        if (message == null) {
-            return true;
-        }
-        String normalized = message.toLowerCase();
-        return !(normalized.contains("http 400")
-            || normalized.contains("http 401")
-            || normalized.contains("http 403")
-            || normalized.contains("http 404")
-            || normalized.contains("invalid_api_key"));
+        return !ProviderErrorClassifier.isPermanent(error);
     }
 
     protected String truncateError(String error) {
