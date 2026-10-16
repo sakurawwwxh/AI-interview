@@ -25,3 +25,13 @@ app/src/main/resources/application.yml
 
 # RAG 评估的观测数据：内容为语料分块正文，随语料一起留在本地
 /evals/retrieval-golden/observed/
+
+# 项目内本地 Maven 仓库（-Dmaven.repo.local=.m2 用），体积上百 MB
+/.m2/
+
+# 本地临时产物
+/tmp/
+
+# 个人资料：简历生成脚本与产物（含简历正文/面试问答），不进公共仓库
+/tools/
+/output/
