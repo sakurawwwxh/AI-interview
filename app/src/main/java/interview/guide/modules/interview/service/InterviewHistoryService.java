@@ -73,7 +73,9 @@ public class InterviewHistoryService {
      * 获取面试会话详情
      */
     public InterviewDetailDTO getInterviewDetail(String sessionId) {
-        Optional<InterviewSessionEntity> sessionOpt = interviewPersistenceService.findBySessionId(sessionId);
+        // 必须用带归属校验的查询：详情里有整场问答与评分，只按 sessionId 取会让任何登录用户读到别人的面试
+        Optional<InterviewSessionEntity> sessionOpt =
+            interviewPersistenceService.findBySessionIdForCurrentUser(sessionId);
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
@@ -183,7 +185,9 @@ public class InterviewHistoryService {
      * 导出面试报告为PDF
      */
     public byte[] exportInterviewPdf(String sessionId) {
-        Optional<InterviewSessionEntity> sessionOpt = interviewPersistenceService.findBySessionId(sessionId);
+        // 同上：导出的 PDF 含整场问答与评分，必须校验归属
+        Optional<InterviewSessionEntity> sessionOpt =
+            interviewPersistenceService.findBySessionIdForCurrentUser(sessionId);
         if (sessionOpt.isEmpty()) {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
