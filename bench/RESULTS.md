@@ -1,7 +1,7 @@
 # 压测报告:简历提交接口(异步化验证)
 
 > 实测时间:2026-09-14 / 环境:应用本机运行(mvn spring-boot:run,默认 application.yml),
-> 中间件(PostgreSQL / Redis / RustFS)部署于远程服务器 <remote-host>,
+> 中间件(PostgreSQL / Redis / RustFS)部署于一台远程服务器（地址属环境信息，不入库）,
 > 本机→服务器单次网络往返(RTT)实测约 **830ms**。
 > 压测方式:`bench/run-bench.sh`,20 份内容各异的样本简历(bench/resumes/),每个文件走完整提交路径
 > (Tika 解析 → 内容哈希 → S3 上传 → DB 落库 → XADD 入队 → 返回任务 ID),120 秒等待端到端完成。
