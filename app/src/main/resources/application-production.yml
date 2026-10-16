@@ -19,9 +19,17 @@ spring:
         singleServerConfig:
           address: "${REDIS_ADDRESS}"
           database: ${REDIS_DATABASE:0}
+          # 刻意保持 Redisson 默认的超时与重试（timeout=3000、retryAttempts=4）。
+          # 这些参数同时管辖连接池建立与握手：调小后在跨机房的丢包链路上会出现
+          # "Unable to init enough connections amount"，应用直接起不来。
+          # Redis 故障对接口的影响改由 RateLimitAspect 的失败放行兜住。
   ai:
     openai:
       api-key: ${DASHSCOPE_API_KEY}
+
+async:
+  task:
+    max-concurrency: ${ASYNC_TASK_MAX_CONCURRENCY:8}
 
 server:
   shutdown: graceful
@@ -30,6 +38,11 @@ server:
     include-stacktrace: never
 
 app:
+  ai:
+    limiter:
+      provider-max-concurrency: ${AI_PROVIDER_MAX_CONCURRENCY:8}
+      user-max-concurrency: ${AI_USER_MAX_CONCURRENCY:4}
+      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:10s}
   jwt:
     secret: ${APP_JWT_SECRET}
   storage:

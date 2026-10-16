@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 限流注解单元测试
  */
 @DisplayName("限流注解单元测试")
-class RateLimitScriptTest {
+class RateLimitAnnotationTest {
 
     @Test
     @DisplayName("验证注解元配置")

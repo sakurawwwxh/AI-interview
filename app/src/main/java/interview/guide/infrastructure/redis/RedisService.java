@@ -231,13 +231,23 @@ public class RedisService {
         RStream<String, String> stream = redissonClient.getStream(streamKey, StringCodec.INSTANCE);
 
         // 使用阻塞读取，让 Redis 服务端等待消息
-        Map<StreamMessageId, Map<String, String>> messages = stream.readGroup(
-            groupName,
-            consumerName,
-            StreamReadGroupArgs.neverDelivered()
-                .count(count)
-                .timeout(Duration.ofMillis(blockTimeoutMs))
-        );
+        Map<StreamMessageId, Map<String, String>> messages;
+        try {
+            messages = stream.readGroup(
+                groupName,
+                consumerName,
+                StreamReadGroupArgs.neverDelivered()
+                    .count(count)
+                    .timeout(Duration.ofMillis(blockTimeoutMs))
+            );
+        } catch (ClassCastException e) {
+            // Redisson 4.0.0 的 RedissonStream.readGroup 把 XREADGROUP 的响应直接强转成 Map，
+            // 空响应偶发会被解码成 Collections.emptyList，于是抛「EmptyList cannot be cast to Map」。
+            // 这与「本轮没读到消息」等价：按无消息返回，未投递的消息下一轮照样会被读到，不会丢。
+            // 这里窄兜底把它降级，避免消费循环持续打 ERROR 噪声。
+            log.debug("readGroup 空响应解码异常，本轮按无消息处理: stream={}, group={}", streamKey, groupName, e);
+            return false;
+        }
 
         if (messages == null || messages.isEmpty()) {
             return false;

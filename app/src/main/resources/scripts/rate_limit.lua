@@ -16,6 +16,11 @@ local interval = tonumber(ARGV[3])
 local max_tokens = tonumber(ARGV[4])
 local request_id = ARGV[5]
 
+-- 注意：配额回补是**惰性**的。过期 permit 只在下一个请求到达时（本脚本第 31 行的
+-- zrangebyscore 扫描）才结算并回充 value_key；静置期间 value_key 保持为 0。
+-- 因此"空闲一会儿后 get value_key 仍为 0"是正常的，不代表欠账不还。
+-- （集成测试 RateLimitRedisIntegrationTest 覆盖了这一点。）
+
 -- 第一阶段：预检查阶段 - 检查所有维度是否有足够令牌
 for i, key in ipairs(KEYS) do
     local value_key = key .. ":value"

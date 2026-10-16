@@ -1,20 +1,19 @@
 package interview.guide.modules.interview.service;
 
-import interview.guide.modules.interview.model.InterviewAnswerEntity;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
-import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.model.InterviewStatisticsDTO;
+import interview.guide.modules.interview.repository.InterviewAnswerRepository;
+import interview.guide.modules.interview.repository.InterviewAnswerRepository.AnswerScoreRow;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.interview.repository.InterviewSessionRepository.StatisticsSessionRow;
 import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -25,6 +24,10 @@ import java.util.stream.Collectors;
 
 /**
  * 从已保存的面试报告聚合个人能力、趋势和薄弱项，不触发额外 AI 调用。
+ * <p>
+ * 读路径刻意只取聚合需要的窄列（见 {@link StatisticsSessionRow} 与 {@link AnswerScoreRow}）：
+ * 会话与答案实体上的大文本列一旦随实体取回，在这类远端部署（单次往返约 100ms）上会把
+ * 一次统计请求从约 0.3 秒拖到十几秒。
  */
 @Slf4j
 @Service
@@ -52,28 +55,21 @@ public class InterviewStatisticsService {
     }
 
     private final InterviewSessionRepository sessionRepository;
-    private final ObjectMapper objectMapper;
+    private final InterviewAnswerRepository answerRepository;
 
     @Transactional(readOnly = true)
     public InterviewStatisticsDTO getStatistics() {
         Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
-            return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
+            return emptyStatistics();
         }
-        List<Long> sessionIds = sessionRepository.findEvaluatedIdsByUserId(
-            userId, PageRequest.of(0, MAX_STATISTICS_SESSIONS));
-        if (sessionIds.isEmpty()) {
-            return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
+        List<StatisticsSessionRow> recent = sessionRepository.findStatisticsSessions(userId, MAX_STATISTICS_SESSIONS);
+        if (recent.isEmpty()) {
+            return emptyStatistics();
         }
-        Map<Long, Integer> orderById = java.util.stream.IntStream.range(0, sessionIds.size())
-            .boxed()
-            .collect(Collectors.toMap(sessionIds::get, index -> index));
-        List<InterviewSessionEntity> sessions = new ArrayList<>(
-            sessionRepository.findEvaluatedWithAnswersByIdIn(sessionIds));
-        sessions.sort(Comparator.comparing(session -> orderById.getOrDefault(session.getId(), Integer.MAX_VALUE)));
-        if (sessions.isEmpty()) {
-            return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
-        }
+        // 查询按完成时间倒序取最近的场次，翻回时间正序后用于趋势展示
+        List<StatisticsSessionRow> sessions = new ArrayList<>(recent);
+        Collections.reverse(sessions);
 
         List<InterviewStatisticsDTO.TrendPoint> trend = sessions.stream()
             .map(session -> new InterviewStatisticsDTO.TrendPoint(
@@ -83,13 +79,15 @@ public class InterviewStatisticsService {
             ))
             .toList();
 
+        List<Long> sessionIds = sessions.stream().map(StatisticsSessionRow::getId).toList();
+        Map<Long, List<AnswerScoreRow>> answersBySession = answerRepository
+            .findAnswerScoresBySessionIds(sessionIds).stream()
+            .collect(Collectors.groupingBy(AnswerScoreRow::getSessionId));
+
         Map<String, List<Integer>> categoryScores = new LinkedHashMap<>();
-        for (InterviewSessionEntity session : sessions) {
-            Map<Integer, String> categoryByQuestionIndex = readQuestionCategories(session);
-            for (InterviewAnswerEntity answer : session.getAnswers()) {
-                if (answer.getScore() == null) {
-                    continue;
-                }
+        for (StatisticsSessionRow session : sessions) {
+            Map<Integer, String> categoryByQuestionIndex = parseQuestionCategories(session);
+            for (AnswerScoreRow answer : answersBySession.getOrDefault(session.getId(), List.of())) {
                 String category = categoryByQuestionIndex.get(answer.getQuestionIndex());
                 if (category == null) {
                     category = fallbackCategory(answer.getCategory());
@@ -114,7 +112,7 @@ public class InterviewStatisticsService {
             .toList();
 
         int averageScore = average(sessions.stream()
-            .map(InterviewSessionEntity::getOverallScore)
+            .map(StatisticsSessionRow::getOverallScore)
             .filter(Objects::nonNull)
             .toList());
         int latestScore = trend.getLast().score();
@@ -128,26 +126,42 @@ public class InterviewStatisticsService {
         );
     }
 
-    private Map<Integer, String> readQuestionCategories(InterviewSessionEntity session) {
-        if (session.getQuestionsJson() == null || session.getQuestionsJson().isBlank()) {
+    private InterviewStatisticsDTO emptyStatistics() {
+        return new InterviewStatisticsDTO(0, 0, null, null, List.of(), List.of(), List.of());
+    }
+
+    /**
+     * 把 {@code 0:PROJECT,1:JAVA_BASIC} 这类「题号:类型」串还原成「题号 → 中文分类」。
+     * <p>
+     * 题号为空串表示原 JSON 里该题没有 questionIndex（还原成 null 键，与按题号取值的行为一致）；
+     * 类型为空串表示该题没有 type，此时不写入条目，随后会回退到答案自身的 category。
+     */
+    private Map<Integer, String> parseQuestionCategories(StatisticsSessionRow session) {
+        String encoded = session.getQuestionTypes();
+        if (encoded == null || encoded.isBlank()) {
             return Map.of();
         }
+        Map<Integer, String> categories = new LinkedHashMap<>();
         try {
-            List<InterviewQuestionDTO> questions = objectMapper.readValue(
-                session.getQuestionsJson(), new TypeReference<List<InterviewQuestionDTO>>() {
+            for (String pair : encoded.split(",")) {
+                int separator = pair.indexOf(':');
+                String indexPart = separator < 0 ? pair : pair.substring(0, separator);
+                String typePart = separator < 0 ? "" : pair.substring(separator + 1);
+                if (typePart.isBlank()) {
+                    continue;
                 }
-            );
-            Map<Integer, String> categories = new LinkedHashMap<>();
-            for (InterviewQuestionDTO question : questions) {
-                if (question.type() != null) {
-                    categories.put(question.questionIndex(), CATEGORY_LABELS.get(question.type()));
-                }
+                categories.put(
+                    indexPart.isBlank() ? null : Integer.valueOf(indexPart),
+                    CATEGORY_LABELS.get(InterviewQuestionDTO.QuestionType.valueOf(typePart))
+                );
             }
-            return categories;
-        } catch (Exception e) {
-            log.warn("解析统计面试题目失败: sessionId={}", session.getSessionId(), e);
+        } catch (RuntimeException e) {
+            // 类型串解析不了（例如枚举值不在当前版本内）：整场退化成按答案自身 category 归类，
+            // 与原先 JSON 反序列化失败后返回空映射的行为保持一致
+            log.warn("解析统计题目类型失败: sessionId={}, questionTypes={}", session.getSessionId(), encoded, e);
             return Map.of();
         }
+        return categories;
     }
 
     private String fallbackCategory(String category) {

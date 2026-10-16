@@ -13,6 +13,7 @@ import interview.guide.modules.interview.model.InterviewListItemDTO;
 import interview.guide.modules.interview.model.InterviewQuestionDTO;
 import interview.guide.modules.interview.model.InterviewSessionEntity;
 import interview.guide.modules.interview.repository.InterviewSessionRepository;
+import interview.guide.modules.interview.repository.InterviewSessionRepository.InterviewListRow;
 import interview.guide.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,28 +44,28 @@ public class InterviewHistoryService {
     @Transactional(readOnly = true)
     public List<InterviewListItemDTO> listCurrentUserInterviews() {
         Long userId = UserContext.getCurrentUserIdOrThrow();
-        return sessionRepository.findAllByUserIdWithResumeOrderByCreatedAtDesc(userId).stream()
+        return sessionRepository.findListRowsByUserId(userId).stream()
             .map(this::toListItem)
             .toList();
     }
 
-    private InterviewListItemDTO toListItem(InterviewSessionEntity session) {
-        String filename = session.getResume() != null ? session.getResume().getOriginalFilename() : "未知简历";
-        Long resumeId = session.getResume() != null ? session.getResume().getId() : null;
+    private InterviewListItemDTO toListItem(InterviewListRow row) {
+        // LEFT JOIN 未命中时简历信息为 null，与原实体路径的兜底保持一致
+        String filename = row.getResumeFilename() != null ? row.getResumeFilename() : "未知简历";
         return new InterviewListItemDTO(
-            session.getId(),
-            session.getSessionId(),
-            resumeId,
+            row.getId(),
+            row.getSessionId(),
+            row.getResumeId(),
             filename,
-            session.getTotalQuestions(),
-            session.getStatus() != null ? session.getStatus().name() : null,
-            session.getEvaluateStatus() != null ? session.getEvaluateStatus().name() : null,
-            session.getEvaluateError(),
-            session.getEvaluateProgress(),
-            session.getOverallScore(),
-            session.getOverallFeedback(),
-            session.getCreatedAt(),
-            session.getCompletedAt()
+            row.getTotalQuestions(),
+            row.getStatus(),
+            row.getEvaluateStatus(),
+            row.getEvaluateError(),
+            row.getEvaluateProgress(),
+            row.getOverallScore(),
+            row.getOverallFeedback(),
+            row.getCreatedAt(),
+            row.getCompletedAt()
         );
     }
 

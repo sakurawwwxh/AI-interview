@@ -68,16 +68,49 @@ public class RateLimitAspect {
     }
 
     /**
-     * 初始化：预加载脚本到 Redis 提高性能
+     * 初始化：预加载脚本到 Redis 提高性能。
+     * <p>
+     * 预加载失败不阻止应用启动。启动阶段一次 Redis 抖动（跨机房部署上尤其常见）不该让
+     * 整个服务起不来——脚本会在首个请求上按需加载（见 {@link #scriptSha}），
+     * 仍失败则由 {@link #around} 的失败放行兜住。
      */
     @jakarta.annotation.PostConstruct
     public void init() {
-        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
-        scriptShaCache.put(RateLimit.Strategy.SLIDING_WINDOW,
-                script.scriptLoad(SLIDING_WINDOW_SCRIPT));
-        scriptShaCache.put(RateLimit.Strategy.TOKEN_BUCKET,
-                script.scriptLoad(TOKEN_BUCKET_SCRIPT));
-        log.info("限流 Lua 脚本加载完成, SHA1: {}", scriptShaCache);
+        try {
+            RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+            scriptShaCache.put(RateLimit.Strategy.SLIDING_WINDOW,
+                    script.scriptLoad(SLIDING_WINDOW_SCRIPT));
+            scriptShaCache.put(RateLimit.Strategy.TOKEN_BUCKET,
+                    script.scriptLoad(TOKEN_BUCKET_SCRIPT));
+            log.info("限流 Lua 脚本加载完成, SHA1: {}", scriptShaCache);
+        } catch (RuntimeException e) {
+            log.warn("限流 Lua 脚本预加载失败，改为首次使用时加载: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 取脚本 SHA1；缓存缺失时按需加载一次，覆盖「预加载失败」的自愈路径。
+     * <p>
+     * 这里的加载发生在请求线程上，失败会交给调用方（{@link #around}）的失败放行处理。
+     */
+    private String scriptSha(RScript script, RateLimit.Strategy strategy) {
+        String cached = scriptShaCache.get(strategy);
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (scriptShaCache) {
+            String current = scriptShaCache.get(strategy);
+            if (current != null) {
+                return current;
+            }
+            String loaded = script.scriptLoad(switch (strategy) {
+                case SLIDING_WINDOW -> SLIDING_WINDOW_SCRIPT;
+                case TOKEN_BUCKET -> TOKEN_BUCKET_SCRIPT;
+            });
+            scriptShaCache.put(strategy, loaded);
+            log.info("限流 Lua 脚本按需加载完成: strategy={}, SHA1={}", strategy, loaded);
+            return loaded;
+        }
     }
 
     /**
@@ -96,15 +129,7 @@ public class RateLimitAspect {
         // 2. 根据配置维度动态生成 Redis Keys
         List<String> keys = generateKeys(className, methodName, rateLimit.dimensions());
 
-        // 3. 根据限流策略选择对应的 Lua 脚本执行原子限流
-        // 使用 StringCodec 确保参数正确传递为字符串
-        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
-        String scriptSha = scriptShaCache.get(rateLimit.strategy());
-        if (scriptSha == null) {
-            throw new IllegalStateException("限流脚本未加载: " + rateLimit.strategy());
-        }
-
-        // 准备参数（两种策略脚本共用同一签名）
+        // 3. 准备参数（两种策略脚本共用同一签名）
         List<Object> keysList = new ArrayList<>(keys);
         Object[] args = {
                 String.valueOf(System.currentTimeMillis()), // ARGV[1]: 当前时间戳
@@ -114,23 +139,37 @@ public class RateLimitAspect {
                 UUID.randomUUID().toString()               // ARGV[5]: 请求唯一标识
         };
 
-        Object resultObj = script.evalSha(
-                RScript.Mode.READ_WRITE,
-                scriptSha,
-                RScript.ReturnType.VALUE,
-                keysList,
-                args
-        );
+        // 4. 选择对应的 Lua 脚本执行原子限流；StringCodec 确保参数以字符串传递。
+        // 脚本句柄与执行都放在 try 里：预加载失败时首个请求会补齐脚本，
+        // 补不齐（Redis 真的不可用）就按失败放行处理。
+        Object resultObj;
+        try {
+            RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+            resultObj = script.evalSha(
+                    RScript.Mode.READ_WRITE,
+                    scriptSha(script, rateLimit.strategy()),
+                    RScript.ReturnType.VALUE,
+                    keysList,
+                    args
+            );
+        } catch (RuntimeException e) {
+            // Redis 不可用或超时属于基础设施故障，与“请求过于频繁”是两回事。
+            // 限流是保护手段而不是授权判定，这里选择失败开放（fail-open）：
+            // 否则跨机房部署下一次 Redis 抖动，就会把全部带 @RateLimit 的接口打成 5xx，
+            // 而它们本该是最需要的那些接口（如能力画像统计）。
+            log.warn("限流脚本执行失败，本次请求放行: keys={}, error={}", keys, e.getMessage());
+            return joinPoint.proceed();
+        }
 
         // 将结果转换为 Long
         Long result = convertToLong(resultObj);
 
-        // 4. 处理限流结果
+        // 5. 处理限流结果
         if (result == null || result == 0) {
             return handleRateLimitExceeded(joinPoint, rateLimit, keys);
         }
 
-        // 5. 执行原方法
+        // 6. 执行原方法
         return joinPoint.proceed();
     }
 
