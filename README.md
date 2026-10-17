@@ -253,12 +253,17 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ### 3. 配置后端
 
 本地默认读取 `app/src/main/resources/application.yml`（该文件默认被 `.gitignore` 忽略，避免提交密钥）。
+**新克隆的仓库里没有这个文件，先复制模板**：
 
-请至少配置：
+```bash
+cp app/src/main/resources/application.yml.example app/src/main/resources/application.yml
+```
+
+然后至少配置：
 
 - 数据源：PostgreSQL 地址 / 库名 / 账号密码  
 - Redis：Redisson 地址  
-- 对象存储：endpoint / access-key / secret-key / bucket  
+- 对象存储：endpoint / access-key / secret-key / bucket（模板里故意留空，必须自行注入）  
 - AI：`spring.ai.openai.*`（DashScope 兼容模式与 API Key）  
 - JWT：`app.jwt.secret`（长度需满足签名要求）  
 

@@ -1,0 +1,153 @@
+# 本地配置模板：使用前先复制成同目录的 application.yml
+#   cp app/src/main/resources/application.yml.example app/src/main/resources/application.yml
+# 那个文件被 .gitignore 忽略（避免把主机、口令与密钥提交进来），
+# 所以新克隆后没有它会无法启动。所有 ${VAR:默认值} 都可用环境变量覆盖。
+# 注意：APP_STORAGE_ACCESS_KEY / SECRET_KEY 必须在部署时注入，模板里故意留空。
+
+# AI Interview Platform Configuration
+
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-interview-platform
+
+  threads:
+    virtual:
+      enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:true}
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # 远端数据库单次往返约 400ms；默认 10 条连接会在约 23 RPS 时饱和。
+      # 生产环境应按数据库实例容量通过环境变量调整，而不是再依赖 Hikari 默认值。
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  redis:
+    redisson:
+      config: |
+        singleServerConfig:
+          address: "redis://${REDIS_HOST:127.0.0.1}:${REDIS_PORT:6379}"
+          database: 0
+          connectionMinimumIdleSize: 10
+          connectionPoolSize: 64
+          subscriptionConnectionMinimumIdleSize: 1
+          subscriptionConnectionPoolSize: 50
+          # 刻意保持 Redisson 默认的超时与重试（timeout=3000、retryAttempts=4）。
+          # 它们同时管辖连接池建立与握手，调小后在跨机房丢包链路上会出现
+          # "Unable to init enough connections amount" 导致启动失败。
+          # 另注：不要写 retryInterval —— Redisson 4.0 的 YAML 绑定认不出它。
+
+  ai:
+    openai:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      api-key: ${AI_BAILIAN_API_KEY:}
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.2
+      embedding:
+        options:
+          model: text-embedding-v3
+    retry:
+      max-attempts: 1
+      on-client-errors: false
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1024
+        initialize-schema: true
+        remove-existing-vector-store-table: false
+
+async:
+  task:
+    max-concurrency: ${ASYNC_TASK_MAX_CONCURRENCY:8}
+
+app:
+  admin:
+    bootstrap:
+      enabled: true
+      username: admin
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:change-me}
+      email: admin@example.com
+  ai:
+    structured-max-attempts: 2
+    structured-include-last-error: true
+    limiter:
+      provider-max-concurrency: ${AI_PROVIDER_MAX_CONCURRENCY:8}
+      user-max-concurrency: ${AI_USER_MAX_CONCURRENCY:4}
+      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:10s}
+    quota:
+      enabled: true
+      daily-token-limit: 500000
+    rag:
+      rewrite:
+        enabled: true
+      search:
+        short-query-length: 4
+        topk-short: 20
+        topk-medium: 12
+        topk-long: 8
+        min-score-short: 0.18
+        min-score-default: 0.28
+  jwt:
+    secret: local-development-jwt-secret-please-change-before-production
+    access-expiration: 1800
+    refresh-expiration: 604800
+  interview:
+    follow-up-count: 1
+    evaluation:
+      batch-size: 8
+  resume:
+    upload-dir: ${java.io.tmpdir}/ai-interview/resumes
+    allowed-types:
+      - application/pdf
+      - application/msword
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - text/plain
+  storage:
+    endpoint: ${APP_STORAGE_ENDPOINT:http://127.0.0.1:9002}
+    access-key: ${APP_STORAGE_ACCESS_KEY:}
+    secret-key: ${APP_STORAGE_SECRET_KEY:}
+    bucket: interview-guide
+    region: us-east-1
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:80}
+
+dify:
+  api-url: ${DIFY_API_URL:https://api.dify.ai/v1}
+  api-key: ${DIFY_API_KEY:}
+  app-api-key: ${DIFY_APP_API_KEY:}
+  dataset-id: ${DIFY_DATASET_ID:}
+  sync:
+    # Dify Cloud 不可达时不应让后台同步影响核心面试服务；部署时显式设为 true。
+    enabled: ${DIFY_SYNC_ENABLED:false}
+    interval: 600000
+    retry-count: 3
+    retry-delay: 5000
+  proxy:
+    enabled: false
+    host: 127.0.0.1
+    port: 7890
+    connect-timeout-ms: 15000
