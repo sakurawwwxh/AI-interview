@@ -1,0 +1,554 @@
+package ai.interview.modules.knowledgebase.service;
+
+import ai.interview.common.exception.BusinessException;
+import ai.interview.common.exception.ErrorCode;
+import ai.interview.modules.knowledgebase.model.QueryRequest;
+import ai.interview.modules.knowledgebase.model.QueryResponse;
+import ai.interview.common.ai.AiRequestLimiter;
+import ai.interview.common.ai.AiUsageRecorder;
+import ai.interview.common.ai.LimitedChatModel;
+import ai.interview.modules.user.security.UserContext;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * 知识库查询服务
+ * 基于向量搜索的RAG问答
+ */
+@Slf4j
+@Service
+public class KnowledgeBaseQueryService {
+    private static final String NO_RESULT_RESPONSE = "抱歉，在选定的知识库中未检索到相关信息。请换一个更具体的关键词或补充上下文后再试。";
+    private static final String ERROR_RESPONSE = "AI服务暂时不可用，请稍后重试。";
+    /**
+     * 短 token 模式：仅匹配 2-4 个字符的纯标识符（如 JVM、GC、IO）。
+     * 这类短 token 在向量空间中语义信息不足，需要额外做文本包含确认。
+     * 更长的短语（如"java的基本特性"）已有足够语义信息，不需要额外确认。
+     */
+    private static final Pattern SHORT_TOKEN_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_-]{2,4}$");
+    private static final int STREAM_PROBE_CHARS = 120;
+    /** context 最大字符数，防止 token 溢出 */
+    private static final int MAX_CONTEXT_CHARS = 8000;
+    /** 多轮对话注入的历史消息条数（3 轮 = 6 条） */
+    private static final int MAX_HISTORY_MESSAGES = 6;
+
+    private final ChatModel platformChatModel;
+    private final AiRequestLimiter requestLimiter;
+    private final KnowledgeBaseVectorService vectorService;
+    private final KnowledgeBaseListService listService;
+    private final KnowledgeBaseCountService countService;
+    private final AiUsageRecorder usageRecorder;
+    private final PromptTemplate systemPromptTemplate;
+    private final PromptTemplate userPromptTemplate;
+    private final PromptTemplate rewritePromptTemplate;
+    private final boolean rewriteEnabled;
+    private final int shortQueryLength;
+    private final int topkShort;
+    private final int topkMedium;
+    private final int topkLong;
+    private final double minScoreShort;
+    private final double minScoreDefault;
+
+    public KnowledgeBaseQueryService(
+            ChatModel platformChatModel,
+            KnowledgeBaseVectorService vectorService,
+            KnowledgeBaseListService listService,
+            KnowledgeBaseCountService countService,
+            AiUsageRecorder usageRecorder,
+            AiRequestLimiter requestLimiter,
+            @Value("classpath:prompts/knowledgebase-query-system.st") Resource systemPromptResource,
+            @Value("classpath:prompts/knowledgebase-query-user.st") Resource userPromptResource,
+            @Value("classpath:prompts/knowledgebase-query-rewrite.st") Resource rewritePromptResource,
+            @Value("${app.ai.rag.rewrite.enabled:true}") boolean rewriteEnabled,
+            @Value("${app.ai.rag.search.short-query-length:4}") int shortQueryLength,
+            @Value("${app.ai.rag.search.topk-short:20}") int topkShort,
+            @Value("${app.ai.rag.search.topk-medium:12}") int topkMedium,
+            @Value("${app.ai.rag.search.topk-long:8}") int topkLong,
+            @Value("${app.ai.rag.search.min-score-short:0.18}") double minScoreShort,
+            @Value("${app.ai.rag.search.min-score-default:0.28}") double minScoreDefault) throws IOException {
+        this.platformChatModel = platformChatModel;
+        this.requestLimiter = requestLimiter;
+        this.vectorService = vectorService;
+        this.listService = listService;
+        this.countService = countService;
+        this.usageRecorder = usageRecorder;
+        this.systemPromptTemplate = new PromptTemplate(systemPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.userPromptTemplate = new PromptTemplate(userPromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.rewritePromptTemplate = new PromptTemplate(rewritePromptResource.getContentAsString(StandardCharsets.UTF_8));
+        this.rewriteEnabled = rewriteEnabled;
+        this.shortQueryLength = shortQueryLength;
+        this.topkShort = topkShort;
+        this.topkMedium = topkMedium;
+        this.topkLong = topkLong;
+        this.minScoreShort = minScoreShort;
+        this.minScoreDefault = minScoreDefault;
+    }
+
+    /**
+     * 基于单个知识库回答用户问题
+     */
+    public String answerQuestion(Long knowledgeBaseId, String question) {
+        return answerQuestion(List.of(knowledgeBaseId), question);
+    }
+
+    /**
+     * 基于多个知识库回答用户问题（RAG）
+     */
+    public String answerQuestion(List<Long> knowledgeBaseIds, String question) {
+        return answerQuestion(knowledgeBaseIds, question, List.of());
+    }
+
+    /**
+     * 基于多个知识库回答用户问题（RAG），支持多轮对话历史
+     *
+     * @param knowledgeBaseIds 知识库 ID 列表
+     * @param question         用户问题
+     * @param history          历史对话消息（最近 N 条，按时间正序），可为空
+     * @return AI 回答
+     */
+    public String answerQuestion(List<Long> knowledgeBaseIds, String question, List<Message> history) {
+        List<Message> safeHistory = history != null ? history : List.of();
+        log.info("收到知识库提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, safeHistory.size());
+        if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
+            return NO_RESULT_RESPONSE;
+        }
+        List<Long> ownedKnowledgeBaseIds = listService.requireOwnedKnowledgeBaseIds(knowledgeBaseIds);
+
+        // 1. 验证知识库是否存在并更新问题计数
+        countService.updateQuestionCounts(ownedKnowledgeBaseIds);
+
+        // 2. Query rewrite + 动态参数检索
+        QueryContext queryContext = buildQueryContext(question);
+        List<Document> relevantDocs = retrieveRelevantDocs(queryContext, ownedKnowledgeBaseIds);
+
+        if (!hasEffectiveHit(question, relevantDocs)) {
+            return NO_RESULT_RESPONSE;
+        }
+
+        // 3. 构建上下文（带来源标注 + 长度裁剪）
+        String context = buildContextWithSources(relevantDocs, ownedKnowledgeBaseIds);
+
+        log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
+
+        // 4. 构建提示词
+        String systemPrompt = buildSystemPrompt();
+        String userPrompt = buildUserPrompt(context, question);
+
+        usageRecorder.checkQuota();
+        try {
+            // 5. 调用AI生成回答（注入历史消息）
+            var promptBuilder = chatClient().prompt()
+                    .system(systemPrompt)
+                    .user(userPrompt);
+            if (!safeHistory.isEmpty()) {
+                promptBuilder.messages(safeHistory);
+            }
+            ChatResponse response = promptBuilder.call().chatResponse();
+            usageRecorder.recordUsage(response, "rag-chat");
+            String answer = extractResponseText(response);
+            answer = normalizeAnswer(answer);
+
+            log.info("知识库问答完成: kbIds={}", ownedKnowledgeBaseIds);
+            return answer;
+
+        } catch (Exception e) {
+            log.error("知识库问答失败: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.KNOWLEDGE_BASE_QUERY_FAILED, ERROR_RESPONSE);
+        }
+    }
+
+    /**
+     * 构建系统提示词
+     */
+    private String buildSystemPrompt() {
+        return systemPromptTemplate.render();
+    }
+
+    /**
+     * 构建用户提示词
+     */
+    private String buildUserPrompt(String context, String question) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("context", context);
+        variables.put("question", question);
+        return userPromptTemplate.render(variables);
+    }
+
+    /**
+     * 构建带来源标注的上下文，并裁剪总长度防止 token 溢出
+     *
+     * <p>每个检索片段前标注来源知识库名称，格式：
+     * <pre>【来源：知识库名】
+     * 文档内容...</pre>
+     */
+    private String buildContextWithSources(List<Document> docs, List<Long> knowledgeBaseIds) {
+        // 批量查询知识库名称
+        List<String> kbNames = listService.getKnowledgeBaseNames(knowledgeBaseIds);
+        Map<String, String> kbIdToName = new HashMap<>();
+        for (int i = 0; i < knowledgeBaseIds.size() && i < kbNames.size(); i++) {
+            kbIdToName.put(knowledgeBaseIds.get(i).toString(), kbNames.get(i));
+        }
+
+        StringBuilder context = new StringBuilder();
+        for (Document doc : docs) {
+            Object kbIdObj = doc.getMetadata() != null ? doc.getMetadata().get("kb_id") : null;
+            String kbName = (kbIdObj != null) ? kbIdToName.getOrDefault(kbIdObj.toString(), "未知知识库") : "未知知识库";
+            String text = doc.getText();
+            if (text == null || text.isBlank()) {
+                continue;
+            }
+
+            if (context.length() > 0) {
+                context.append("\n\n---\n\n");
+            }
+            context.append("【来源：").append(kbName).append("】\n").append(text);
+
+            // 长度裁剪，防止 token 溢出
+            if (context.length() >= MAX_CONTEXT_CHARS) {
+                context.setLength(MAX_CONTEXT_CHARS);
+                context.append("\n\n[...内容已截断]");
+                log.info("Context 超过 {} 字符，已截断", MAX_CONTEXT_CHARS);
+                break;
+            }
+        }
+        return context.toString();
+    }
+
+    /**
+     * 查询知识库并返回完整响应
+     */
+    public QueryResponse queryKnowledgeBase(QueryRequest request) {
+        String answer = answerQuestion(request.knowledgeBaseIds(), request.question());
+
+        // 获取知识库名称（多个知识库用逗号分隔）
+        List<String> kbNames = listService.getKnowledgeBaseNames(request.knowledgeBaseIds());
+        String kbNamesStr = String.join("、", kbNames);
+
+        // 使用第一个知识库ID作为主要标识（兼容前端）
+        Long primaryKbId = request.knowledgeBaseIds().getFirst();
+
+        return new QueryResponse(answer, primaryKbId, kbNamesStr);
+    }
+
+    /**
+     * 流式查询知识库（SSE）
+     */
+    public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question) {
+        return answerQuestionStream(knowledgeBaseIds, question, List.of());
+    }
+
+    /**
+     * 流式查询知识库（SSE），支持多轮对话历史
+     *
+     * @param knowledgeBaseIds 知识库 ID 列表
+     * @param question         用户问题
+     * @param history          历史对话消息（按时间正序），可为空
+     * @return 流式响应
+     */
+    public Flux<String> answerQuestionStream(List<Long> knowledgeBaseIds, String question, List<Message> history) {
+        List<Message> safeHistory = history != null ? history : List.of();
+        log.info("收到知识库流式提问: kbIds={}, question={}, historySize={}", knowledgeBaseIds, question, safeHistory.size());
+        if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty() || normalizeQuestion(question).isBlank()) {
+            return Flux.just(NO_RESULT_RESPONSE);
+        }
+        List<Long> ownedKnowledgeBaseIds = listService.requireOwnedKnowledgeBaseIds(knowledgeBaseIds);
+
+        try {
+            // 1. 验证知识库是否存在并更新问题计数
+            countService.updateQuestionCounts(ownedKnowledgeBaseIds);
+
+            // 2. Query rewrite + 动态参数检索
+            QueryContext queryContext = buildQueryContext(question);
+            List<Document> relevantDocs = retrieveRelevantDocs(queryContext, ownedKnowledgeBaseIds);
+
+            if (!hasEffectiveHit(question, relevantDocs)) {
+                return Flux.just(NO_RESULT_RESPONSE);
+            }
+
+            // 3. 构建上下文（带来源标注 + 长度裁剪）
+            String context = buildContextWithSources(relevantDocs, ownedKnowledgeBaseIds);
+
+            log.debug("检索到 {} 个相关文档片段", relevantDocs.size());
+
+            // 4. 构建提示词
+            String systemPrompt = buildSystemPrompt();
+            String userPrompt = buildUserPrompt(context, question);
+
+            usageRecorder.checkQuota();
+            // 5. 流式调用（注入历史消息）+ 探测窗口归一化
+            var promptBuilder = chatClient().prompt()
+                    .system(systemPrompt)
+                    .user(userPrompt);
+            if (!safeHistory.isEmpty()) {
+                promptBuilder.messages(safeHistory);
+            }
+            AtomicReference<ChatResponse> responseWithUsage = new AtomicReference<>();
+            Flux<String> responseFlux = promptBuilder.stream()
+                .chatResponse()
+                .doOnNext(response -> {
+                    if (hasUsage(response)) {
+                        responseWithUsage.set(response);
+                    }
+                })
+                .map(this::extractResponseText)
+                .doFinally(signal -> usageRecorder.recordUsage(responseWithUsage.get(), "rag-chat-stream"));
+
+            log.info("开始流式输出知识库回答(探测窗口): kbIds={}", ownedKnowledgeBaseIds);
+            return normalizeStreamOutput(responseFlux)
+                .doOnComplete(() -> log.info("流式输出完成: kbIds={}", ownedKnowledgeBaseIds))
+                .onErrorResume(e -> {
+                    log.error("流式输出失败: kbIds={}, error={}", ownedKnowledgeBaseIds, e.getMessage(), e);
+                    return Flux.just(ERROR_RESPONSE);
+                });
+
+        } catch (Exception e) {
+            log.error("知识库流式问答失败: {}", e.getMessage(), e);
+            return Flux.just(ERROR_RESPONSE);
+        }
+    }
+
+    private QueryContext buildQueryContext(String originalQuestion) {
+        String normalizedQuestion = normalizeQuestion(originalQuestion);
+        String rewrittenQuestion = rewriteQuestion(normalizedQuestion);
+        Set<String> candidates = new LinkedHashSet<>();
+        candidates.add(rewrittenQuestion);
+        candidates.add(normalizedQuestion);
+
+        SearchParams searchParams = resolveSearchParams(normalizedQuestion);
+        return new QueryContext(normalizedQuestion, new ArrayList<>(candidates), searchParams);
+    }
+
+    private String normalizeQuestion(String question) {
+        return question == null ? "" : question.trim();
+    }
+
+    private List<Document> retrieveRelevantDocs(QueryContext queryContext, List<Long> knowledgeBaseIds) {
+        for (String candidateQuery : queryContext.candidateQueries()) {
+            if (candidateQuery.isBlank()) {
+                continue;
+            }
+            List<Document> docs = vectorService.similaritySearch(
+                candidateQuery,
+                knowledgeBaseIds,
+                queryContext.searchParams().topK(),
+                queryContext.searchParams().minScore()
+            );
+            log.info("检索候选 query='{}'，命中 {} 条", candidateQuery, docs.size());
+            if (hasEffectiveHit(candidateQuery, docs)) {
+                return docs;
+            }
+        }
+        return List.of();
+    }
+
+    private SearchParams resolveSearchParams(String question) {
+        int compactLength = question.replaceAll("\\s+", "").length();
+        if (compactLength <= shortQueryLength) {
+            return new SearchParams(topkShort, minScoreShort);
+        }
+        if (compactLength <= 12) {
+            return new SearchParams(topkMedium, minScoreDefault);
+        }
+        return new SearchParams(topkLong, minScoreDefault);
+    }
+
+    private String rewriteQuestion(String question) {
+        if (!rewriteEnabled || question.isBlank()) {
+            return question;
+        }
+        // 配额异常必须在兜底 try/catch 外抛出，不能因为改写失败而绕过配额限制。
+        usageRecorder.checkQuota();
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("question", question);
+            String rewritePrompt = rewritePromptTemplate.render(variables);
+            ChatResponse response = chatClient().prompt()
+                .user(rewritePrompt)
+                .call()
+                .chatResponse();
+            usageRecorder.recordUsage(response, "rag-query-rewrite");
+            String rewritten = extractResponseText(response);
+            if (rewritten == null || rewritten.isBlank()) {
+                return question;
+            }
+            String normalized = rewritten.trim();
+            log.info("Query rewrite: origin='{}', rewritten='{}'", question, normalized);
+            return normalized;
+        } catch (Exception e) {
+            log.warn("Query rewrite 失败，使用原问题继续检索: {}", e.getMessage());
+            return question;
+        }
+    }
+
+    private ChatClient chatClient() {
+        return ChatClient.create(new LimitedChatModel(
+            platformChatModel, requestLimiter, "platform", UserContext.getCurrentUserId()));
+    }
+
+    private boolean hasUsage(ChatResponse response) {
+        return response != null
+            && response.getMetadata() != null
+            && response.getMetadata().getUsage() != null;
+    }
+
+    private String extractResponseText(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        String text = response.getResult().getOutput().getText();
+        return text == null ? "" : text;
+    }
+
+    /**
+     * 检索命中不等于可回答。
+     * 对短 token 场景增加一次命中确认，避免把弱相关片段交给模型后生成大段“信息不足说明”。
+     */
+    private boolean hasEffectiveHit(String question, List<Document> docs) {
+        if (docs == null || docs.isEmpty()) {
+            return false;
+        }
+
+        String normalized = normalizeQuestion(question);
+        if (!isShortTokenQuery(normalized)) {
+            return true;
+        }
+
+        String loweredToken = normalized.toLowerCase();
+        for (Document doc : docs) {
+            String text = doc.getText();
+            if (text != null && text.toLowerCase().contains(loweredToken)) {
+                return true;
+            }
+        }
+
+        log.info("短 query 命中确认失败，视为无有效结果: question='{}', docs={}", normalized, docs.size());
+        return false;
+    }
+
+    private boolean isShortTokenQuery(String question) {
+        if (question == null) {
+            return false;
+        }
+        String compact = question.trim();
+        return SHORT_TOKEN_PATTERN.matcher(compact).matches();
+    }
+
+    private String normalizeAnswer(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return NO_RESULT_RESPONSE;
+        }
+        String normalized = answer.trim();
+        if (isNoResultLike(normalized)) {
+            return NO_RESULT_RESPONSE;
+        }
+        return normalized;
+    }
+
+    /**
+     * 判断回答是否为"无信息"拒答
+     *
+     * <p>prompt 里已固化拒答话术，此处精确匹配 NO_RESULT_RESPONSE 的前缀，
+     * 减少对正常回答的误判。
+     */
+    private boolean isNoResultLike(String text) {
+        if (text == null || text.isBlank()) {
+            return true;
+        }
+        String trimmed = text.trim();
+        // 精确匹配固化话术的前 20 个字符
+        String noResultPrefix = NO_RESULT_RESPONSE.substring(0, 20);
+        return trimmed.startsWith(noResultPrefix);
+    }
+
+    /**
+     * 先观察前一小段流式内容，快速识别“无信息”模板。
+     * - 命中无信息：立即输出固定模板并结束，防止长篇拒答
+     * - 非无信息：尽快释放缓冲并继续实时透传
+     */
+    private Flux<String> normalizeStreamOutput(Flux<String> rawFlux) {
+        return Flux.create(sink -> {
+            StringBuilder probeBuffer = new StringBuilder();
+            AtomicBoolean passthrough = new AtomicBoolean(false);
+            AtomicBoolean completed = new AtomicBoolean(false);
+            final Disposable[] disposableRef = new Disposable[1];
+
+            disposableRef[0] = rawFlux.subscribe(
+                chunk -> {
+                    if (completed.get() || sink.isCancelled()) {
+                        return;
+                    }
+                    if (passthrough.get()) {
+                        sink.next(chunk);
+                        return;
+                    }
+
+                    probeBuffer.append(chunk);
+                    String probeText = probeBuffer.toString();
+                    if (isNoResultLike(probeText)) {
+                        completed.set(true);
+                        sink.next(NO_RESULT_RESPONSE);
+                        sink.complete();
+                        if (disposableRef[0] != null) {
+                            disposableRef[0].dispose();
+                        }
+                        return;
+                    }
+
+                    if (probeBuffer.length() >= STREAM_PROBE_CHARS) {
+                        passthrough.set(true);
+                        sink.next(probeText);
+                        probeBuffer.setLength(0);
+                    }
+                },
+                sink::error,
+                () -> {
+                    if (completed.get() || sink.isCancelled()) {
+                        return;
+                    }
+                    if (!passthrough.get()) {
+                        sink.next(normalizeAnswer(probeBuffer.toString()));
+                    }
+                    sink.complete();
+                }
+            );
+
+            sink.onCancel(() -> {
+                if (disposableRef[0] != null) {
+                    disposableRef[0].dispose();
+                }
+            });
+        });
+    }
+
+    private record SearchParams(int topK, double minScore) {
+    }
+
+    private record QueryContext(String originalQuestion, List<String> candidateQueries, SearchParams searchParams) {
+    }
+}
+

@@ -129,7 +129,7 @@ git commit -m "feat: 添加 Dify 同步数据库迁移脚本"
 
 ```java
 // DifyConfig.java
-package interview.guide.modules.dify.config;
+package ai.interview.modules.dify.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -175,7 +175,7 @@ public class DifyConfig {
 
 ```java
 // DifyApiException.java
-package interview.guide.modules.dify.exception;
+package ai.interview.modules.dify.exception;
 
 /**
  * Dify API 调用异常
@@ -193,7 +193,7 @@ public class DifyApiException extends RuntimeException {
 
 ```java
 // DifySyncException.java
-package interview.guide.modules.dify.exception;
+package ai.interview.modules.dify.exception;
 
 /**
  * Dify 同步异常
@@ -273,7 +273,7 @@ git commit -m "feat: 添加 Dify 配置类和异常处理"
 
 ```java
 // DifySyncDirection.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 /**
  * Dify 同步方向枚举
@@ -288,7 +288,7 @@ public enum DifySyncDirection {
 
 ```java
 // DifySyncAction.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 /**
  * Dify 同步动作枚举
@@ -302,7 +302,7 @@ public enum DifySyncAction {
 
 ```java
 // DifySyncStatus.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 /**
  * Dify 同步状态枚举
@@ -321,7 +321,7 @@ public enum DifySyncStatus {
 
 ```java
 // DifyDocument.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -364,7 +364,7 @@ public class DifyDocument {
 
 ```java
 // DifyDocumentList.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -402,7 +402,7 @@ public class DifyDocumentList {
 
 ```java
 // DifyChatRequest.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import java.util.List;
 import java.util.Map;
@@ -424,7 +424,7 @@ public record DifyChatRequest(
 
 ```java
 // DifyChatResponse.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -475,7 +475,7 @@ public class DifyChatResponse {
 
 ```java
 // DifyWorkflowResponse.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -513,7 +513,7 @@ public class DifyWorkflowResponse {
 
 ```java
 // DifySyncLogEntity.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -571,7 +571,7 @@ public class DifySyncLogEntity {
 
 ```java
 // DifySyncStatusDTO.java
-package interview.guide.modules.dify.model;
+package ai.interview.modules.dify.model;
 
 import java.time.LocalDateTime;
 
@@ -607,13 +607,13 @@ git commit -m "feat: 添加 Dify 数据模型和枚举类"
 
 ```java
 // DifyApiClientTest.java
-package interview.guide.modules.dify.client;
+package ai.interview.modules.dify.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.exception.DifyApiException;
-import interview.guide.modules.dify.model.DifyDocument;
-import interview.guide.modules.dify.model.DifyDocumentList;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.exception.DifyApiException;
+import ai.interview.modules.dify.model.DifyDocument;
+import ai.interview.modules.dify.model.DifyDocumentList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -690,13 +690,13 @@ Expected: 编译失败（DifyApiClient 不存在）
 
 ```java
 // DifyApiClient.java
-package interview.guide.modules.dify.client;
+package ai.interview.modules.dify.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.exception.DifyApiException;
-import interview.guide.modules.dify.model.*;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.exception.DifyApiException;
+import ai.interview.modules.dify.model.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
@@ -1158,11 +1158,11 @@ git commit -m "feat: 实现 Dify API 客户端"
 
 ```java
 // DifySyncLogRepository.java
-package interview.guide.modules.dify.repository;
+package ai.interview.modules.dify.repository;
 
-import interview.guide.modules.dify.model.DifySyncDirection;
-import interview.guide.modules.dify.model.DifySyncLogEntity;
-import interview.guide.modules.dify.model.DifySyncStatus;
+import ai.interview.modules.dify.model.DifySyncDirection;
+import ai.interview.modules.dify.model.DifySyncLogEntity;
+import ai.interview.modules.dify.model.DifySyncStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -1274,14 +1274,14 @@ public void setDifySyncError(String difySyncError) {
 
 ```java
 // DifySyncServiceTest.java
-package interview.guide.modules.dify.service;
+package ai.interview.modules.dify.service;
 
-import interview.guide.modules.dify.client.DifyApiClient;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.model.*;
-import interview.guide.modules.dify.repository.DifySyncLogRepository;
-import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
-import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import ai.interview.modules.dify.client.DifyApiClient;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.model.*;
+import ai.interview.modules.dify.repository.DifySyncLogRepository;
+import ai.interview.modules.knowledgebase.model.KnowledgeBaseEntity;
+import ai.interview.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1452,15 +1452,15 @@ Expected: 编译失败（DifySyncService 不存在）
 
 ```java
 // DifySyncService.java
-package interview.guide.modules.dify.service;
+package ai.interview.modules.dify.service;
 
-import interview.guide.modules.dify.client.DifyApiClient;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.exception.DifySyncException;
-import interview.guide.modules.dify.model.*;
-import interview.guide.modules.dify.repository.DifySyncLogRepository;
-import interview.guide.modules.knowledgebase.model.KnowledgeBaseEntity;
-import interview.guide.modules.knowledgebase.repository.KnowledgeBaseRepository;
+import ai.interview.modules.dify.client.DifyApiClient;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.exception.DifySyncException;
+import ai.interview.modules.dify.model.*;
+import ai.interview.modules.dify.repository.DifySyncLogRepository;
+import ai.interview.modules.knowledgebase.model.KnowledgeBaseEntity;
+import ai.interview.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -1754,11 +1754,11 @@ git commit -m "feat: 实现 Dify 同步服务"
 
 ```java
 // DifyChatServiceTest.java
-package interview.guide.modules.dify.service;
+package ai.interview.modules.dify.service;
 
-import interview.guide.modules.dify.client.DifyApiClient;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.model.DifyChatResponse;
+import ai.interview.modules.dify.client.DifyApiClient;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.model.DifyChatResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -1862,11 +1862,11 @@ Expected: 编译失败（DifyChatService 不存在）
 
 ```java
 // DifyChatService.java
-package interview.guide.modules.dify.service;
+package ai.interview.modules.dify.service;
 
-import interview.guide.modules.dify.client.DifyApiClient;
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.model.DifyChatResponse;
+import ai.interview.modules.dify.client.DifyApiClient;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.model.DifyChatResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -1973,10 +1973,10 @@ git commit -m "feat: 实现 Dify 对话服务"
 
 ```java
 // DifySyncScheduler.java
-package interview.guide.modules.dify.scheduler;
+package ai.interview.modules.dify.scheduler;
 
-import interview.guide.modules.dify.config.DifyConfig;
-import interview.guide.modules.dify.service.DifySyncService;
+import ai.interview.modules.dify.config.DifyConfig;
+import ai.interview.modules.dify.service.DifySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -2020,12 +2020,12 @@ public class DifySyncScheduler {
 
 ```java
 // DifyController.java
-package interview.guide.modules.dify.controller;
+package ai.interview.modules.dify.controller;
 
-import interview.guide.common.result.Result;
-import interview.guide.modules.dify.model.*;
-import interview.guide.modules.dify.service.DifyChatService;
-import interview.guide.modules.dify.service.DifySyncService;
+import ai.interview.common.result.Result;
+import ai.interview.modules.dify.model.*;
+import ai.interview.modules.dify.service.DifyChatService;
+import ai.interview.modules.dify.service.DifySyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;

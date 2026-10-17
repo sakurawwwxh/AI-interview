@@ -15,7 +15,7 @@
 
 ## 项目介绍
 
-AI-Interview（本仓库 `interview-guide`）是一个面向求职训练的智能面试辅助平台。系统以 Spring Boot + Spring AI 为后端，React + Vite 为前端，结合 PostgreSQL（pgvector）、Redis Stream 与 S3 兼容存储，覆盖从简历解析、岗位对标、模拟面试到错题复练的完整闭环。
+AI-Interview（本仓库 `ai-interview`）是一个面向求职训练的智能面试辅助平台。系统以 Spring Boot + Spring AI 为后端，React + Vite 为前端，结合 PostgreSQL（pgvector）、Redis Stream 与 S3 兼容存储，覆盖从简历解析、岗位对标、模拟面试到错题复练的完整闭环。
 
 ## 核心能力
 
@@ -139,7 +139,7 @@ sequenceDiagram
 ## 项目结构
 
 ```text
-interview-guide/
+ai-interview/
 ├── app/                          # 后端（Spring Boot）
 │   └── src/main/java/interview/guide/
 │       ├── common/               # 配置、异常、限流、异步 Stream 模板

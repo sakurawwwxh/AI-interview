@@ -14,7 +14,7 @@
 
     <!-- 项目信息 -->
     <groupId>com.interview</groupId>
-    <artifactId>interview-guide</artifactId>
+    <artifactId>ai-interview</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>AI Interview Platform</name>
