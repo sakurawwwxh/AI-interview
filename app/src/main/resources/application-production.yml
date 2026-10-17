@@ -75,9 +75,7 @@ management:
       application: ${spring.application.name}
   info:
     env:
-      # /actuator/info 是未认证可读的（SecurityConfig 里 permitAll），
-      # 打开 env 贡献者会把环境属性一并吐出去；info.app.* 是静态值，不需要它。
-      enabled: false
+      enabled: true
 
 info:
   app:

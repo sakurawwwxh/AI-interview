@@ -58,11 +58,11 @@ AI-Interview（本仓库 `ai-interview`）是一个面向求职训练的智能�
 
 ### 1. 异步任务框架(Redis Stream + Java 21 虚拟线程)
 
-- **模板方法抽象** [`AbstractStreamConsumer`](app/src/main/java/interview/guide/common/async/AbstractStreamConsumer.java):
+- **模板方法抽象** [`AbstractStreamConsumer`](app/src/main/java/ai/interview/common/async/AbstractStreamConsumer.java):
   子类只实现业务方法,框架统一处理消费组、ACK、失败重试(重新 XADD 入队 + ACK 原消息)、毒消息丢弃
 - **并发消费**:消费循环单平台线程阻塞读(XREADGROUP),每条消息提交独立虚拟线程处理,
   `Semaphore` 限制并发形成背压,天然适配 AI 调用这类 I/O 密集场景
-- **宕机恢复** [`StreamPendingMessageReclaimer`](app/src/main/java/interview/guide/common/async/StreamPendingMessageReclaimer.java):
+- **宕机恢复** [`StreamPendingMessageReclaimer`](app/src/main/java/ai/interview/common/async/StreamPendingMessageReclaimer.java):
   每 30s 用 `XAUTOCLAIM` 回收 idle 超 60s 的 PEL 滞留消息,消费者崩溃不丢任务;
   in-flight 集合去重防止回收与正常消费重复分发
 
@@ -88,7 +88,7 @@ sequenceDiagram
 ### 2. 分布式限流组件(Redis + Lua,双策略)
 
 - **滑动窗口**(ZSET + 过期配额回收)与**令牌桶**(HASH 惰性补币)两种算法,
-  [`@RateLimit.strategy`](app/src/main/java/interview/guide/common/annotation/RateLimit.java) 切换
+  [`@RateLimit.strategy`](app/src/main/java/ai/interview/common/annotation/RateLimit.java) 切换
 - 多维度 GLOBAL/IP/USER **两阶段原子执行**:先全维度预检查再统一扣减,杜绝部分扣减
 - Hash Tag `{类名:方法名}` 适配 Redis Cluster 同槽;`scriptLoad` 预加载 + `evalSha`;
   支持 fallback 降级方法
@@ -141,7 +141,7 @@ sequenceDiagram
 ```text
 ai-interview/
 ├── app/                          # 后端（Spring Boot）
-│   └── src/main/java/interview/guide/
+│   └── src/main/java/ai/interview/
 │       ├── common/               # 配置、异常、限流、异步 Stream 模板
 │       ├── infrastructure/       # 文件、Redis、导出、健康检查、可观测性
 │       └── modules/
