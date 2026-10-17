@@ -129,11 +129,13 @@ export const ragChatApi = {
       );
 
       if (!response.ok) {
+        // 同上：后端 message 不能被下面这个 catch 吞掉
+        let detail = '';
         try {
           const errorData = await response.json();
-          if (errorData && errorData.message) throw new Error(errorData.message);
-        } catch { /* ignore */ }
-        throw new Error(`请求失败 (${response.status})`);
+          if (errorData && errorData.message) detail = String(errorData.message);
+        } catch { /* 响应体不是 JSON，忽略解析错误 */ }
+        throw new Error(detail ? `${detail}（HTTP ${response.status}）` : `请求失败 (${response.status})`);
       }
 
       const reader = response.body?.getReader();
@@ -211,15 +213,16 @@ export const ragChatApi = {
       );
 
       if (!response.ok) {
+        // 先取出后端给的 message 再抛出：原来把 throw 写在 try 里，紧跟的 catch
+        // 会把它自己吞掉，用户只看到「请求失败 (500)」，看不到真正原因。
+        let detail = '';
         try {
           const errorData = await response.json();
-          if (errorData && errorData.message) {
-            throw new Error(errorData.message);
-          }
+          if (errorData && errorData.message) detail = String(errorData.message);
         } catch {
-          // 忽略解析错误
+          // 响应体不是 JSON，忽略解析错误
         }
-        throw new Error(`请求失败 (${response.status})`);
+        throw new Error(detail ? `${detail}（HTTP ${response.status}）` : `请求失败 (${response.status})`);
       }
 
       const reader = response.body?.getReader();
@@ -335,11 +338,13 @@ export const ragChatApi = {
       );
 
       if (!response.ok) {
+        // 同上：后端 message 不能被下面这个 catch 吞掉
+        let detail = '';
         try {
           const errorData = await response.json();
-          if (errorData && errorData.message) throw new Error(errorData.message);
-        } catch { /* ignore */ }
-        throw new Error(`请求失败 (${response.status})`);
+          if (errorData && errorData.message) detail = String(errorData.message);
+        } catch { /* 响应体不是 JSON，忽略解析错误 */ }
+        throw new Error(detail ? `${detail}（HTTP ${response.status}）` : `请求失败 (${response.status})`);
       }
 
       const reader = response.body?.getReader();

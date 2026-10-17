@@ -29,7 +29,12 @@ export function formatDate(
     day: '2-digit',
     ...options
   };
-  
+
+  // 带时分时必须走 toLocaleString：toLocaleDateString 按规范只保留日期字段，
+  // 传进来的 hour/minute 会被静默丢弃（formatDateTime 因此一直只显示日期）。
+  if (options?.hour !== undefined || options?.minute !== undefined) {
+    return date.toLocaleString('zh-CN', defaultOptions);
+  }
   return date.toLocaleDateString('zh-CN', defaultOptions);
 }
 
