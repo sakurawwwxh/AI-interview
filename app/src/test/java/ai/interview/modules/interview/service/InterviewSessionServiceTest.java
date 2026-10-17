@@ -274,4 +274,31 @@ class InterviewSessionServiceTest {
         assertEquals(true, response.get("completed"));
         verify(sessionCache, never()).updateSessionStatus(anyLong(), anyString(), any());
     }
+
+    @Nested
+    @DisplayName("generateReport 生成报告")
+    class GenerateReport {
+
+        @Test
+        @DisplayName("异步评估进行中时拒绝同步再跑一遍，避免两路并发写同一份报告")
+        void shouldRejectWhileAsyncEvaluationInFlight() {
+            when(sessionCache.getSession(1L, SESSION_ID))
+                .thenReturn(java.util.Optional.of(buildSession(1, SessionStatus.COMPLETED)));
+            ai.interview.modules.interview.model.InterviewSessionEntity entity =
+                new ai.interview.modules.interview.model.InterviewSessionEntity();
+            entity.setEvaluateStatus(ai.interview.common.model.AsyncTaskStatus.PROCESSING);
+            when(persistenceService.findBySessionIdForCurrentUser(SESSION_ID))
+                .thenReturn(java.util.Optional.of(entity));
+
+            ai.interview.common.exception.BusinessException error =
+                assertThrows(ai.interview.common.exception.BusinessException.class,
+                    () -> service.generateReport(SESSION_ID));
+
+            assertEquals(ai.interview.common.exception.ErrorCode.INTERVIEW_EVALUATION_IN_PROGRESS.getCode(),
+                error.getCode());
+            verify(evaluationService, never())
+                .evaluateInterview(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any());
+        }
+    }
 }

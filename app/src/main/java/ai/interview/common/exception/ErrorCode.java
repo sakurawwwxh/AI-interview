@@ -38,6 +38,7 @@ public enum ErrorCode {
     INTERVIEW_QUESTION_GENERATION_FAILED(3006, "面试问题生成失败"),
     INTERVIEW_NOT_COMPLETED(3007, "面试尚未完成"),
     INTERVIEW_EVALUATION_NOT_RETRYABLE(3008, "当前状态不可重新评估"),
+    INTERVIEW_EVALUATION_IN_PROGRESS(3009, "面试评估进行中"),
     
     // ========== 存储模块错误 4xxx ==========
     STORAGE_UPLOAD_FAILED(4001, "文件上传失败"),

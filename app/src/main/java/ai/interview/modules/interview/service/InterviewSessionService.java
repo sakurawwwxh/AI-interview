@@ -559,6 +559,15 @@ public class InterviewSessionService {
             throw new BusinessException(ErrorCode.INTERVIEW_NOT_COMPLETED, "面试尚未完成，无法生成报告");
         }
 
+        // 异步评估还在跑时不要再起一路同步评估：两路会并发写同一份报告（后写覆盖，
+        // 练习题唯一键还可能撞车导致报告事务整体回滚）。让前端继续轮询，等异步结果落库。
+        AsyncTaskStatus evaluateStatus = persistenceService.findBySessionIdForCurrentUser(sessionId)
+            .map(InterviewSessionEntity::getEvaluateStatus)
+            .orElse(null);
+        if (evaluateStatus == AsyncTaskStatus.PENDING || evaluateStatus == AsyncTaskStatus.PROCESSING) {
+            throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_IN_PROGRESS, "面试评估正在进行中，请稍候");
+        }
+
         log.info("生成面试报告: {}", sessionId);
 
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);
