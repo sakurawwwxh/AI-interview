@@ -174,6 +174,7 @@ export default function InterviewPanel({
         <ConfirmDialog
           open={deleteConfirm !== null}
           title="删除面试记录"
+          aria-label="删除面试记录"
           message="确定要删除这条面试记录吗？删除后无法恢复。"
           confirmText="确定删除"
           cancelText="取消"
@@ -255,11 +256,12 @@ function InterviewItemCard({
       </div>
 
       {/* 操作按钮 */}
-      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
+      <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
       {/* 导出按钮 */}
       <motion.button
         onClick={(e) => { e.stopPropagation(); onExport(); }}
         disabled={exporting}
+        aria-label="导出面试报告"
         className="px-3 py-2 text-slate-400 hover:text-primary-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -271,8 +273,9 @@ function InterviewItemCard({
         <button
           onClick={onDelete}
           disabled={deleting}
-          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
           title="删除面试记录"
+          aria-label="删除面试记录"
         >
           {deleting ? (
             <motion.div
