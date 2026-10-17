@@ -14,7 +14,6 @@ import ai.interview.modules.userai.service.UserAiChatClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -56,8 +55,11 @@ public class JobMatchService {
 
     /**
      * 实时调用 AI 匹配，并将结果持久化。
+     *
+     * <p>刻意不加 {@code @Transactional}：整个方法只有最后一次 save 是写操作，
+     * 读的都是标量字段，没有跨句柄的一致性要求。加事务等于把一条数据库连接
+     * 按在「一次几十秒的模型调用」上，连接池很快会被并发的匹配请求吃光。
      */
-    @Transactional
     public JobMatchDTO match(Long targetId, Long resumeId) {
         Long userId = UserContext.getCurrentUserIdOrThrow();
         JobTargetEntity target = targetService.getOwned(targetId);
