@@ -548,42 +548,57 @@ public class InterviewPersistenceService {
      * <p>报告字段与逐题评分在 saveReport 时都已落库，这里只做读回与重算、不调用模型——
      * 否则每打开一次报告就重跑一遍 AI 评估（既让用户等，也重复花钱）。
      */
-    public Optional<InterviewReportDTO> restoreReport(String sessionId) {
-        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
-        if (sessionOpt.isEmpty()) {
+    public Optional<InterviewReportDTO> restoreReport(InterviewSessionEntity session) {
+        if (session == null || session.getOverallScore() == null || session.getOverallFeedback() == null) {
             return Optional.empty();
         }
-        InterviewSessionEntity session = sessionOpt.get();
-        if (session.getOverallScore() == null || session.getOverallFeedback() == null) {
+        String sessionId = session.getSessionId();
+
+        List<InterviewQuestionDTO> questions;
+        try {
+            questions = objectMapper.readValue(session.getQuestionsJson(),
+                new TypeReference<List<InterviewQuestionDTO>>() {});
+        } catch (Exception e) {
+            // 题目都读不出来就别还原了：退回同步评估路径，总好过永久返回一份残缺报告
+            log.warn("还原报告失败，questionsJson 无法解析: sessionId={}, error={}", sessionId, e.getMessage());
+            return Optional.empty();
+        }
+        if (questions == null || questions.isEmpty()) {
             return Optional.empty();
         }
 
-        List<InterviewQuestionDTO> questions = readReportJson(session.getQuestionsJson(),
-            new TypeReference<List<InterviewQuestionDTO>>() {});
-        List<String> strengths = readReportJson(session.getStrengthsJson(),
-            new TypeReference<List<String>>() {});
-        List<String> improvements = readReportJson(session.getImprovementsJson(),
-            new TypeReference<List<String>>() {});
+        List<String> strengths = readReportJson(session.getStrengthsJson(), new TypeReference<List<String>>() {});
+        List<String> improvements = readReportJson(session.getImprovementsJson(), new TypeReference<List<String>>() {});
         List<InterviewReportDTO.ReferenceAnswer> referenceAnswers = readReportJson(
-            session.getReferenceAnswersJson(),
-            new TypeReference<List<InterviewReportDTO.ReferenceAnswer>>() {});
+            session.getReferenceAnswersJson(), new TypeReference<List<InterviewReportDTO.ReferenceAnswer>>() {});
 
-        Map<Integer, InterviewAnswerEntity> answerByIndex = answerRepository
-            .findBySession_SessionIdOrderByQuestionIndex(sessionId).stream()
-            .filter(answer -> answer.getQuestionIndex() != null)
-            .collect(java.util.stream.Collectors.toMap(
-                InterviewAnswerEntity::getQuestionIndex, answer -> answer, (first, second) -> first));
+        Map<Integer, AnswerScoreViewRow> answerByIndex = new LinkedHashMap<>();
+        for (var view : answerRepository.findScoreViewsBySessionId(sessionId)) {
+            if (view.getQuestionIndex() != null) {
+                answerByIndex.put(view.getQuestionIndex(),
+                    new AnswerScoreViewRow(view.getQuestionIndex(), view.getScore(), view.getFeedback(), view.getUserAnswer()));
+            }
+        }
+        // 报告落库时会给未答题也建答案行；行数少于题目数说明是中间态，别还原半份报告
+        if (answerByIndex.size() < questions.size()) {
+            log.warn("还原报告跳过：答案行不完整 sessionId={}, answers={}, questions={}",
+                sessionId, answerByIndex.size(), questions.size());
+            return Optional.empty();
+        }
 
         List<InterviewReportDTO.QuestionEvaluation> details = new ArrayList<>();
         Map<String, List<Integer>> scoresByCategory = new LinkedHashMap<>();
         for (InterviewQuestionDTO question : questions) {
-            InterviewAnswerEntity answer = answerByIndex.get(question.questionIndex());
-            int score = answer != null && answer.getScore() != null ? answer.getScore() : 0;
-            String feedback = answer != null && answer.getFeedback() != null
-                ? answer.getFeedback() : "该题未成功生成评估反馈。";
+            AnswerScoreViewRow answer = answerByIndex.get(question.questionIndex());
+            int score = answer != null && answer.score() != null ? answer.score() : 0;
+            String feedback = answer != null && answer.feedback() != null
+                ? answer.feedback() : "该题未成功生成评估反馈。";
+            // 暂存答案只进答案行、不回写 questionsJson，所以原文以答案行为准
+            String userAnswer = answer != null && answer.userAnswer() != null
+                ? answer.userAnswer() : question.userAnswer();
             details.add(new InterviewReportDTO.QuestionEvaluation(
                 question.questionIndex(), question.question(), question.category(),
-                question.userAnswer(), score, feedback));
+                userAnswer, score, feedback));
             scoresByCategory.computeIfAbsent(question.category(), ignored -> new ArrayList<>()).add(score);
         }
 
@@ -599,13 +614,17 @@ public class InterviewPersistenceService {
             details, session.getOverallFeedback(), strengths, improvements, referenceAnswers));
     }
 
+    private record AnswerScoreViewRow(Integer questionIndex, Integer score, String feedback, String userAnswer) {
+    }
+
     /** 报告里的 JSON 列解析失败时按空列表处理：宁可少一段展示，也不要让报告接口 500。 */
     private <T> List<T> readReportJson(String json, TypeReference<List<T>> type) {
         if (json == null || json.isBlank()) {
             return List.of();
         }
         try {
-            return objectMapper.readValue(json, type);
+            List<T> parsed = objectMapper.readValue(json, type);
+            return parsed == null ? List.of() : parsed;
         } catch (Exception e) {
             log.warn("解析面试报告字段失败: {}", e.getMessage());
             return List.of();

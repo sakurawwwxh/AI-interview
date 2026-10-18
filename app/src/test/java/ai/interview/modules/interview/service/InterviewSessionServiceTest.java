@@ -315,7 +315,7 @@ class InterviewSessionServiceTest {
                 new ai.interview.modules.interview.model.InterviewReportDTO(
                     SESSION_ID, 2, 77, java.util.List.of(), java.util.List.of(), "总评",
                     java.util.List.of("优势"), java.util.List.of("改进"), java.util.List.of());
-            when(persistenceService.restoreReport(SESSION_ID))
+            when(persistenceService.restoreReport(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(java.util.Optional.of(stored));
 
             assertEquals(stored, service.generateReport(SESSION_ID));

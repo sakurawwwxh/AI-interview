@@ -561,15 +561,15 @@ public class InterviewSessionService {
 
         // 异步评估还在跑时不要再起一路同步评估：两路会并发写同一份报告（后写覆盖，
         // 练习题唯一键还可能撞车导致报告事务整体回滚）。让前端继续轮询，等异步结果落库。
-        AsyncTaskStatus evaluateStatus = persistenceService.findBySessionIdForCurrentUser(sessionId)
-            .map(InterviewSessionEntity::getEvaluateStatus)
+        InterviewSessionEntity sessionEntity = persistenceService.findBySessionIdForCurrentUser(sessionId)
             .orElse(null);
+        AsyncTaskStatus evaluateStatus = sessionEntity == null ? null : sessionEntity.getEvaluateStatus();
         if (evaluateStatus == AsyncTaskStatus.PENDING || evaluateStatus == AsyncTaskStatus.PROCESSING) {
             throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_IN_PROGRESS, "面试评估正在进行中，请稍候");
         }
 
         // 已经出过报告（异步评估已落库）就直接读回来：这条路径原先每次都会重跑一遍 AI 评估
-        Optional<InterviewReportDTO> storedReport = persistenceService.restoreReport(sessionId);
+        Optional<InterviewReportDTO> storedReport = persistenceService.restoreReport(sessionEntity);
         if (storedReport.isPresent()) {
             return storedReport.get();
         }

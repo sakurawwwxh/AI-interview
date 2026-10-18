@@ -64,4 +64,30 @@ public interface InterviewAnswerRepository extends JpaRepository<InterviewAnswer
           AND a.session.id IN :sessionIds
         """)
     List<AnswerScoreRow> findAnswerScoresBySessionIds(@Param("sessionIds") Collection<Long> sessionIds);
+
+    /**
+     * 报告还原用的窄列视图：只要题号、分数、反馈与用户原文。
+     * 走实体会把 question / reference_answer / key_points_json 三个 TEXT 一起拉回来。
+     */
+    interface AnswerScoreView {
+        Integer getQuestionIndex();
+
+        Integer getScore();
+
+        String getFeedback();
+
+        String getUserAnswer();
+    }
+
+    @Query(value = """
+        select a.question_index as "questionIndex",
+               a.score as "score",
+               a.feedback as "feedback",
+               a.user_answer as "userAnswer"
+        from interview_answers a
+        join interview_sessions s on s.id = a.session_id
+        where s.session_id = :sessionId
+        order by a.question_index
+        """, nativeQuery = true)
+    List<AnswerScoreView> findScoreViewsBySessionId(@Param("sessionId") String sessionId);
 }
