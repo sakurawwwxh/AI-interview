@@ -61,6 +61,10 @@ public class DifySyncService {
      * {@code save(旧实体)} 会把 vectorStatus 等字段回退。因此这里只读入实体的
      * 只读字段用于 Dify API 调用，落库时按 ID 重新查最新实体再更新 Dify 字段。
      *
+     * <p>刻意不加 {@code @Transactional}：方法主体是 Dify 的 HTTP 调用（创建或更新文档），
+     * 一个事务会让数据库连接在整个网络往返期间被占用。落库只有两步互相独立的写
+     * （更新实体、写同步日志），各自走 Repository 自带的事务即可。
+     *
      * @param kbId             知识库 ID
      * @param name             知识库名称
      * @param originalFilename 原始文件名
@@ -69,7 +73,6 @@ public class DifySyncService {
      * @param existingDifyDocId 已有的 Dify 文档 ID（可为 null）
      */
     @Async
-    @Transactional
     public void syncToDify(Long kbId, String name, String originalFilename,
                             String category, String content, String existingDifyDocId) {
         // 1. 检查同步是否启用
@@ -382,10 +385,12 @@ public class DifySyncService {
      * 从 Dify 删除文档
      * 在本地知识库删除时调用
      *
+     * <p>同样不加 {@code @Transactional}：删文档是 Dify 的 HTTP 调用，事务没有要保护的
+     * 多步写入（只有一条同步日志），没必要占着连接等网络。
+     *
      * @param entity 知识库实体
      */
     @Async
-    @Transactional
     public void deleteFromDify(KnowledgeBaseEntity entity) {
         if (!config.getSync().isEnabled()) {
             log.debug("Dify 同步已禁用，跳过删除: kbId={}", entity.getId());
