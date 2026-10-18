@@ -523,6 +523,13 @@ public class DifySyncService {
         if (abandoned > 0) {
             log.error("有 {} 条 Dify 删除墓碑超过 7 天仍未完成，远端文档可能残留，需要人工处理", abandoned);
         }
+
+        // 已完成的墓碑保留 30 天用于拦回拉，之后清掉避免无限增长
+        long pruned = syncLogRepository.deleteBySyncActionAndSyncStatusAndCreatedAtBefore(
+            DifySyncAction.DELETE, DifySyncStatus.SUCCESS, LocalDateTime.now().minusDays(30));
+        if (pruned > 0) {
+            log.info("清理了 {} 条超过 30 天且已完成的 Dify 删除墓碑", pruned);
+        }
         return cleared;
     }
 

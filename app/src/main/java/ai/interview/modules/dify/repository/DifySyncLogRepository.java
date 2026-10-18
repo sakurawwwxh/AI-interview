@@ -7,9 +7,11 @@ import ai.interview.modules.dify.model.DifySyncStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -67,6 +69,14 @@ public interface DifySyncLogRepository extends JpaRepository<DifySyncLogEntity, 
      */
     long countBySyncActionAndSyncStatusInAndCreatedAtBefore(
         DifySyncAction syncAction, Collection<DifySyncStatus> syncStatuses, LocalDateTime createdAt);
+
+    /**
+     * 清理已完成的旧墓碑。删除成功意味着远端文档已不存在，不再需要拦着反向同步。
+     */
+    @Transactional
+    @Modifying
+    long deleteBySyncActionAndSyncStatusAndCreatedAtBefore(
+        DifySyncAction syncAction, DifySyncStatus syncStatus, LocalDateTime createdAt);
 
     void deleteByCreatedAtBefore(LocalDateTime dateTime);
 }

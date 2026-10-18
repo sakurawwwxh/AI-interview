@@ -285,6 +285,14 @@ class DifySyncServiceTest {
         assertTrue(cutoff.getValue().isAfter(LocalDateTime.now().minusDays(8))
                 && cutoff.getValue().isBefore(LocalDateTime.now().minusDays(6)),
             "只重试最近 7 天内的墓碑");
+
+        // 已完成的旧墓碑会被清理（保留 30 天）
+        ArgumentCaptor<LocalDateTime> pruneCutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(syncLogRepository).deleteBySyncActionAndSyncStatusAndCreatedAtBefore(
+            eq(DifySyncAction.DELETE), eq(DifySyncStatus.SUCCESS), pruneCutoff.capture());
+        assertTrue(pruneCutoff.getValue().isAfter(LocalDateTime.now().minusDays(31))
+                && pruneCutoff.getValue().isBefore(LocalDateTime.now().minusDays(29)),
+            "墓碑保留 30 天");
     }
 
     @Test
