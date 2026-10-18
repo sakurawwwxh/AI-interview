@@ -3,6 +3,11 @@ spring:
   config:
     activate:
       on-profile: production
+  task:
+    scheduling:
+      pool:
+        # 默认单线程：Dify 删除重试可能连续做多次 HTTP（含退避），会把简历回收器等任务堵在后面
+        size: 4
   lifecycle:
     timeout-per-shutdown-phase: 30s
   datasource:
