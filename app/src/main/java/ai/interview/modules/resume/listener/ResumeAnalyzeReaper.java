@@ -51,6 +51,19 @@ public class ResumeAnalyzeReaper {
         }
 
         for (Long resumeId : candidates) {
+            if (tracker.isMessageStillQueued(resumeId)) {
+                // 消息还在 Stream 里（消费者停机/积压）：这不是「丢了」，不能压成 FAILED。
+                if (resumeRepository.existsByIdAndAnalyzeStatus(resumeId, AsyncTaskStatus.PENDING)) {
+                    // 不刷新分值：消息一旦真的消失，下一轮就能立刻回收，不必再等一个阈值；
+                    // 也不清登记，否则这条任务彻底失去兜底
+                    log.info("分析任务仍在队列中，暂不回收: resumeId={}", resumeId);
+                } else {
+                    // 任务其实已经处理完，只是消费端的清理没成功（例如 Redis 抖动）
+                    tracker.clear(resumeId, cutoff);
+                }
+                continue;
+            }
+
             int flipped = resumeRepository.failIfStillPending(
                 resumeId,
                 AsyncTaskStatus.FAILED,
@@ -60,8 +73,8 @@ public class ResumeAnalyzeReaper {
             if (flipped == 1) {
                 log.warn("已回收长期 PENDING 的简历分析任务: resumeId={}", resumeId);
             }
+            // 条件删除：并发重试刚刷新过分值的登记会保留
+            tracker.clear(resumeId, cutoff);
         }
-        // 只清仍然超时的登记：期间被并发重试刷新过分值的成员会保留
-        tracker.clearStale(cutoff);
     }
 }

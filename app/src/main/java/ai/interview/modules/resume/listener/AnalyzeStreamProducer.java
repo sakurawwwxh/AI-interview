@@ -39,7 +39,11 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
     public void sendAnalyzeTask(Long resumeId, Long userId, String content) {
         // 先登记再入队：入队失败时 onSendFailed 会把状态改成 FAILED，回收器看到非 PENDING 就只清登记
         tracker.markQueued(resumeId);
-        sendTask(new AnalyzeTaskPayload(resumeId, userId, content));
+        String messageId = sendTask(new AnalyzeTaskPayload(resumeId, userId, content));
+        if (messageId != null) {
+            // 记下消息 ID，回收器据此区分「消息丢了」与「还在队列里排队」
+            tracker.attachMessage(resumeId, messageId);
+        }
     }
 
     @Override

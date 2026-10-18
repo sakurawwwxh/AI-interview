@@ -40,5 +40,6 @@ class AnalyzeStreamProducerTest {
         InOrder inOrder = inOrder(tracker, redisService);
         inOrder.verify(tracker).markQueued(5L);
         inOrder.verify(redisService).streamAdd(anyString(), anyMap(), anyInt());
+        inOrder.verify(tracker).attachMessage(5L, "1-1");
     }
 }

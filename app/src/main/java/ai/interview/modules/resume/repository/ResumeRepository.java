@@ -131,5 +131,10 @@ public interface ResumeRepository extends JpaRepository<ResumeEntity, Long> {
         @Param("pending") AsyncTaskStatus pending
     );
 
+    /**
+     * 判断简历是否仍处于某个状态（回收器用来确认「消息还在队列、但任务其实已经处理完」）。
+     */
+    boolean existsByIdAndAnalyzeStatus(Long id, AsyncTaskStatus analyzeStatus);
+
     List<ResumeEntity> findAllByUserIdIsNull();
 }

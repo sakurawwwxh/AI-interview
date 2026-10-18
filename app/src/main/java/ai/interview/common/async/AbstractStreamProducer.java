@@ -19,7 +19,12 @@ public abstract class AbstractStreamProducer<T> {
         this.redisService = redisService;
     }
 
-    protected void sendTask(T payload) {
+    /**
+     * 发送一条任务消息。
+     *
+     * @return 消息 ID；发送失败返回 null（失败已由 {@link #onSendFailed} 处理）
+     */
+    protected String sendTask(T payload) {
         try {
             String messageId = redisService.streamAdd(
                 streamKey(),
@@ -28,10 +33,12 @@ public abstract class AbstractStreamProducer<T> {
             );
             log.info("{}任务已发送到Stream: {}, messageId={}",
                 taskDisplayName(), payloadIdentifier(payload), messageId);
+            return messageId;
         } catch (Exception e) {
             log.error("发送{}任务失败: {}, error={}",
                 taskDisplayName(), payloadIdentifier(payload), e.getMessage(), e);
             onSendFailed(payload, "任务入队失败: " + e.getMessage());
+            return null;
         }
     }
 

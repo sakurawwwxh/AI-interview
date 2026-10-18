@@ -1,10 +1,12 @@
 package ai.interview.modules.resume.listener;
 
+import ai.interview.common.constant.AsyncTaskStreamConstants;
 import ai.interview.infrastructure.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +30,8 @@ import java.util.List;
 public class AnalyzeTaskTracker {
 
     static final String PENDING_KEY = "resume:analyze:pending";
+    private static final String MESSAGE_KEY_PREFIX = "resume:analyze:message:";
+    private static final Duration MESSAGE_TTL = Duration.ofHours(6);
 
     private final RedisService redisService;
 
@@ -41,28 +45,61 @@ public class AnalyzeTaskTracker {
         }
     }
 
+    /** 入队成功后记下消息 ID：回收前据此判断任务是否还在队列里。 */
+    public void attachMessage(Long resumeId, String messageId) {
+        try {
+            redisService.set(messageKey(resumeId), messageId, MESSAGE_TTL);
+        } catch (Exception e) {
+            log.warn("记录简历分析消息失败: resumeId={}, error={}", resumeId, e.getMessage());
+        }
+    }
+
+    /**
+     * 任务是否仍留在 Stream 中（未消费，或已投递未 ACK）。
+     *
+     * <p>查不到消息 ID 时返回 false——那说明任务压根没入队成功，正是需要回收的情况。
+     * 查询本身失败时保守返回 true：宁可晚一轮回收，也不要把还在队列里的任务压成 FAILED。
+     */
+    public boolean isMessageStillQueued(Long resumeId) {
+        try {
+            String messageId = redisService.get(messageKey(resumeId));
+            return messageId != null
+                && redisService.streamContainsMessage(AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY, messageId);
+        } catch (Exception e) {
+            log.warn("查询简历分析任务队列状态失败，本轮跳过回收: resumeId={}, error={}", resumeId, e.getMessage());
+            return true;
+        }
+    }
+
     public void clear(Long resumeId) {
         try {
             redisService.zRemove(PENDING_KEY, resumeId.toString());
+            redisService.delete(messageKey(resumeId));
         } catch (Exception e) {
             log.warn("清理简历分析任务登记失败: resumeId={}, error={}", resumeId, e.getMessage());
         }
     }
 
     /**
-     * 清掉所有在 cutoff 之前登记、且之后没有被刷新过的成员。
+     * 只清理「分值仍是超时值」的登记。
      *
-     * <p>按分值区间删除而不是逐个删：并发重试会刷新分值，刷新过的成员落在区间外，
-     * 不会被这一轮误删——否则刚重新认领的任务会失去回收兜底。
-     * 顺带清掉分值很旧的脏成员（无法解析的成员）。
+     * <p>并发重试会给同一成员写入新分值（新的认领），无条件删除会把新登记一起删掉，
+     * 让刚重新发起的任务失去回收兜底。分值已被刷新时保留，连消息绑定也不动。
      */
-    public void clearStale(Instant cutoff) {
+    public void clear(Long resumeId, Instant cutoff) {
         try {
-            redisService.zRemoveRangeByScore(PENDING_KEY, Double.NEGATIVE_INFINITY,
-                cutoff.toEpochMilli());
+            boolean removed = redisService.zRemoveIfScoreAtMost(
+                PENDING_KEY, resumeId.toString(), cutoff.toEpochMilli());
+            if (removed) {
+                redisService.delete(messageKey(resumeId));
+            }
         } catch (Exception e) {
-            log.warn("清理过期的简历分析任务登记失败: error={}", e.getMessage());
+            log.warn("清理过期的简历分析任务登记失败: resumeId={}, error={}", resumeId, e.getMessage());
         }
+    }
+
+    private static String messageKey(Long resumeId) {
+        return MESSAGE_KEY_PREFIX + resumeId;
     }
 
     /** 取出在 cutoff 之前登记、且尚未被清理的简历 ID。 */
@@ -73,8 +110,9 @@ public class AnalyzeTaskTracker {
             try {
                 resumeIds.add(Long.valueOf(member));
             } catch (NumberFormatException e) {
-                // 一条脏数据（旧版本写入格式、人工塞入）不能把整轮回收卡死
-                log.warn("忽略无法解析的简历分析任务登记项: member={}", member);
+                // 一条脏数据（旧版本写入格式、人工塞入）不能把整轮回收卡死，直接清掉
+                log.warn("清理无法解析的简历分析任务登记项: member={}", member);
+                redisService.zRemove(PENDING_KEY, member);
             }
         }
         return resumeIds;

@@ -1,5 +1,6 @@
 package ai.interview.modules.resume.listener;
 
+import ai.interview.common.constant.AsyncTaskStreamConstants;
 import ai.interview.infrastructure.redis.RedisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -9,13 +10,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -60,14 +64,61 @@ class AnalyzeTaskTrackerTest {
     }
 
     @Test
-    @DisplayName("清理只按分值区间删，刷新过的登记保留")
-    void clearStaleRemovesOnlyExpiredEntries() {
+    @DisplayName("入队成功后记下消息 ID")
+    void attachMessageStoresTheMessageId() {
+        tracker.attachMessage(5L, "1700000000000-0");
+
+        verify(redisService).set(eq("resume:analyze:message:5"), eq("1700000000000-0"), any(Duration.class));
+    }
+
+    @Test
+    @DisplayName("消息仍在 Stream 里就算还在队列")
+    void reportsQueuedWhenMessageStillExists() {
+        when(redisService.get("resume:analyze:message:5")).thenReturn("1700000000000-0");
+        when(redisService.streamContainsMessage(AsyncTaskStreamConstants.RESUME_ANALYZE_STREAM_KEY,
+            "1700000000000-0")).thenReturn(true);
+
+        assertTrue(tracker.isMessageStillQueued(5L));
+    }
+
+    @Test
+    @DisplayName("没有消息 ID 说明没入队成功，按可回收处理")
+    void reportsNotQueuedWhenMessageIdMissing() {
+        when(redisService.get("resume:analyze:message:5")).thenReturn(null);
+
+        assertFalse(tracker.isMessageStillQueued(5L));
+    }
+
+    @Test
+    @DisplayName("队列状态查不到时保守处理：本轮不回收")
+    void treatsLookupFailureAsStillQueued() {
+        when(redisService.get(anyString())).thenThrow(new IllegalStateException("redis down"));
+
+        assertTrue(tracker.isMessageStillQueued(5L));
+    }
+
+    @Test
+    @DisplayName("条件清理：分值仍是旧的才删，并连带清掉消息绑定")
+    void clearRemovesOnlyWhenScoreIsStillStale() {
         Instant cutoff = Instant.now();
+        when(redisService.zRemoveIfScoreAtMost(eq(AnalyzeTaskTracker.PENDING_KEY), eq("5"),
+            eq((double) cutoff.toEpochMilli()))).thenReturn(true);
 
-        tracker.clearStale(cutoff);
+        tracker.clear(5L, cutoff);
 
-        verify(redisService).zRemoveRangeByScore(AnalyzeTaskTracker.PENDING_KEY,
-            Double.NEGATIVE_INFINITY, cutoff.toEpochMilli());
+        verify(redisService).delete("resume:analyze:message:5");
+    }
+
+    @Test
+    @DisplayName("条件清理：分值已被并发重试刷新时不删，也不动消息绑定")
+    void clearKeepsFreshRegistration() {
+        Instant cutoff = Instant.now();
+        when(redisService.zRemoveIfScoreAtMost(eq(AnalyzeTaskTracker.PENDING_KEY), eq("5"),
+            eq((double) cutoff.toEpochMilli()))).thenReturn(false);
+
+        tracker.clear(5L, cutoff);
+
+        verify(redisService, org.mockito.Mockito.never()).delete(anyString());
     }
 
     @Test

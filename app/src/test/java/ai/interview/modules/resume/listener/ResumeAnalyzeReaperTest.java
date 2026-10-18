@@ -52,7 +52,33 @@ class ResumeAnalyzeReaperTest {
 
         verify(resumeRepository).failIfStillPending(eq(RESUME_ID), eq(AsyncTaskStatus.FAILED),
             anyString(), eq(AsyncTaskStatus.PENDING));
-        verify(tracker).clearStale(any());
+        verify(tracker).clear(eq(RESUME_ID), any());
+    }
+
+    @Test
+    @DisplayName("消息仍在队列里且仍是 PENDING：不回收，也不清登记")
+    void doesNotReapTasksStillInTheQueue() {
+        when(tracker.claimedBefore(any(), anyInt())).thenReturn(List.of(RESUME_ID));
+        when(tracker.isMessageStillQueued(RESUME_ID)).thenReturn(true);
+        when(resumeRepository.existsByIdAndAnalyzeStatus(RESUME_ID, AsyncTaskStatus.PENDING)).thenReturn(true);
+
+        reaper.failStalePendingTasks();
+
+        verify(resumeRepository, never()).failIfStillPending(any(), any(), anyString(), any());
+        verify(tracker, never()).clear(any(), any());
+    }
+
+    @Test
+    @DisplayName("消息还在队列但任务已处理完：只清残留登记")
+    void clearsLeftoverRegistrationWhenTaskAlreadyFinished() {
+        when(tracker.claimedBefore(any(), anyInt())).thenReturn(List.of(RESUME_ID));
+        when(tracker.isMessageStillQueued(RESUME_ID)).thenReturn(true);
+        when(resumeRepository.existsByIdAndAnalyzeStatus(RESUME_ID, AsyncTaskStatus.PENDING)).thenReturn(false);
+
+        reaper.failStalePendingTasks();
+
+        verify(resumeRepository, never()).failIfStillPending(any(), any(), anyString(), any());
+        verify(tracker).clear(eq(RESUME_ID), any());
     }
 
     @Test
@@ -63,7 +89,7 @@ class ResumeAnalyzeReaperTest {
 
         reaper.failStalePendingTasks();
 
-        verify(tracker).clearStale(any());
+        verify(tracker).clear(eq(RESUME_ID), any());
     }
 
     @Test
@@ -74,7 +100,7 @@ class ResumeAnalyzeReaperTest {
         reaper.failStalePendingTasks();
 
         verifyNoInteractions(resumeRepository);
-        verify(tracker, never()).clearStale(any());
+        verify(tracker, never()).clear(any(), any());
     }
 
     @Test
@@ -93,6 +119,6 @@ class ResumeAnalyzeReaperTest {
                 && cutoff.getValue().isBefore(after.minus(Duration.ofMinutes(10)).plusSeconds(1)),
             "cutoff 应当是当前时间往前 10 分钟");
         // 清理用同一个 cutoff：只删分值仍超时的登记
-        verify(tracker).clearStale(cutoff.getValue());
+        verify(tracker).clear(eq(RESUME_ID), eq(cutoff.getValue()));
     }
 }

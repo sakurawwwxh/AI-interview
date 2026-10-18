@@ -353,6 +353,35 @@ public class RedisService {
         return stream.size();
     }
 
+    /**
+     * Stream 中是否还存在这条消息。
+     *
+     * <p>被消费但未 ACK 的消息仍留在 Stream 里（PEL 也是引用它），所以「仍存在」意味着
+     * 任务还在队列中或正在被重试，不能当成「消息丢了」。
+     */
+    public boolean streamContainsMessage(String streamKey, String messageId) {
+        StreamMessageId id = parseStreamMessageId(messageId);
+        if (id == null) {
+            return false;
+        }
+        return !redissonClient.getStream(streamKey, StringCodec.INSTANCE).range(id, id).isEmpty();
+    }
+
+    private static StreamMessageId parseStreamMessageId(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            return null;
+        }
+        try {
+            int dash = messageId.indexOf('-');
+            long ms = dash < 0 ? Long.parseLong(messageId) : Long.parseLong(messageId.substring(0, dash));
+            long seq = dash < 0 ? 0L : Long.parseLong(messageId.substring(dash + 1));
+            return new StreamMessageId(ms, seq);
+        } catch (NumberFormatException e) {
+            log.warn("非法的 Stream 消息 ID: {}", messageId);
+            return null;
+        }
+    }
+
     // ==================== 原子计数器 ====================
 
     /**
@@ -386,6 +415,32 @@ public class RedisService {
         return redissonClient.getScoredSortedSet(key, StringCodec.INSTANCE)
             .removeRangeByScore(minScore, true, maxScore, true);
     }
+
+    /**
+     * 有序集合：仅当成员当前分值不高于 maxScore 时才移除（原子操作）。
+     *
+     * <p>「读分值再决定删不删」必须原子：并发重试会刷新分值，分开两步会把刚写入的新登记误删。
+     */
+    public boolean zRemoveIfScoreAtMost(String key, String member, double maxScore) {
+        RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+        Object result = script.eval(
+            RScript.Mode.READ_WRITE,
+            REMOVE_IF_SCORE_AT_MOST_SCRIPT,
+            RScript.ReturnType.LONG,
+            List.of(key),
+            member,
+            String.valueOf((long) maxScore)
+        );
+        return result instanceof Number removed && removed.longValue() > 0;
+    }
+
+    private static final String REMOVE_IF_SCORE_AT_MOST_SCRIPT = """
+        local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
+        if score and tonumber(score) <= tonumber(ARGV[2]) then
+            return redis.call('ZREM', KEYS[1], ARGV[1])
+        end
+        return 0
+        """;
 
     /**
      * 获取原子计数器
