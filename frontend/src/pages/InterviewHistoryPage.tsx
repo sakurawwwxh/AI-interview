@@ -180,6 +180,8 @@ export default function InterviewHistoryPage({
   const [interviews, setInterviews] = useState<InterviewWithResume[]>([]);
   const [stats, setStats] = useState<InterviewStats | null>(null);
   const [loading, setLoading] = useState(true);
+  // 同上：接口挂了不能伪装成"暂无面试记录"
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [deleteItem, setDeleteItem] = useState<InterviewWithResume | null>(null);
@@ -204,6 +206,7 @@ export default function InterviewHistoryPage({
       // 计算统计信息（只统计评估已完成的面试）
       const evaluated = allInterviews.filter(i => isEvaluateCompleted(i));
       const totalScore = evaluated.reduce((sum, i) => sum + (i.overallScore || 0), 0);
+      setLoadError(null);
       setStats({
         totalCount: allInterviews.length,
         completedCount: evaluated.length,
@@ -211,6 +214,7 @@ export default function InterviewHistoryPage({
       });
     } catch (err) {
       console.error('加载面试记录失败', err);
+      setLoadError(err instanceof Error ? err.message : '请稍后重试');
     } finally {
       if (!isPolling) {
         setLoading(false);
@@ -353,7 +357,15 @@ export default function InterviewHistoryPage({
         </div>
       )}
 
-      {!loading && filteredInterviews.length === 0 && (
+      {!loading && loadError && (
+            <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">加载失败：{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="mt-4 text-sm font-semibold text-primary-600 dark:text-primary-400">
+                重新加载
+              </button>
+            </div>
+      )}
+      {!loading && !loadError && filteredInterviews.length === 0 && (
         <motion.div
           className="ui-panel px-6 py-16 text-center"
           initial={{ opacity: 0, scale: 0.98 }}

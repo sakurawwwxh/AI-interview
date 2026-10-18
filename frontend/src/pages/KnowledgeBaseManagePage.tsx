@@ -116,6 +116,8 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   const [stats, setStats] = useState<KnowledgeBaseStats | null>(null);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // 失败与"真的没有数据"必须分开：原来只有 console.error，用户看到的是"暂无知识库"
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('time');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -144,11 +146,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
           : knowledgeBaseApi.getAllKnowledgeBases(sortBy),
         knowledgeBaseApi.getAllCategories(),
       ]);
+      setLoadError(null);
       setStats(statsData);
       setKnowledgeBases(kbList);
       setCategories(categoryList);
     } catch (error) {
       console.error('加载数据失败:', error);
+      setLoadError(error instanceof Error ? error.message : '请稍后重试');
     }
   }, [searchKeyword, sortBy, selectedCategory]);
 
@@ -170,6 +174,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
       setCategories(categoryList);
     } catch (error) {
       console.error('加载数据失败:', error);
+      setLoadError(error instanceof Error ? error.message : '请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -404,6 +409,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
           </div>
+        ) : loadError ? (
+            <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">加载失败：{loadError}</p>
+              <button type="button" onClick={() => window.location.reload()} className="mt-4 text-sm font-semibold text-primary-600 dark:text-primary-400">
+                重新加载
+              </button>
+            </div>
         ) : knowledgeBases.length === 0 ? (
           <div className="text-center py-20">
             <HardDrive className="w-16 h-16 text-slate-300 mx-auto mb-4" />
