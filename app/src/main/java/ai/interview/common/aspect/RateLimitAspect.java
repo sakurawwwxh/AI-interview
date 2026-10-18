@@ -39,6 +39,11 @@ public class RateLimitAspect {
 
     private final RedissonClient redissonClient;
 
+    /** 可信代理地址（逗号分隔），只有来自这些地址的请求才采信 X-Forwarded-For。 */
+    @org.springframework.beans.factory.annotation.Value(
+        "${app.rate-limit.trusted-proxies:127.0.0.1,0:0:0:0:0:0:0:1}")
+    private String trustedProxies = "127.0.0.1,0:0:0:0:0:0:0:1";
+
     /**
      * 滑动窗口 Lua 脚本
      */
@@ -307,6 +312,12 @@ public class RateLimitAspect {
         }
 
         HttpServletRequest request = attributes.getRequest();
+        String remoteAddr = request.getRemoteAddr();
+        // 只有直连方是受信代理时才采信转发头：否则任何客户端伪造一个
+        // X-Forwarded-For 就能绕开按 IP 的限流。默认只信任回环地址。
+        if (!isTrustedProxy(remoteAddr)) {
+            return remoteAddr != null ? remoteAddr : "unknown";
+        }
         String ip = request.getHeader("X-Forwarded-For");
 
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
@@ -337,5 +348,17 @@ public class RateLimitAspect {
     private String getCurrentUserId() {
         Long userId = ai.interview.modules.user.security.UserContext.getCurrentUserId();
         return userId != null ? userId.toString() : "anonymous";
+    }
+
+    private boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || trustedProxies == null || trustedProxies.isBlank()) {
+            return false;
+        }
+        for (String candidate : trustedProxies.split(",")) {
+            if (remoteAddr.equals(candidate.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
