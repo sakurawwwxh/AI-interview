@@ -8,6 +8,7 @@ import ai.interview.infrastructure.file.FileStorageService;
 import ai.interview.infrastructure.file.FileValidationService;
 import ai.interview.modules.interview.model.ResumeAnalysisResponse;
 import ai.interview.modules.resume.listener.AnalyzeStreamProducer;
+import ai.interview.modules.resume.listener.AnalyzeTaskTracker;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeRepository;
 import ai.interview.modules.user.security.UserContext;
@@ -35,6 +36,7 @@ public class ResumeUploadService {
     private final FileValidationService fileValidationService;
     private final AnalyzeStreamProducer analyzeStreamProducer;
     private final ResumeRepository resumeRepository;
+    private final AnalyzeTaskTracker analyzeTaskTracker;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -173,6 +175,9 @@ public class ResumeUploadService {
                 throw new BusinessException(ErrorCode.RESUME_PARSE_FAILED, "无法获取简历文本内容");
             }
         }
+
+        // 先登记再认领：认领提交与入队之间若进程退出，回收器仍能按登记把 PENDING 压回 FAILED
+        analyzeTaskTracker.markQueued(resumeId);
 
         // 条件更新同时完成「认领」和「正文回填」：拆成两条语句的话，claim 提交后、回填前失败
         // 会让简历永久停在 PENDING（重试入口对 PENDING 一律拒绝，也没有任何任务会来完成它）。

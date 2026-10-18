@@ -110,5 +110,26 @@ public interface ResumeRepository extends JpaRepository<ResumeEntity, Long> {
         @Param("resumeText") String resumeText
     );
 
+    /**
+     * 把仍停留在 PENDING 的简历改回 FAILED（条件更新，避免误伤已被消费者推进的任务）。
+     *
+     * <p>供 {@code ResumeAnalyzeReaper} 回收「认领成功但消息没入队」的记录使用。
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        update ResumeEntity r
+           set r.analyzeStatus = :failed,
+               r.analyzeError = :error
+         where r.id = :resumeId
+           and r.analyzeStatus = :pending
+        """)
+    int failIfStillPending(
+        @Param("resumeId") Long resumeId,
+        @Param("failed") AsyncTaskStatus failed,
+        @Param("error") String error,
+        @Param("pending") AsyncTaskStatus pending
+    );
+
     List<ResumeEntity> findAllByUserIdIsNull();
 }

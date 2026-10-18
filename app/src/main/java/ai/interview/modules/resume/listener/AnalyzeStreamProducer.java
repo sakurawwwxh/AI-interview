@@ -19,12 +19,15 @@ import java.util.Map;
 public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamProducer.AnalyzeTaskPayload> {
 
     private final ResumeRepository resumeRepository;
+    private final AnalyzeTaskTracker tracker;
 
     record AnalyzeTaskPayload(Long resumeId, Long userId, String content) {}
 
-    public AnalyzeStreamProducer(RedisService redisService, ResumeRepository resumeRepository) {
+    public AnalyzeStreamProducer(RedisService redisService, ResumeRepository resumeRepository,
+                                 AnalyzeTaskTracker tracker) {
         super(redisService);
         this.resumeRepository = resumeRepository;
+        this.tracker = tracker;
     }
 
     /**
@@ -34,6 +37,8 @@ public class AnalyzeStreamProducer extends AbstractStreamProducer<AnalyzeStreamP
      * @param content  简历内容
      */
     public void sendAnalyzeTask(Long resumeId, Long userId, String content) {
+        // 先登记再入队：入队失败时 onSendFailed 会把状态改成 FAILED，回收器看到非 PENDING 就只清登记
+        tracker.markQueued(resumeId);
         sendTask(new AnalyzeTaskPayload(resumeId, userId, content));
     }
 

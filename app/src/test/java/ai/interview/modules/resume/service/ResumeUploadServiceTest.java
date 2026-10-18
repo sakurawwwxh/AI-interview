@@ -6,6 +6,7 @@ import ai.interview.common.model.AsyncTaskStatus;
 import ai.interview.infrastructure.file.FileStorageService;
 import ai.interview.infrastructure.file.FileValidationService;
 import ai.interview.modules.resume.listener.AnalyzeStreamProducer;
+import ai.interview.modules.resume.listener.AnalyzeTaskTracker;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -53,6 +54,7 @@ class ResumeUploadServiceTest {
     @Mock private AppConfigProperties appConfig;
     @Mock private FileValidationService fileValidationService;
     @Mock private AnalyzeStreamProducer analyzeStreamProducer;
+    @Mock private AnalyzeTaskTracker analyzeTaskTracker;
     @Mock private ResumeRepository resumeRepository;
 
     private ResumeUploadService service;
@@ -62,7 +64,7 @@ class ResumeUploadServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(USER_ID, "owner", List.of()));
         service = new ResumeUploadService(parseService, storageService, persistenceService, appConfig,
-            fileValidationService, analyzeStreamProducer, resumeRepository);
+            fileValidationService, analyzeStreamProducer, resumeRepository, analyzeTaskTracker);
     }
 
     @AfterEach
@@ -98,8 +100,10 @@ class ResumeUploadServiceTest {
 
         service.reanalyze(RESUME_ID);
 
-        InOrder inOrder = inOrder(parseService, resumeRepository);
+        InOrder inOrder = inOrder(parseService, analyzeTaskTracker, resumeRepository);
         inOrder.verify(parseService).downloadAndParseContent(STORAGE_KEY, FILENAME);
+        // 登记必须在认领之前：认领提交后进程若退出，回收器要靠这条登记找到它
+        inOrder.verify(analyzeTaskTracker).markQueued(RESUME_ID);
         inOrder.verify(resumeRepository).claimForReanalysis(eq(RESUME_ID), eq(USER_ID),
             eq(AsyncTaskStatus.PENDING), anyCollection(), any());
     }

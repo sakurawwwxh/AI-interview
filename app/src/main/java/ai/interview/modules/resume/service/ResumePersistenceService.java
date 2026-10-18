@@ -8,6 +8,7 @@ import ai.interview.modules.interview.model.ResumeAnalysisResponse;
 import ai.interview.modules.resume.model.ResumeAnalysisEntity;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeAnalysisRepository;
+import ai.interview.modules.resume.listener.AnalyzeTaskTracker;
 import ai.interview.modules.resume.repository.ResumeRepository;
 import ai.interview.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class ResumePersistenceService {
     private final ObjectMapper objectMapper;
     private final ResumeMapper resumeMapper;
     private final FileHashService fileHashService;
+    private final AnalyzeTaskTracker analyzeTaskTracker;
     
     /**
      * 检查简历是否已存在（基于文件内容hash）
@@ -90,6 +92,9 @@ public class ResumePersistenceService {
             resume.setResumeText(resumeText);
             
             ResumeEntity saved = resumeRepository.save(resume);
+            // 在事务内登记：PENDING 提交前就有一条可被回收器看到的记录，
+            // 进程在提交后立刻退出也不会留下永远没人处理的任务
+            analyzeTaskTracker.markQueued(saved.getId());
             log.info("简历已保存: id={}, hash={}", saved.getId(), fileHash);
             
             return saved;

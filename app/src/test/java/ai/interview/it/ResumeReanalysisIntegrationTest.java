@@ -94,6 +94,23 @@ class ResumeReanalysisIntegrationTest {
     }
 
     @Test
+    @DisplayName("回收器只压回仍为 PENDING 的记录，不误伤已推进的任务")
+    void failIfStillPendingOnlyTouchesPending() {
+        Long pendingId = saveResume(AsyncTaskStatus.PENDING, "正文", null);
+        Long completedId = saveResume(AsyncTaskStatus.COMPLETED, "正文", null);
+
+        assertEquals(1, resumeRepository.failIfStillPending(pendingId, AsyncTaskStatus.FAILED,
+            "任务超时未入队", AsyncTaskStatus.PENDING));
+        assertEquals(0, resumeRepository.failIfStillPending(completedId, AsyncTaskStatus.FAILED,
+            "任务超时未入队", AsyncTaskStatus.PENDING));
+
+        ResumeEntity reaped = reload(pendingId);
+        assertEquals(AsyncTaskStatus.FAILED, reaped.getAnalyzeStatus());
+        assertEquals("任务超时未入队", reaped.getAnalyzeError());
+        assertEquals(AsyncTaskStatus.COMPLETED, reload(completedId).getAnalyzeStatus());
+    }
+
+    @Test
     @DisplayName("别人的简历认领不到")
     void claimIsScopedToTheOwner() {
         Long id = saveResume(AsyncTaskStatus.FAILED, "原正文", null);

@@ -4,6 +4,7 @@ import ai.interview.infrastructure.file.FileHashService;
 import ai.interview.infrastructure.mapper.ResumeMapper;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeAnalysisRepository;
+import ai.interview.modules.resume.listener.AnalyzeTaskTracker;
 import ai.interview.modules.resume.repository.ResumeRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +30,14 @@ class ResumePersistenceServiceTest {
 
     private final ResumeRepository resumeRepository = mock(ResumeRepository.class);
     private final FileHashService fileHashService = new FileHashService();
+    private final AnalyzeTaskTracker analyzeTaskTracker = mock(AnalyzeTaskTracker.class);
     private final ResumePersistenceService service = new ResumePersistenceService(
         resumeRepository,
         mock(ResumeAnalysisRepository.class),
         new ObjectMapper(),
         mock(ResumeMapper.class),
-        fileHashService
+        fileHashService,
+        analyzeTaskTracker
     );
 
     @BeforeEach
@@ -65,6 +68,21 @@ class ResumePersistenceServiceTest {
         String rawHash = fileHashService.calculateHash(file);
         assertEquals(42L, captor.getValue().getUserId());
         assertEquals(fileHashService.calculateUserScopedHash(rawHash, 42L), captor.getValue().getFileHash());
+    }
+
+    @Test
+    void registersTheAnalysisTaskBeforeTheTransactionCommits() {
+        MockMultipartFile file = file("resume.txt", "content");
+        when(resumeRepository.save(any(ResumeEntity.class))).thenAnswer(invocation -> {
+            ResumeEntity saved = invocation.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
+
+        service.saveResume(file, "parsed resume", "resumes/key", "http://storage/key");
+
+        // 登记发生在保存事务内：提交后即使进程退出，回收器也能看到这条记录
+        verify(analyzeTaskTracker).markQueued(1L);
     }
 
     @Test

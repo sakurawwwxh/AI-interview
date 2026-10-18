@@ -13,6 +13,8 @@ import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -352,6 +354,38 @@ public class RedisService {
     }
 
     // ==================== 原子计数器 ====================
+
+    /**
+     * 有序集合：写入成员及其分值（成员已存在时更新分值）。
+     */
+    public boolean zAdd(String key, double score, String member) {
+        return redissonClient.getScoredSortedSet(key, StringCodec.INSTANCE).add(score, member);
+    }
+
+    /**
+     * 有序集合：取分值落在 [minScore, maxScore] 内的成员，按分值升序。
+     */
+    public Collection<String> zRangeByScore(String key, double minScore, double maxScore, int limit) {
+        RScoredSortedSet<String> set = redissonClient.getScoredSortedSet(key, StringCodec.INSTANCE);
+        return set.valueRange(minScore, true, maxScore, true, 0, limit);
+    }
+
+    /**
+     * 有序集合：移除成员，返回是否移除了至少一个。
+     */
+    public boolean zRemove(String key, String... members) {
+        return redissonClient.getScoredSortedSet(key, StringCodec.INSTANCE).removeAll(Arrays.asList(members));
+    }
+
+    /**
+     * 有序集合：按分值区间移除成员（闭区间），返回移除数量。
+     *
+     * <p>用于「只清理仍然超时的登记」——期间被刷新过分值的成员会落在区间外，不会被误删。
+     */
+    public int zRemoveRangeByScore(String key, double minScore, double maxScore) {
+        return redissonClient.getScoredSortedSet(key, StringCodec.INSTANCE)
+            .removeRangeByScore(minScore, true, maxScore, true);
+    }
 
     /**
      * 获取原子计数器

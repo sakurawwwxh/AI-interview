@@ -29,18 +29,21 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
     private final ResumeGradingService gradingService;
     private final ResumePersistenceService persistenceService;
     private final ResumeRepository resumeRepository;
+    private final AnalyzeTaskTracker tracker;
 
     public AnalyzeStreamConsumer(
         RedisService redisService,
         ResumeGradingService gradingService,
         ResumePersistenceService persistenceService,
         ResumeRepository resumeRepository,
+        AnalyzeTaskTracker tracker,
         AsyncTaskProperties asyncTaskProperties
     ) {
         super(redisService, asyncTaskProperties.getMaxConcurrency());
         this.gradingService = gradingService;
         this.persistenceService = persistenceService;
         this.resumeRepository = resumeRepository;
+        this.tracker = tracker;
     }
 
     record AnalyzePayload(Long resumeId, Long userId, String content) {}
@@ -104,6 +107,8 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
     @Override
     protected void markProcessing(AnalyzePayload payload) {
         updateAnalyzeStatus(payload.resumeId(), AsyncTaskStatus.PROCESSING, null);
+        // 已经开始消费，不再需要回收兜底；留着会让「排队久但仍会执行」的任务被误判
+        tracker.clear(payload.resumeId());
     }
 
     @Override
