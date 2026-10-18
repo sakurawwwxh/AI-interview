@@ -55,7 +55,10 @@ public class KnowledgeBaseDeleteService {
         // 2. 数据库侧：拆会话关联 → 删向量 → 删记录（短事务，要么全成要么全不成）
         transactionTemplate.executeWithoutResult(status -> {
             removeSessionLinks(id);
-            // 向量删除未抛异常时事务照常提交；它自身在失败时只记日志，保留原有降级语义
+            // 向量删除走 JdbcTemplate，但同在一个 DataSource 上，会加入当前事务
+            // （见 JdbcTransactionSharingIntegrationTest）。它若在 SQL 层失败，
+            // PostgreSQL 会中止整个事务，后续删记录必然失败、整体回滚——
+            // 这是有意的：宁可删不掉让用户重试，也不留下「记录还在、向量已没」的状态。
             vectorService.deleteByKnowledgeBaseId(id);
             knowledgeBaseRepository.deleteById(id);
         });

@@ -116,13 +116,16 @@ class KnowledgeBaseDeleteServiceTest {
     }
 
     @Test
-    @DisplayName("向量删除抛异常：事务回滚，且不再去删 Dify 与 S3")
+    @DisplayName("删记录失败：事务回滚，且不再去删 Dify 与 S3")
     void rollsBackAndSkipsExternalCleanupWhenDatabaseWorkFails() {
         KnowledgeBaseEntity kb = knowledgeBase(KB_ID, STORAGE_KEY);
         when(listService.getKnowledgeBaseEntity(KB_ID)).thenReturn(Optional.of(kb));
         when(sessionRepository.findByKnowledgeBaseIds(List.of(KB_ID))).thenReturn(List.of());
-        doThrow(new IllegalStateException("vector store down"))
-            .when(vectorService).deleteByKnowledgeBaseId(KB_ID);
+        // 真实可达的失败点：外键冲突/死锁都发生在删记录这条语句上。
+        // 向量删除本身在 KnowledgeBaseVectorService 里被吞掉，失败会以「事务已中止」
+        // 的形式在下一步暴露，最终同样走这条回滚路径。
+        doThrow(new IllegalStateException("fk violation"))
+            .when(knowledgeBaseRepository).deleteById(KB_ID);
 
         assertThrows(IllegalStateException.class, () -> service.deleteKnowledgeBase(KB_ID));
 
