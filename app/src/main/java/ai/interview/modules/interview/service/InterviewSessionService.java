@@ -568,6 +568,12 @@ public class InterviewSessionService {
             throw new BusinessException(ErrorCode.INTERVIEW_EVALUATION_IN_PROGRESS, "面试评估正在进行中，请稍候");
         }
 
+        // 已经出过报告（异步评估已落库）就直接读回来：这条路径原先每次都会重跑一遍 AI 评估
+        Optional<InterviewReportDTO> storedReport = persistenceService.restoreReport(sessionId);
+        if (storedReport.isPresent()) {
+            return storedReport.get();
+        }
+
         log.info("生成面试报告: {}", sessionId);
 
         List<InterviewQuestionDTO> questions = session.getQuestions(objectMapper);

@@ -300,5 +300,29 @@ class InterviewSessionServiceTest {
                 .evaluateInterview(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                     org.mockito.ArgumentMatchers.any());
         }
+
+        @Test
+        @DisplayName("已出报告时直接读库返回，不再调用模型")
+        void shouldReturnStoredReportWithoutCallingModel() {
+            when(sessionCache.getSession(1L, SESSION_ID))
+                .thenReturn(java.util.Optional.of(buildSession(1, SessionStatus.EVALUATED)));
+            ai.interview.modules.interview.model.InterviewSessionEntity entity =
+                new ai.interview.modules.interview.model.InterviewSessionEntity();
+            entity.setEvaluateStatus(ai.interview.common.model.AsyncTaskStatus.COMPLETED);
+            when(persistenceService.findBySessionIdForCurrentUser(SESSION_ID))
+                .thenReturn(java.util.Optional.of(entity));
+            ai.interview.modules.interview.model.InterviewReportDTO stored =
+                new ai.interview.modules.interview.model.InterviewReportDTO(
+                    SESSION_ID, 2, 77, java.util.List.of(), java.util.List.of(), "总评",
+                    java.util.List.of("优势"), java.util.List.of("改进"), java.util.List.of());
+            when(persistenceService.restoreReport(SESSION_ID))
+                .thenReturn(java.util.Optional.of(stored));
+
+            assertEquals(stored, service.generateReport(SESSION_ID));
+            verify(evaluationService, never())
+                .evaluateInterview(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any());
+        }
+
     }
 }

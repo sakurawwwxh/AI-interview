@@ -24,6 +24,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -537,5 +540,75 @@ public class InterviewPersistenceService {
             .distinct()
             .limit(30) // 核心改动：只保留最近的 30 道题
             .toList();
+    }
+
+    /**
+     * 从已落库的会话与答案还原面试报告；还没有出过报告时返回 empty。
+     *
+     * <p>报告字段与逐题评分在 saveReport 时都已落库，这里只做读回与重算、不调用模型——
+     * 否则每打开一次报告就重跑一遍 AI 评估（既让用户等，也重复花钱）。
+     */
+    public Optional<InterviewReportDTO> restoreReport(String sessionId) {
+        Optional<InterviewSessionEntity> sessionOpt = sessionRepository.findBySessionId(sessionId);
+        if (sessionOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        InterviewSessionEntity session = sessionOpt.get();
+        if (session.getOverallScore() == null || session.getOverallFeedback() == null) {
+            return Optional.empty();
+        }
+
+        List<InterviewQuestionDTO> questions = readReportJson(session.getQuestionsJson(),
+            new TypeReference<List<InterviewQuestionDTO>>() {});
+        List<String> strengths = readReportJson(session.getStrengthsJson(),
+            new TypeReference<List<String>>() {});
+        List<String> improvements = readReportJson(session.getImprovementsJson(),
+            new TypeReference<List<String>>() {});
+        List<InterviewReportDTO.ReferenceAnswer> referenceAnswers = readReportJson(
+            session.getReferenceAnswersJson(),
+            new TypeReference<List<InterviewReportDTO.ReferenceAnswer>>() {});
+
+        Map<Integer, InterviewAnswerEntity> answerByIndex = answerRepository
+            .findBySession_SessionIdOrderByQuestionIndex(sessionId).stream()
+            .filter(answer -> answer.getQuestionIndex() != null)
+            .collect(java.util.stream.Collectors.toMap(
+                InterviewAnswerEntity::getQuestionIndex, answer -> answer, (first, second) -> first));
+
+        List<InterviewReportDTO.QuestionEvaluation> details = new ArrayList<>();
+        Map<String, List<Integer>> scoresByCategory = new LinkedHashMap<>();
+        for (InterviewQuestionDTO question : questions) {
+            InterviewAnswerEntity answer = answerByIndex.get(question.questionIndex());
+            int score = answer != null && answer.getScore() != null ? answer.getScore() : 0;
+            String feedback = answer != null && answer.getFeedback() != null
+                ? answer.getFeedback() : "该题未成功生成评估反馈。";
+            details.add(new InterviewReportDTO.QuestionEvaluation(
+                question.questionIndex(), question.question(), question.category(),
+                question.userAnswer(), score, feedback));
+            scoresByCategory.computeIfAbsent(question.category(), ignored -> new ArrayList<>()).add(score);
+        }
+
+        List<InterviewReportDTO.CategoryScore> categoryScores = scoresByCategory.entrySet().stream()
+            .map(entry -> new InterviewReportDTO.CategoryScore(
+                entry.getKey(),
+                (int) entry.getValue().stream().mapToInt(Integer::intValue).average().orElse(0),
+                entry.getValue().size()))
+            .toList();
+
+        return Optional.of(new InterviewReportDTO(
+            sessionId, questions.size(), session.getOverallScore(), categoryScores,
+            details, session.getOverallFeedback(), strengths, improvements, referenceAnswers));
+    }
+
+    /** 报告里的 JSON 列解析失败时按空列表处理：宁可少一段展示，也不要让报告接口 500。 */
+    private <T> List<T> readReportJson(String json, TypeReference<List<T>> type) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, type);
+        } catch (Exception e) {
+            log.warn("解析面试报告字段失败: {}", e.getMessage());
+            return List.of();
+        }
     }
 }
