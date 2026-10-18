@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -83,12 +84,20 @@ public interface ResumeRepository extends JpaRepository<ResumeEntity, Long> {
     /**
      * Atomically claims a terminal resume for re-analysis. The status predicate is important:
      * two concurrent retry requests may both read COMPLETED, but only one may transition it to PENDING.
+     *
+     * <p>正文回填与状态变更放在同一条语句里：分开写的话，claim 提交后、回填前如果失败，
+     * 简历会永久停在 PENDING —— 而重试入口对 PENDING 一律拒绝，用户只能等一个不会到来的任务。
+     * {@code resumeText} 传 null 表示沿用库里已有的正文。
+     *
+     * <p>自带事务：调用方不再为「下载并解析简历」这类耗时动作开事务，这条语句必须能独立提交。
      */
+    @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         update ResumeEntity r
            set r.analyzeStatus = :pending,
-               r.analyzeError = null
+               r.analyzeError = null,
+               r.resumeText = coalesce(cast(:resumeText as string), r.resumeText)
          where r.id = :resumeId
            and r.userId = :userId
            and (r.analyzeStatus is null or r.analyzeStatus in :retryableStatuses)
@@ -97,7 +106,8 @@ public interface ResumeRepository extends JpaRepository<ResumeEntity, Long> {
         @Param("resumeId") Long resumeId,
         @Param("userId") Long userId,
         @Param("pending") AsyncTaskStatus pending,
-        @Param("retryableStatuses") Collection<AsyncTaskStatus> retryableStatuses
+        @Param("retryableStatuses") Collection<AsyncTaskStatus> retryableStatuses,
+        @Param("resumeText") String resumeText
     );
 
     List<ResumeEntity> findAllByUserIdIsNull();

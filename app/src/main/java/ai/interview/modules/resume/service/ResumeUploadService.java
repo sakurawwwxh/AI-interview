@@ -14,7 +14,6 @@ import ai.interview.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Optional;
@@ -146,9 +145,12 @@ public class ResumeUploadService {
      * 重新分析简历（手动重试）
      * 从数据库获取简历文本并发送分析任务
      *
+     * <p>刻意不加 {@code @Transactional}：正文缺失时会从对象存储下载并解析文件，
+     * 这是数秒级的网络 + CPU 动作，包进事务会让数据库连接一直被占用。
+     * 需要原子性的只有 {@code claimForReanalysis} 这一条条件更新，它自带事务。
+     *
      * @param resumeId 简历ID
      */
-    @Transactional
     public void reanalyze(Long resumeId) {
         Long userId = UserContext.getCurrentUserIdOrThrow();
         ResumeEntity resume = persistenceService.findById(resumeId)
@@ -163,32 +165,27 @@ public class ResumeUploadService {
         log.info("开始重新分析简历: resumeId={}, filename={}", resumeId, resume.getOriginalFilename());
 
         String resumeText = resume.getResumeText();
-        if (resumeText == null || resumeText.trim().isEmpty()) {
-            // 如果没有缓存的文本，尝试重新解析
+        boolean recoveredFromStorage = resumeText == null || resumeText.trim().isEmpty();
+        if (recoveredFromStorage) {
+            // 没有缓存的文本，重新从存储下载解析
             resumeText = parseService.downloadAndParseContent(resume.getStorageKey(), resume.getOriginalFilename());
             if (resumeText == null || resumeText.trim().isEmpty()) {
                 throw new BusinessException(ErrorCode.RESUME_PARSE_FAILED, "无法获取简历文本内容");
             }
-            // 更新缓存的文本
-            resume.setResumeText(resumeText);
         }
 
-        // Conditional update closes the check-then-set race between concurrent retry requests.
+        // 条件更新同时完成「认领」和「正文回填」：拆成两条语句的话，claim 提交后、回填前失败
+        // 会让简历永久停在 PENDING（重试入口对 PENDING 一律拒绝，也没有任何任务会来完成它）。
         int claimed = resumeRepository.claimForReanalysis(
             resumeId,
             userId,
             AsyncTaskStatus.PENDING,
-            java.util.List.of(AsyncTaskStatus.FAILED, AsyncTaskStatus.COMPLETED)
+            java.util.List.of(AsyncTaskStatus.FAILED, AsyncTaskStatus.COMPLETED),
+            recoveredFromStorage ? resumeText : null
         );
         if (claimed != 1) {
             throw new BusinessException(ErrorCode.RESUME_ANALYSIS_IN_PROGRESS,
                 "简历分析任务已被其他请求提交，请勿重复操作");
-        }
-
-        // Persist text recovered from storage after the claim succeeds.
-        if (!resumeText.equals(resume.getResumeText())) {
-            resume.setResumeText(resumeText);
-            resumeRepository.save(resume);
         }
 
         // 发送分析任务到 Stream
