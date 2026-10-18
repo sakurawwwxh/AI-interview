@@ -17,6 +17,18 @@ local permits = tonumber(ARGV[2])
 local interval = tonumber(ARGV[3])
 local capacity = tonumber(ARGV[4])
 
+-- 幂等：Redisson 在命令超时后会重发，令牌桶不幂等，重发会多扣一次令牌。
+-- 用请求唯一标识记住「本次调用的结果」，重发时直接返回上次结果。
+-- （键都带 {} 哈希标签，追加后缀不改变 Redis Cluster 槽位）
+local request_id = ARGV[5]
+local result_key = KEYS[1] .. ":req"
+local idempotency_ttl = math.ceil(interval / 1000)
+if idempotency_ttl < 1 then idempotency_ttl = 1 end
+local cached_result = redis.call("hget", result_key, request_id)
+if cached_result then
+    return tonumber(cached_result)
+end
+
 -- 每补充 1 个令牌需要的毫秒数
 local refill_interval = interval / capacity
 
@@ -55,6 +67,8 @@ for i, key in ipairs(KEYS) do
     local tokens = refill_tokens(key)
     if tokens < permits then
         -- 任何一个维度令牌不足，直接返回失败（不扣减，其他维度状态保持不变）
+        redis.call("hset", result_key, request_id, 0)
+        redis.call("expire", result_key, idempotency_ttl)
         return 0
     end
 end
@@ -68,4 +82,6 @@ for i, key in ipairs(KEYS) do
 end
 
 -- 成功获取所有维度的令牌
+redis.call("hset", result_key, request_id, 1)
+redis.call("expire", result_key, idempotency_ttl)
 return 1
