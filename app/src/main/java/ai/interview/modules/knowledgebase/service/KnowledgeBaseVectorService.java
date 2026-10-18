@@ -40,7 +40,6 @@ public class KnowledgeBaseVectorService {
      * @param knowledgeBaseId 知识库ID
      * @param content 知识库文本内容
      */
-    @Transactional
     public void vectorizeAndStore(Long knowledgeBaseId, String content) {
         log.info("开始向量化知识库: kbId={}, contentLength={}", knowledgeBaseId, content.length());
         try {
@@ -86,7 +85,6 @@ public class KnowledgeBaseVectorService {
      * @param knowledgeBaseId 知识库 ID
      * @param segments        Dify 分段列表（已按 position 排序）
      */
-    @Transactional
     public void vectorizeSegmentsAndStore(Long knowledgeBaseId, List<String> segments) {
         log.info("开始按 Dify 分段向量化: kbId={}, segments={}", knowledgeBaseId, segments.size());
         try {
