@@ -60,7 +60,15 @@ public class KnowledgeBaseDeleteService {
             // PostgreSQL 会中止整个事务，后续删记录必然失败、整体回滚——
             // 这是有意的：宁可删不掉让用户重试，也不留下「记录还在、向量已没」的状态。
             vectorService.deleteByKnowledgeBaseId(id);
+            // 事务内重新读一次 Dify 文档 ID：外面的实体可能是异步同步写回 docId 之前读到的旧值，
+            // 用它写墓碑会漏掉刚建好的远端文档
+            String difyDocId = knowledgeBaseRepository.findById(id)
+                .map(KnowledgeBaseEntity::getDifyDocumentId)
+                .orElse(null);
             knowledgeBaseRepository.deleteById(id);
+            // 墓碑与删除同事务提交：此后即使进程退出或 Dify 不可达，定时任务仍会重试删除，
+            // 反向同步也不会把这篇文档当成新文档拉回来
+            difySyncService.recordDeletionIntent(id, difyDocId);
         });
 
         // 3. 提交后再清理外部资源；此刻记录已经删掉，清理失败不应让用户看到「删除失败」

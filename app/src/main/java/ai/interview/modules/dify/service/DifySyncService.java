@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -104,13 +105,19 @@ public class DifySyncService {
             }
 
             // 3. 仅更新 Dify 相关字段，绝不覆盖 vectorStatus 等其他字段
-            knowledgeBaseRepository.findById(kbId).ifPresent(latestEntity -> {
-                latestEntity.setDifyDocumentId(difyDocumentId);
-                latestEntity.setDifySyncStatus(DifySyncStatus.SYNCED);
-                latestEntity.setDifySyncTime(LocalDateTime.now());
-                latestEntity.setDifySyncError(null);
-                knowledgeBaseRepository.save(latestEntity);
-            });
+            Optional<KnowledgeBaseEntity> latestEntity = knowledgeBaseRepository.findById(kbId);
+            if (latestEntity.isEmpty()) {
+                // 本地在同步期间被删了（此时本地还没有 docId，删除方写不出墓碑）：
+                // 远端刚建好的这篇必须登记删除意图，否则反向同步会把它当作新文档拉回来
+                recordDeletionIntent(kbId, difyDocumentId);
+                log.info("知识库已被删除，登记 Dify 删除墓碑: kbId={}, difyDocId={}", kbId, difyDocumentId);
+                return;
+            }
+            latestEntity.get().setDifyDocumentId(difyDocumentId);
+            latestEntity.get().setDifySyncStatus(DifySyncStatus.SYNCED);
+            latestEntity.get().setDifySyncTime(LocalDateTime.now());
+            latestEntity.get().setDifySyncError(null);
+            knowledgeBaseRepository.save(latestEntity.get());
 
             // 4. 记录同步日志
             saveSyncLog(kbId, difyDocumentId, DifySyncDirection.TO_DIFY,
@@ -226,6 +233,12 @@ public class DifySyncService {
         String datasetId = config.getDatasetId();
         String difyDocId = remoteDoc.getId();
 
+        // 本地主动删过：这是删除墓碑，不是待拉取的新文档。否则下次同步会把删掉的知识库重新拉回来。
+        if (syncLogRepository.existsByDifyDocumentIdAndSyncAction(difyDocId, DifySyncAction.DELETE)) {
+            log.info("本地已删除该文档，跳过回拉: difyDocId={}", difyDocId);
+            return;
+        }
+
         log.info("从 Dify 拉取新文档: difyDocId={}, name={}", difyDocId, remoteDoc.getName());
 
         // 1. 获取 Dify 分段（复用 Dify 的分块结构，不重新分块）
@@ -272,6 +285,19 @@ public class DifySyncService {
         KnowledgeBaseEntity savedKb = persistenceService.saveKnowledgeBaseFromDify(
             remoteDoc.getName(), filename, (long) contentBytes.length,
             "text/markdown", storageKey, storageUrl, fileHash, difyDocId, 1L);
+
+        // 上面的检查到这次落库之间有秒级的网络往返（拉分段、传对象存储），期间知识库可能已被删除。
+        // 再确认一次：命中墓碑就撤掉刚建的记录与文件，否则这条会被永久保留。
+        if (syncLogRepository.existsByDifyDocumentIdAndSyncAction(difyDocId, DifySyncAction.DELETE)) {
+            knowledgeBaseRepository.deleteById(savedKb.getId());
+            try {
+                storageService.deleteKnowledgeBase(storageKey);
+            } catch (Exception cleanupError) {
+                log.warn("撤销复活记录时删除对象失败: storageKey={}, error={}", storageKey, cleanupError.getMessage());
+            }
+            log.info("落库期间知识库被删除，已撤销回拉: difyDocId={}, kbId={}", difyDocId, savedKb.getId());
+            return;
+        }
 
         // 5. 复用 Dify 分段直接向量化（不重新分块）
         List<String> segmentContents = segments.stream()
@@ -404,22 +430,130 @@ public class DifySyncService {
 
         log.info("从 Dify 删除文档: kbId={}, difyDocId={}", entity.getId(), entity.getDifyDocumentId());
 
-        try {
-            difyApiClient.deleteDocument(config.getDatasetId(), entity.getDifyDocumentId());
+        String difyDocId = entity.getDifyDocumentId();
+        Optional<DifySyncLogEntity> tombstone = syncLogRepository
+            .findFirstByDifyDocumentIdAndSyncActionOrderByCreatedAtDesc(difyDocId, DifySyncAction.DELETE);
 
-            saveSyncLog(entity.getId(), entity.getDifyDocumentId(), DifySyncDirection.TO_DIFY,
-                DifySyncAction.DELETE, DifySyncStatus.SUCCESS, null);
+        try {
+            difyApiClient.deleteDocument(config.getDatasetId(), difyDocId);
+
+            markDeletionOutcome(tombstone, entity.getId(), difyDocId, DifySyncStatus.SUCCESS, null);
 
             log.info("从 Dify 删除文档成功: kbId={}", entity.getId());
 
         } catch (Exception e) {
-            log.warn("从 Dify 删除文档失败: kbId={}, error={}", entity.getId(), e.getMessage());
+            log.warn("从 Dify 删除文档失败，留待定时任务重试: kbId={}, error={}", entity.getId(), e.getMessage());
 
-            saveSyncLog(entity.getId(), entity.getDifyDocumentId(), DifySyncDirection.TO_DIFY,
-                DifySyncAction.DELETE, DifySyncStatus.FAILED, e.getMessage());
+            markDeletionOutcome(tombstone, entity.getId(), difyDocId, DifySyncStatus.FAILED, e.getMessage());
 
             // 不抛出异常，允许继续执行
         }
+    }
+
+    /**
+     * 记录「本地已删除、需要从 Dify 删除」的意图（墓碑）。
+     *
+     * <p>必须与知识库删除写在同一个事务里提交：事务一旦提交，即使进程立刻退出、
+     * 或这次 Dify 调用失败，墓碑都还在——定时任务会继续重试删除，
+     * 反向同步也不会把这篇文档当作新文档重新拉回本地。
+     */
+    public void recordDeletionIntent(Long kbId, String difyDocId) {
+        if (difyDocId == null || difyDocId.isBlank()) {
+            return;
+        }
+        syncLogRepository.save(DifySyncLogEntity.builder()
+            .knowledgeBaseId(kbId)
+            .difyDocumentId(difyDocId)
+            .syncDirection(DifySyncDirection.TO_DIFY)
+            .syncAction(DifySyncAction.DELETE)
+            .syncStatus(DifySyncStatus.PENDING)
+            .build());
+    }
+
+    /**
+     * 重试未完成的 Dify 删除，由定时任务在拉取变更前调用。
+     *
+     * <p>只重试最近 7 天的墓碑：更早的失败通常意味着配置问题（key 失效、dataset 被删），
+     * 每 10 分钟重试一次只会刷日志，留给人工处理。
+     */
+    public int retryPendingDeletions() {
+        if (!config.getSync().isEnabled()) {
+            return 0;
+        }
+
+        List<DifySyncLogEntity> tombstones = syncLogRepository.findRetryable(
+            DifySyncAction.DELETE,
+            List.of(DifySyncStatus.PENDING, DifySyncStatus.FAILED),
+            LocalDateTime.now().minusDays(7),
+            PageRequest.of(0, 20));
+
+        int cleared = 0;
+        for (DifySyncLogEntity tombstone : tombstones) {
+            String difyDocId = tombstone.getDifyDocumentId();
+            try {
+                difyApiClient.deleteDocument(config.getDatasetId(), difyDocId);
+                markDeletionOutcome(Optional.of(tombstone), tombstone.getKnowledgeBaseId(), difyDocId,
+                    DifySyncStatus.SUCCESS, null);
+                cleared++;
+            } catch (Exception e) {
+                if (isDocumentNotFound(e)) {
+                    // 远端已经没有这篇文档，删除目标已达成
+                    markDeletionOutcome(Optional.of(tombstone), tombstone.getKnowledgeBaseId(), difyDocId,
+                        DifySyncStatus.SUCCESS, null);
+                    cleared++;
+                    log.info("Dify 文档已不存在，删除墓碑标记完成: difyDocId={}", difyDocId);
+                } else {
+                    markDeletionOutcome(Optional.of(tombstone), tombstone.getKnowledgeBaseId(), difyDocId,
+                        DifySyncStatus.FAILED, e.getMessage());
+                    log.warn("重试删除 Dify 文档失败: difyDocId={}, error={}", difyDocId, e.getMessage());
+                }
+            }
+        }
+        if (!tombstones.isEmpty()) {
+            log.info("Dify 删除重试：候选 {} 条，完成 {} 条", tombstones.size(), cleared);
+        }
+
+        // 超出重试窗口仍未完成的墓碑不会再被自动处理：远端文档会残留在 Dify，
+        // 而墓碑又永久阻断回拉，必须让人看得到
+        LocalDateTime retryWindowStart = LocalDateTime.now().minusDays(7);
+        long abandoned = syncLogRepository.countBySyncActionAndSyncStatusInAndCreatedAtBefore(
+            DifySyncAction.DELETE,
+            List.of(DifySyncStatus.PENDING, DifySyncStatus.FAILED),
+            retryWindowStart);
+        if (abandoned > 0) {
+            log.error("有 {} 条 Dify 删除墓碑超过 7 天仍未完成，远端文档可能残留，需要人工处理", abandoned);
+        }
+        return cleared;
+    }
+
+    /** 墓碑存在时更新它，否则退回「插一条日志」的旧行为（例如没有墓碑的历史调用方）。 */
+    private void markDeletionOutcome(Optional<DifySyncLogEntity> tombstone, Long kbId, String difyDocId,
+                                     DifySyncStatus status, String error) {
+        if (tombstone.isPresent()) {
+            DifySyncLogEntity logEntity = tombstone.get();
+            logEntity.setSyncStatus(status);
+            logEntity.setErrorMessage(truncateError(error));
+            syncLogRepository.save(logEntity);
+            return;
+        }
+        saveSyncLog(kbId, difyDocId, DifySyncDirection.TO_DIFY, DifySyncAction.DELETE, status, error);
+    }
+
+    private static String truncateError(String error) {
+        if (error == null || error.length() <= 500) {
+            return error;
+        }
+        return error.substring(0, 500);
+    }
+
+    private static boolean isDocumentNotFound(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof RestClientResponseException response
+                && response.getStatusCode().value() == 404) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

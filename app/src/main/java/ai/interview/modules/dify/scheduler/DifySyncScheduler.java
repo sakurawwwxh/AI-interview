@@ -34,6 +34,11 @@ public class DifySyncScheduler {
 
         log.info("开始定时从 Dify 同步变更");
         try {
+            // 先补做上次没删成功的远端文档，避免它们在 Dify 里继续存在
+            int retried = difySyncService.retryPendingDeletions();
+            if (retried > 0) {
+                log.info("重试完成 {} 条待删除的 Dify 文档", retried);
+            }
             difySyncService.syncFromDify();
             log.info("定时从 Dify 同步完成");
         } catch (Exception e) {

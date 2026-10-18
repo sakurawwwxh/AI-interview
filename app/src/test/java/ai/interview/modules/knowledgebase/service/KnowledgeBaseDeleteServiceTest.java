@@ -101,6 +101,24 @@ class KnowledgeBaseDeleteServiceTest {
     }
 
     @Test
+    @DisplayName("Dify 删除墓碑与知识库删除写在同一个事务里")
+    void recordsDeletionTombstoneInsideTheTransaction() {
+        KnowledgeBaseEntity kb = knowledgeBase(KB_ID, STORAGE_KEY);
+        kb.setDifyDocumentId("doc-1");
+        when(listService.getKnowledgeBaseEntity(KB_ID)).thenReturn(Optional.of(kb));
+        when(sessionRepository.findByKnowledgeBaseIds(List.of(KB_ID))).thenReturn(List.of());
+        // 事务内会重新读一次 docId（外面的实体可能是旧值）
+        when(knowledgeBaseRepository.findById(KB_ID)).thenReturn(Optional.of(kb));
+
+        service.deleteKnowledgeBase(KB_ID);
+
+        InOrder inOrder = inOrder(transactionManager, difySyncService);
+        inOrder.verify(transactionManager).getTransaction(any());
+        inOrder.verify(difySyncService).recordDeletionIntent(KB_ID, "doc-1");
+        inOrder.verify(transactionManager).commit(any());
+    }
+
+    @Test
     @DisplayName("Dify 清理提交失败也不影响结果：S3 照常清理，不向调用方抛错")
     void doesNotFailWhenDifyCleanupCannotBeSubmitted() {
         KnowledgeBaseEntity kb = knowledgeBase(KB_ID, STORAGE_KEY);
