@@ -23,7 +23,7 @@ public final class LimitedChatModel implements ChatModel {
 
     @Override
     public ChatResponse call(Prompt prompt) {
-        return limiter.execute(providerKey, userId, () -> delegate.call(prompt));
+        return limiter.execute(providerKey, userId, () -> delegate.call(withCompatibleOptions(prompt)));
     }
 
     @Override
@@ -31,7 +31,7 @@ public final class LimitedChatModel implements ChatModel {
         return Flux.defer(() -> {
             AiRequestLimiter.Lease lease = limiter.acquire(providerKey, userId);
             try {
-                return delegate.stream(prompt).doFinally(signal -> lease.close());
+                return delegate.stream(withCompatibleOptions(prompt)).doFinally(signal -> lease.close());
             } catch (RuntimeException e) {
                 lease.close();
                 throw e;
@@ -42,5 +42,22 @@ public final class LimitedChatModel implements ChatModel {
     @Override
     public ChatOptions getDefaultOptions() {
         return delegate.getDefaultOptions();
+    }
+
+    /**
+     * Spring AI 2.0 的模型实现会对 prompt 的选项做强转（例如 {@code OpenAiChatModel} 直接
+     * {@code checkcast OpenAiChatOptions}），而 {@code ChatClient} 默认塞进去的是通用
+     * {@code DefaultChatOptions}——直接传下去会抛 ClassCastException。
+     *
+     * <p>在调用边界把「与模型默认选项类型不兼容」的选项替换成模型默认选项；
+     * 调用方显式传入的同类型选项原样保留。
+     */
+    private Prompt withCompatibleOptions(Prompt prompt) {
+        ChatOptions defaults = delegate.getDefaultOptions();
+        ChatOptions provided = prompt.getOptions();
+        if (defaults == null || provided == null || defaults.getClass().isInstance(provided)) {
+            return prompt;
+        }
+        return new Prompt(prompt.getInstructions(), defaults);
     }
 }

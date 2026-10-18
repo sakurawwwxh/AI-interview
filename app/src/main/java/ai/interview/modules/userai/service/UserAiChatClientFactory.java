@@ -5,30 +5,26 @@ import ai.interview.modules.userai.model.UserAiConfigEntity;
 import ai.interview.modules.userai.repository.UserAiConfigRepository;
 import ai.interview.common.ai.AiRequestLimiter;
 import ai.interview.common.ai.LimitedChatModel;
+import com.openai.client.OpenAIClient;
+import com.openai.client.OpenAIClientAsync;
 import io.micrometer.observation.ObservationRegistry;
-import io.netty.channel.ChannelOption;
 import lombok.RequiredArgsConstructor;
-import reactor.netty.http.client.HttpClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.core.retry.RetryPolicy;
-import org.springframework.core.retry.RetryTemplate;
-import org.springframework.http.client.ReactorClientHttpRequestFactory;
+import org.springframework.ai.openai.setup.OpenAiSetup;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class UserAiChatClientFactory {
     /** A stalled upstream must not permanently consume an asynchronous analysis slot. */
-    private static final Duration MODEL_CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration MODEL_RESPONSE_TIMEOUT = Duration.ofSeconds(45);
 
     private final ChatModel platformChatModel;
@@ -69,21 +65,25 @@ public class UserAiChatClientFactory {
     private ChatClient create(String baseUrl, String model, String apiKey, Long userId) {
         validateBaseUrl(baseUrl);
         String normalizedBaseUrl = trimBaseUrl(baseUrl);
-        HttpClient httpClient = HttpClient.create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, Math.toIntExact(MODEL_CONNECT_TIMEOUT.toMillis()))
-            .responseTimeout(MODEL_RESPONSE_TIMEOUT);
-        ReactorClientHttpRequestFactory requestFactory = new ReactorClientHttpRequestFactory(httpClient);
-        OpenAiApi api = OpenAiApi.builder()
-            .baseUrl(normalizedBaseUrl)
-            .apiKey(apiKey)
-            .restClientBuilder(RestClient.builder().requestFactory(requestFactory))
-            .webClientBuilder(WebClient.builder().clientConnector(new org.springframework.http.client.reactive.ReactorClientHttpConnector(httpClient)))
-            .build();
+        String apiBaseUrl = withApiVersion(normalizedBaseUrl);
+        // Spring AI 2.0 起底层改成官方 OpenAI SDK：客户端由 OpenAiSetup 构造，
+        // 超时与重试直接透传，不再需要手工拼 RestClient / WebClient。
+        // maxRetries=0：跨供应商重试由 StructuredOutputInvoker 统一负责，避免重复叠加。
+        OpenAIClient syncClient = OpenAiSetup.setupSyncClient(
+            apiBaseUrl, apiKey, null, null, null, null,
+            false, false, model, MODEL_RESPONSE_TIMEOUT, 0, null, Map.of(),
+            ObservationRegistry.NOOP, null, List.of());
+        OpenAIClientAsync asyncClient = OpenAiSetup.setupAsyncClient(
+            apiBaseUrl, apiKey, null, null, null, null,
+            false, false, model, MODEL_RESPONSE_TIMEOUT, 0, null, Map.of(),
+            ObservationRegistry.NOOP, null, List.of());
         OpenAiChatOptions options = OpenAiChatOptions.builder().model(model).temperature(0.2).build();
-        OpenAiChatModel chatModel = OpenAiChatModel.builder().openAiApi(api).defaultOptions(options)
-            // StructuredOutputInvoker owns cross-provider retry; avoid compounded retries here.
-            .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0)))
-            .observationRegistry(ObservationRegistry.NOOP).build();
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+            .openAiClient(syncClient)
+            .openAiClientAsync(asyncClient)
+            .options(options)
+            .observationRegistry(ObservationRegistry.NOOP)
+            .build();
         return ChatClient.create(new LimitedChatModel(chatModel, requestLimiter, normalizedBaseUrl, userId));
     }
 
@@ -101,4 +101,13 @@ public class UserAiChatClientFactory {
         catch (Exception e) { throw new IllegalArgumentException("Invalid AI service address"); }
     }
     private String trimBaseUrl(String url) { return url.trim().replaceAll("/+$", ""); }
+
+    /**
+     * Spring AI 2.0 底层换成官方 OpenAI SDK 后，baseUrl 必须是带版本的根路径
+     * （例如 {@code https://api.openai.com/v1}）；旧版会自己拼 {@code /v1}。
+     * 用户填的多是不带版本的形式，这里统一补齐，两种写法都能用。
+     */
+    private String withApiVersion(String url) {
+        return url.endsWith("/v1") ? url : url + "/v1";
+    }
 }
