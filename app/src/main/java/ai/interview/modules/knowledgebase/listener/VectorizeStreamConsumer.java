@@ -136,7 +136,9 @@ public class VectorizeStreamConsumer extends AbstractStreamConsumer<VectorizeStr
                 log.debug("向量化状态已更新: kbId={}, status={}", kbId, status);
             });
         } catch (Exception e) {
+            // 状态没落库就不能让框架继续 ACK：否则知识库会永远卡在 PENDING/PROCESSING。
             log.error("更新向量化状态失败: kbId={}, status={}, error={}", kbId, status, e.getMessage(), e);
+            throw new IllegalStateException("更新向量化状态失败", e);
         }
     }
 

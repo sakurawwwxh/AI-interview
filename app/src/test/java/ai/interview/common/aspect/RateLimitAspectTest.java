@@ -87,6 +87,32 @@ class RateLimitAspectTest {
     }
 
     @Test
+    @DisplayName("Redis 重启后 NOSCRIPT：重新加载脚本并重试，不会永久放行")
+    void recoversFromNoScriptInsteadOfFailingOpenForever() throws Throwable {
+        AtomicInteger loads = new AtomicInteger();
+        AtomicInteger evals = new AtomicInteger();
+        RScript script = mock(RScript.class, invocation -> switch (invocation.getMethod().getName()) {
+            case "scriptLoad" -> "sha-" + loads.incrementAndGet();
+            case "evalSha" -> {
+                if (evals.incrementAndGet() == 1) {
+                    throw new RedisException("NOSCRIPT No matching script. Please use EVAL.");
+                }
+                yield 0L; // 重试后正常返回「配额不足」，说明脚本确实被重新加载了
+            }
+            default -> null;
+        });
+        RateLimitAspect aspect = aspectFor(script);
+        // init() 会预加载两个策略，这里的基线要按实际加载次数算
+        int loadsBefore = loads.get();
+        ProceedingJoinPoint joinPoint = joinPoint();
+
+        assertThrows(RateLimitExceededException.class, () -> aspect.around(joinPoint, annotation()));
+        assertEquals(loadsBefore + 1, loads.get(), "NOSCRIPT 后必须重新加载脚本");
+        assertEquals(2, evals.get(), "重新加载后要再执行一次");
+        verify(joinPoint, never()).proceed();
+    }
+
+    @Test
     @DisplayName("配额充足时正常执行原方法")
     void proceedsWhenQuotaIsAvailable() throws Throwable {
         RateLimitAspect aspect = aspectWhoseEvalReturns(1L);

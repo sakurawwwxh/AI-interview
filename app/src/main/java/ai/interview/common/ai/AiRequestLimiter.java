@@ -29,7 +29,7 @@ public class AiRequestLimiter {
     public AiRequestLimiter(
         @Value("${app.ai.limiter.provider-max-concurrency:8}") int providerMaxConcurrency,
         @Value("${app.ai.limiter.user-max-concurrency:4}") int userMaxConcurrency,
-        @Value("${app.ai.limiter.acquire-timeout:10s}") Duration acquireTimeout
+        @Value("${app.ai.limiter.acquire-timeout:60s}") Duration acquireTimeout
     ) {
         this.providerMaxConcurrency = Math.max(1, providerMaxConcurrency);
         this.userMaxConcurrency = Math.max(1, userMaxConcurrency);

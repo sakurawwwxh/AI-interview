@@ -127,8 +127,39 @@ public abstract class AbstractStreamConsumer<T> {
                     log.info("消费者线程被中断");
                     break;
                 }
-                log.error("消费消息时发生错误: {}", e.getMessage(), e);
+                if (isNoGroup(e)) {
+                    // Redis 重启/FLUSHALL 后消费组会消失，而组只在启动时创建过一次。
+                    // 不重建的话读命令会一直立即失败，形成无退避热循环且永不自愈。
+                    log.warn("消费者组不存在，尝试重建: stream={}, group={}", streamKey(), groupName());
+                    try {
+                        redisService.createStreamGroup(streamKey(), groupName());
+                    } catch (Exception recreateError) {
+                        log.warn("重建消费者组失败: {}", recreateError.getMessage());
+                    }
+                } else {
+                    log.error("消费消息时发生错误: {}", e.getMessage(), e);
+                }
+                // 无论哪种错误都退避一轮，避免故障期间把日志和 CPU 打满
+                sleepQuietly(AsyncTaskStreamConstants.POLL_INTERVAL_MS);
             }
+        }
+    }
+
+    private static boolean isNoGroup(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains("NOGROUP")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 

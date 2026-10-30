@@ -98,6 +98,16 @@ public class RateLimitAspect {
      * <p>
      * 这里的加载发生在请求线程上，失败会交给调用方（{@link #around}）的失败放行处理。
      */
+    private static boolean isNoScript(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains("NOSCRIPT")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String scriptSha(RScript script, RateLimit.Strategy strategy) {
         String cached = scriptShaCache.get(strategy);
         if (cached != null) {
@@ -158,12 +168,33 @@ public class RateLimitAspect {
                     args
             );
         } catch (RuntimeException e) {
-            // Redis 不可用或超时属于基础设施故障，与“请求过于频繁”是两回事。
-            // 限流是保护手段而不是授权判定，这里选择失败开放（fail-open）：
-            // 否则跨机房部署下一次 Redis 抖动，就会把全部带 @RateLimit 的接口打成 5xx，
-            // 而它们本该是最需要的那些接口（如能力画像统计）。
-            log.warn("限流脚本执行失败，本次请求放行: keys={}, error={}", keys, e.getMessage());
-            return joinPoint.proceed();
+            if (isNoScript(e)) {
+                // Redis 重启/主从切换/SCRIPT FLUSH 后脚本缓存是空的，缓存的 SHA 会一直 NOSCRIPT。
+                // 这是可自愈的错误：清掉缓存、重新加载并重试一次；不能直接失败放行，
+                // 否则该实例整个生命周期内所有限流都会静默失效。
+                scriptShaCache.remove(rateLimit.strategy());
+                try {
+                    RScript script = redissonClient.getScript(StringCodec.INSTANCE);
+                    resultObj = script.evalSha(
+                            RScript.Mode.READ_WRITE,
+                            scriptSha(script, rateLimit.strategy()),
+                            RScript.ReturnType.VALUE,
+                            keysList,
+                            args
+                    );
+                } catch (RuntimeException retryError) {
+                    log.warn("限流脚本重新加载后仍失败，本次请求放行: keys={}, error={}",
+                            keys, retryError.getMessage());
+                    return joinPoint.proceed();
+                }
+            } else {
+                // Redis 不可用或超时属于基础设施故障，与“请求过于频繁”是两回事。
+                // 限流是保护手段而不是授权判定，这里选择失败开放（fail-open）：
+                // 否则跨机房部署下一次 Redis 抖动，就会把全部带 @RateLimit 的接口打成 5xx，
+                // 而它们本该是最需要的那些接口（如能力画像统计）。
+                log.warn("限流脚本执行失败，本次请求放行: keys={}, error={}", keys, e.getMessage());
+                return joinPoint.proceed();
+            }
         }
 
         // 将结果转换为 Long

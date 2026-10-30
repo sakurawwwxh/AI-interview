@@ -1,5 +1,7 @@
 package ai.interview.common.ai;
 
+import ai.interview.common.exception.BusinessException;
+import ai.interview.common.exception.ErrorCode;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
@@ -24,6 +26,12 @@ public final class ProviderErrorClassifier {
     public static boolean isPermanent(Throwable error) {
         Throwable current = error;
         while (current != null) {
+            // 本地并发闸门等待超时：重试会立刻再撞同一堵墙，先落失败让用户重试，
+            // 避免 3 次重试全打在同一时刻、把队列压力放大。
+            if (current instanceof BusinessException businessException
+                && ErrorCode.AI_RATE_LIMIT_EXCEEDED.getCode().equals(businessException.getCode())) {
+                return true;
+            }
             if (current instanceof RestClientResponseException responseException) {
                 int status = responseException.getStatusCode().value();
                 return status >= 400 && status < 500 && status != 429;

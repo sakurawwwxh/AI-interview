@@ -184,7 +184,9 @@ public class AnalyzeStreamConsumer extends AbstractStreamConsumer<AnalyzeStreamC
                 log.debug("分析状态已更新: resumeId={}, status={}", resumeId, status);
             });
         } catch (Exception e) {
+            // 状态没落库就不能让框架继续 ACK：否则任务会永远卡在 PROCESSING。
             log.error("更新分析状态失败: resumeId={}, status={}, error={}", resumeId, status, e.getMessage(), e);
+            throw new IllegalStateException("更新分析状态失败", e);
         }
     }
 

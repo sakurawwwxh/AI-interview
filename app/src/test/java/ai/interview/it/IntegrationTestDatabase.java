@@ -95,6 +95,11 @@ public final class IntegrationTestDatabase {
             }
             try (Connection test = DriverManager.getConnection(testUrl(testDb), user, password);
                  Statement s = test.createStatement()) {
+                // 上一轮如果在中途失败，create-drop 没来得及收尾会留下半套表，
+                // 下一轮启动就会 "relation already exists"。每次运行前重置 schema，
+                // 让集成测试对失败中断也能自愈。
+                s.execute("drop schema if exists public cascade");
+                s.execute("create schema public");
                 s.execute("create extension if not exists vector");
             }
             prepared = true;

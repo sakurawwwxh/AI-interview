@@ -70,17 +70,20 @@ for i, key in ipairs(KEYS) do
 
     -- 记录本次令牌分配（格式：request_id:permits）
     local permit_record = request_id .. ":" .. permits
-    redis.call("zadd", permits_key, now_ms, permit_record)
+    -- ZADD 返回 1 才代表这条请求第一次进入窗口：客户端超时重发同一个 request_id 时
+    -- member 已存在，返回 0，此时不能再扣一次配额。
+    local added = redis.call("zadd", permits_key, now_ms, permit_record)
+    if added == 1 then
+        -- 扣减令牌
+        local current_v = tonumber(redis.call("get", value_key) or max_tokens)
+        redis.call("set", value_key, current_v - permits)
 
-    -- 扣减令牌
-    local current_v = tonumber(redis.call("get", value_key) or max_tokens)
-    redis.call("set", value_key, current_v - permits)
-
-    -- 设置过期时间，确保过期令牌能被正常回收 (窗口的2倍，至少1秒)
-    local expire_time = math.ceil(interval * 2 / 1000)
-    if expire_time < 1 then expire_time = 1 end
-    redis.call("expire", value_key, expire_time)
-    redis.call("expire", permits_key, expire_time)
+        -- 设置过期时间，确保过期令牌能被正常回收 (窗口的2倍，至少1秒)
+        local expire_time = math.ceil(interval * 2 / 1000)
+        if expire_time < 1 then expire_time = 1 end
+        redis.call("expire", value_key, expire_time)
+        redis.call("expire", permits_key, expire_time)
+    end
 end
 
 -- 成功获取所有维度的令牌

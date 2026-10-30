@@ -205,6 +205,7 @@ public class EvaluateStreamConsumer extends AbstractStreamConsumer<EvaluateStrea
             });
         } catch (Exception e) {
             log.error("更新评估状态失败: sessionId={}, status={}, error={}", sessionId, status, e.getMessage(), e);
+            throw new IllegalStateException("更新评估状态失败", e);
         }
     }
 

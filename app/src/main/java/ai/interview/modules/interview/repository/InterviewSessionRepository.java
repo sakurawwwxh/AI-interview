@@ -1,12 +1,16 @@
 package ai.interview.modules.interview.repository;
 
+import ai.interview.common.model.AsyncTaskStatus;
 import ai.interview.modules.interview.model.InterviewSessionEntity;
 import ai.interview.modules.interview.model.InterviewSessionEntity.SessionStatus;
 import ai.interview.modules.resume.model.ResumeEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -224,4 +228,44 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
         order by s.created_at desc
         """, nativeQuery = true)
     List<ResumeInterviewRow> findResumeInterviewRowsByResumeId(@Param("resumeId") Long resumeId);
+
+    /**
+     * 长时间停留在 PENDING 的评估任务：交卷后先落 PENDING 再入队，中间进程退出的任务
+     * 永远不会被消费，需要定时回收成 FAILED，否则重试入口会一直拒绝。
+     */
+    /** 历史题去重只需要 questions_json 一列，不要整行拉回模板/点评/参考答案等大 TEXT。 */
+    @Query("""
+        SELECT s.questionsJson FROM InterviewSessionEntity s
+         WHERE s.resume.id = :resumeId
+         ORDER BY s.createdAt DESC
+        """)
+    List<String> findRecentQuestionsJsonByResumeId(@Param("resumeId") Long resumeId, Pageable pageable);
+
+    @Query("""
+        SELECT s.sessionId FROM InterviewSessionEntity s
+         WHERE s.evaluateStatus = :pending
+           AND s.completedAt IS NOT NULL
+           AND s.completedAt < :cutoff
+         ORDER BY s.completedAt ASC
+        """)
+    List<String> findStalePendingEvaluationIds(@Param("pending") AsyncTaskStatus pending,
+                                              @Param("cutoff") LocalDateTime cutoff,
+                                              Pageable pageable);
+
+    /**
+     * 条件更新：只有仍是 PENDING 的才改成 FAILED，避免误伤已经推进到 PROCESSING 的任务。
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query("""
+        UPDATE InterviewSessionEntity s
+           SET s.evaluateStatus = :failed,
+               s.evaluateError = :error
+         WHERE s.sessionId = :sessionId
+           AND s.evaluateStatus = :pending
+        """)
+    int failIfStillPendingEvaluation(@Param("sessionId") String sessionId,
+                                     @Param("failed") AsyncTaskStatus failed,
+                                     @Param("error") String error,
+                                     @Param("pending") AsyncTaskStatus pending);
 }

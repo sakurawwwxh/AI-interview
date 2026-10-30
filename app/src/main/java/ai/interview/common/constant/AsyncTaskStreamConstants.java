@@ -52,7 +52,14 @@ public final class AsyncTaskStreamConstants {
     /**
      * Stream 最大长度（自动裁剪旧消息，防止无限增长）
      */
-    public static final int STREAM_MAX_LEN = 1000;
+    /**
+     * 单条任务流的近似长度上限。
+     *
+     * <p>XADD 的裁剪与消费者组无关：上限过小时，消费者停机/积压期间新消息会把
+     * 尚未投递的消息裁掉，任务静默丢失。10000 条按每条约 1KB 估算约 10MB，
+     * 对个人项目是可接受的上限。
+     */
+    public static final int STREAM_MAX_LEN = 10000;
 
     // ========== PEL 滞留消息回收配置 ==========
 
