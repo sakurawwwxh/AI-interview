@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,6 +36,7 @@ public class PracticeTaskService {
     private final PracticeAttemptRepository attemptRepository;
     private final AnswerEvaluationService evaluationService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     /** Called from the report persistence transaction; source-answer uniqueness makes retries idempotent. */
     public void createTasksForEvaluatedAnswers(Long userId, List<InterviewAnswerEntity> answers) {
@@ -91,37 +93,50 @@ public class PracticeTaskService {
             valueOrZero(task.getAttemptCount()), task.getNextReviewAt(), task.getReviewIntervalDays(), attempts);
     }
 
-    @Transactional
+    /**
+     * 提交复练答案。
+     *
+     * <p>模型调用（数秒到数十秒）刻意放在事务外：此前整个方法一个事务，
+     * 池上限 20 的连接会被长时间占住，并发复练能把连接池打满。
+     * 落库用短事务 + 行锁，避免并发提交丢 attemptCount。
+     */
     public PracticeDTO.SubmitAttemptResponse submitAttempt(Long taskId, PracticeDTO.SubmitAttemptRequest request) {
         PracticeTaskEntity task = findOwnedTask(taskId);
         if (task.getStatus() == PracticeTaskStatus.IGNORED) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请先恢复该复练任务");
         }
+        String answer = request.answer().trim();
         AnswerEvaluationService.PracticeAnswerEvaluation evaluation = evaluationService.evaluatePracticeAnswer(
-            String.valueOf(task.getId()), task.getQuestion(), task.getCategory(), request.answer().trim());
+            String.valueOf(task.getId()), task.getQuestion(), task.getCategory(), answer);
 
-        PracticeAttemptEntity attempt = new PracticeAttemptEntity();
-        attempt.setAnswer(request.answer().trim());
-        attempt.setScore(evaluation.score());
-        attempt.setFeedback(evaluation.feedback());
-        task.addAttempt(attempt);
-        task.setAttemptCount(valueOrZero(task.getAttemptCount()) + 1);
-        task.setLastScore(evaluation.score());
-        task.setLastPracticedAt(LocalDateTime.now());
-        if (evaluation.score() >= PRACTICE_THRESHOLD) {
-            task.setStatus(PracticeTaskStatus.COMPLETED);
-            task.setCompletedAt(LocalDateTime.now());
-            int interval = reviewIntervalFor(evaluation.score());
-            task.setReviewIntervalDays(interval);
-            task.setNextReviewAt(LocalDateTime.now().plusDays(interval));
-        } else {
-            task.setStatus(PracticeTaskStatus.TODO);
-            task.setCompletedAt(null);
-            task.setReviewIntervalDays(0);
-            task.setNextReviewAt(LocalDateTime.now());
-        }
-        taskRepository.save(task);
-        return new PracticeDTO.SubmitAttemptResponse(toAttemptItem(attempt), task.getStatus(), improvement(task));
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return transactionTemplate.execute(status -> {
+            PracticeTaskEntity locked = taskRepository.findByIdAndUserIdForUpdate(taskId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "复练任务不存在"));
+
+            PracticeAttemptEntity attempt = new PracticeAttemptEntity();
+            attempt.setAnswer(answer);
+            attempt.setScore(evaluation.score());
+            attempt.setFeedback(evaluation.feedback());
+            locked.addAttempt(attempt);
+            locked.setAttemptCount(valueOrZero(locked.getAttemptCount()) + 1);
+            locked.setLastScore(evaluation.score());
+            locked.setLastPracticedAt(LocalDateTime.now());
+            if (evaluation.score() >= PRACTICE_THRESHOLD) {
+                locked.setStatus(PracticeTaskStatus.COMPLETED);
+                locked.setCompletedAt(LocalDateTime.now());
+                int interval = reviewIntervalFor(evaluation.score());
+                locked.setReviewIntervalDays(interval);
+                locked.setNextReviewAt(LocalDateTime.now().plusDays(interval));
+            } else {
+                locked.setStatus(PracticeTaskStatus.TODO);
+                locked.setCompletedAt(null);
+                locked.setReviewIntervalDays(0);
+                locked.setNextReviewAt(LocalDateTime.now());
+            }
+            taskRepository.save(locked);
+            return new PracticeDTO.SubmitAttemptResponse(toAttemptItem(attempt), locked.getStatus(), improvement(locked));
+        });
     }
 
     @Transactional

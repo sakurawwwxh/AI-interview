@@ -179,6 +179,13 @@ public class InterviewSessionCache {
     }
 
     /**
+     * 删除某个简历下的「未完成会话」映射（会话缓存本身按 sessionId 逐个删）。
+     */
+    public void deleteSessionsForResume(Long userId, Long resumeId) {
+        redisService.delete(buildResumeSessionKey(userId, resumeId));
+    }
+
+    /**
      * 根据简历ID查找未完成的会话ID
      */
     public Optional<String> findUnfinishedSessionId(Long userId, Long resumeId) {

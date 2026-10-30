@@ -10,6 +10,7 @@ import ai.interview.modules.interview.repository.InterviewAnswerRepository;
 import ai.interview.modules.interview.repository.InterviewSessionRepository;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeRepository;
+import ai.interview.infrastructure.redis.InterviewSessionCache;
 import ai.interview.modules.practice.service.PracticeTaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,8 +39,9 @@ class InterviewPersistenceServiceTest {
     private final PracticeTaskService practiceTaskService = mock(PracticeTaskService.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final InterviewSessionCache sessionCache = mock(InterviewSessionCache.class);
     private final InterviewPersistenceService service = new InterviewPersistenceService(
-        sessionRepository, answerRepository, resumeRepository, objectMapper, practiceTaskService);
+        sessionRepository, answerRepository, resumeRepository, objectMapper, practiceTaskService, sessionCache);
 
     @BeforeEach
     void setUpSecurityContext() {
@@ -257,8 +259,9 @@ class InterviewPersistenceServiceTest {
                 InterviewQuestionDTO.create(1, "主问题B", InterviewQuestionDTO.QuestionType.MYSQL, "MySQL")
             )));
 
-            when(sessionRepository.findTop10ByResumeIdOrderByCreatedAtDesc(1L))
-                .thenReturn(List.of(session2, session1));
+            when(sessionRepository.findRecentQuestionsJsonByResumeId(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(session2.getQuestionsJson(), session1.getQuestionsJson()));
 
             List<String> result = service.getHistoricalQuestionsByResumeId(1L);
 

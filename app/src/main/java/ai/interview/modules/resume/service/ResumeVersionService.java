@@ -32,7 +32,7 @@ public class ResumeVersionService {
 
     @Transactional
     public ResumeVersionDTO update(Long resumeId, UpdateResumeContentRequest request) {
-        ResumeEntity resume = ownedResume(resumeId);
+        ResumeEntity resume = ownedResumeForUpdate(resumeId);
         Long userId = UserContext.getCurrentUserIdOrThrow();
         List<ResumeVersionEntity> versions = versionRepository.findByResumeIdAndUserIdOrderByVersionNumberDesc(resumeId, userId);
         if (versions.isEmpty()) {
@@ -47,7 +47,7 @@ public class ResumeVersionService {
 
     @Transactional
     public ResumeVersionDTO restore(Long resumeId, Long versionId) {
-        ResumeEntity resume = ownedResume(resumeId);
+        ResumeEntity resume = ownedResumeForUpdate(resumeId);
         Long userId = UserContext.getCurrentUserIdOrThrow();
         ResumeVersionEntity source = versionRepository.findByIdAndResumeIdAndUserId(versionId, resumeId, userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.RESUME_NOT_FOUND));
@@ -60,6 +60,13 @@ public class ResumeVersionService {
 
     @Transactional
     public void deleteForResume(Long resumeId) { versionRepository.deleteByResumeId(resumeId); }
+
+    /** 写路径：锁住简历行再把「已有版本数 + 1」作为新版本号，避免并发撞唯一索引。 */
+    private ResumeEntity ownedResumeForUpdate(Long id) {
+        Long userId = UserContext.getCurrentUserIdOrThrow();
+        return resumeRepository.findByIdAndUserIdForUpdate(id, userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.RESUME_NOT_FOUND));
+    }
 
     private ResumeEntity ownedResume(Long id) {
         Long userId = UserContext.getCurrentUserIdOrThrow();

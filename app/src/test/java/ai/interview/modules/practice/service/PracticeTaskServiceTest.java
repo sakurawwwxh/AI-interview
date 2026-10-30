@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class PracticeTaskServiceTest {
@@ -33,13 +34,18 @@ class PracticeTaskServiceTest {
     private final PracticeTaskRepository taskRepository = mock(PracticeTaskRepository.class);
     private final PracticeAttemptRepository attemptRepository = mock(PracticeAttemptRepository.class);
     private final AnswerEvaluationService evaluationService = mock(AnswerEvaluationService.class);
+    private final org.springframework.transaction.PlatformTransactionManager txManager =
+        mock(org.springframework.transaction.PlatformTransactionManager.class);
     private final PracticeTaskService service = new PracticeTaskService(taskRepository, attemptRepository,
-        evaluationService, new ObjectMapper());
+        evaluationService, new ObjectMapper(),
+        new org.springframework.transaction.support.TransactionTemplate(txManager));
 
     @BeforeEach
     void authenticate() {
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(1L, "tester", List.of()));
+        when(txManager.getTransaction(any())).thenReturn(
+            new org.springframework.transaction.support.SimpleTransactionStatus());
     }
 
     @AfterEach
@@ -68,6 +74,7 @@ class PracticeTaskServiceTest {
     void passingRetryCompletesTaskAndRecordsImprovement() {
         PracticeTaskEntity task = task(5L, 40, PracticeTaskStatus.TODO);
         when(taskRepository.findByIdAndUserId(5L, 1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdAndUserIdForUpdate(5L, 1L)).thenReturn(Optional.of(task));
         when(evaluationService.evaluatePracticeAnswer("5", "question", "Java", "better answer"))
             .thenReturn(new AnswerEvaluationService.PracticeAnswerEvaluation(78, "feedback"));
         when(taskRepository.save(task)).thenReturn(task);
@@ -109,6 +116,7 @@ class PracticeTaskServiceTest {
     void unsuccessfulRetryStaysTodo() {
         PracticeTaskEntity task = task(5L, 40, PracticeTaskStatus.TODO);
         when(taskRepository.findByIdAndUserId(5L, 1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByIdAndUserIdForUpdate(5L, 1L)).thenReturn(Optional.of(task));
         when(evaluationService.evaluatePracticeAnswer("5", "question", "Java", "retry"))
             .thenReturn(new AnswerEvaluationService.PracticeAnswerEvaluation(55, "feedback"));
         when(taskRepository.save(task)).thenReturn(task);

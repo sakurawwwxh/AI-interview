@@ -2,7 +2,9 @@ package ai.interview.modules.resume.repository;
 
 import ai.interview.common.model.AsyncTaskStatus;
 import ai.interview.modules.resume.model.ResumeEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -80,6 +82,11 @@ public interface ResumeRepository extends JpaRepository<ResumeEntity, Long> {
      * 按 ID 和用户 ID 查找（鉴权）
      */
     Optional<ResumeEntity> findByIdAndUserId(Long id, Long userId);
+
+    /** 分配版本号前锁住简历行：count+1 是先读后写，并发保存会撞唯一索引。 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM ResumeEntity r WHERE r.id = :id AND r.userId = :userId")
+    Optional<ResumeEntity> findByIdAndUserIdForUpdate(@Param("id") Long id, @Param("userId") Long userId);
 
     /**
      * Atomically claims a terminal resume for re-analysis. The status predicate is important:

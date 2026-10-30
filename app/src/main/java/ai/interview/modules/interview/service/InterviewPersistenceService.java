@@ -12,10 +12,12 @@ import ai.interview.modules.interview.repository.InterviewAnswerRepository;
 import ai.interview.modules.interview.repository.InterviewSessionRepository;
 import ai.interview.modules.resume.model.ResumeEntity;
 import ai.interview.modules.resume.repository.ResumeRepository;
+import ai.interview.infrastructure.redis.InterviewSessionCache;
 import ai.interview.modules.practice.service.PracticeTaskService;
 import ai.interview.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -43,6 +45,7 @@ public class InterviewPersistenceService {
     private final ResumeRepository resumeRepository;
     private final ObjectMapper objectMapper;
     private final PracticeTaskService practiceTaskService;
+    private final InterviewSessionCache sessionCache;
 
     /**
      * 校验当前用户拥有指定简历。
@@ -472,6 +475,13 @@ public class InterviewPersistenceService {
         List<InterviewSessionEntity> sessions = sessionRepository.findByResumeIdOrderByCreatedAtDesc(resumeId);
         if (!sessions.isEmpty()) {
             sessionRepository.deleteAll(sessions);
+            // 数据库删了但 Redis 还在时，面试页会拿到一个点进去全是 3001 的幽灵会话
+            for (InterviewSessionEntity session : sessions) {
+                sessionCache.deleteSession(session.getUserId(), session.getSessionId());
+            }
+            if (sessions.getFirst().getUserId() != null) {
+                sessionCache.deleteSessionsForResume(sessions.getFirst().getUserId(), resumeId);
+            }
             log.info("已删除 {} 个面试会话（包含所有答案）", sessions.size());
         }
     }
@@ -489,6 +499,7 @@ public class InterviewPersistenceService {
             throw new BusinessException(ErrorCode.INTERVIEW_SESSION_NOT_FOUND);
         }
         sessionRepository.delete(sessionOpt.get());
+        sessionCache.deleteSession(userId, sessionId);
         log.info("已删除面试会话: sessionId={}", sessionId);
     }
     
@@ -519,10 +530,9 @@ public class InterviewPersistenceService {
      */
     public List<String> getHistoricalQuestionsByResumeId(Long resumeId) {
         // 只查询最近的 10 个会话，避免加载过多历史数据
-        List<InterviewSessionEntity> sessions = sessionRepository.findTop10ByResumeIdOrderByCreatedAtDesc(resumeId);
-        
+        List<String> sessions = sessionRepository.findRecentQuestionsJsonByResumeId(resumeId, PageRequest.of(0, 10));
+
         return sessions.stream()
-            .map(InterviewSessionEntity::getQuestionsJson)
             .filter(json -> json != null && !json.isEmpty())
             .flatMap(json -> {
                 try {

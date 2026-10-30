@@ -9,6 +9,7 @@ import ai.interview.modules.target.repository.JobMatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 简历删除服务
@@ -24,6 +25,7 @@ public class ResumeDeleteService {
     private final JobMatchRepository jobMatchRepository;
     private final InterviewPersistenceService interviewPersistenceService;
     private final FileStorageService storageService;
+    private final TransactionTemplate transactionTemplate;
     
     /**
      * 删除简历
@@ -39,21 +41,25 @@ public class ResumeDeleteService {
             .orElseThrow(() -> new BusinessException(
                 ErrorCode.RESUME_NOT_FOUND));
         
-        // 1. 删除存储的文件（FileStorageService 已内置存在性检查）
+        String storageKey = resume.getStorageKey();
+
+        // 1. 数据库侧放到一个短事务里：会话、岗位匹配、版本、简历要么全删要么全不删。
+        //    此前没有任何事务，删会话自带的事务会先提交，后续任一步失败就留下
+        //    「简历还在、面试记录已经没了」的半删除状态。
+        transactionTemplate.executeWithoutResult(status -> {
+            interviewPersistenceService.deleteSessionsByResumeId(id);
+            jobMatchRepository.deleteByResumeId(id);
+            versionService.deleteForResume(id);
+            persistenceService.deleteResume(id);
+        });
+
+        // 2. 提交后再删对象存储：反过来事务回滚时文件已经没了，记录会指向空文件
         try {
-            storageService.deleteResume(resume.getStorageKey());
+            storageService.deleteResume(storageKey);
         } catch (Exception e) {
-            log.warn("删除存储文件失败，继续删除数据库记录: {}", e.getMessage());
+            log.warn("删除存储文件失败，孤儿文件需手工清理: id={}, error={}", id, e.getMessage());
         }
-        
-        // 2. 删除面试会话（会自动删除面试答案）
-        interviewPersistenceService.deleteSessionsByResumeId(id);
-        
-        // 3. 删除岗位匹配记录、版本与简历
-        jobMatchRepository.deleteByResumeId(id);
-        versionService.deleteForResume(id);
-        persistenceService.deleteResume(id);
-        
+
         log.info("简历删除完成: id={}", id);
     }
 }
