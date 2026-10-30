@@ -92,9 +92,10 @@ async:
 app:
   admin:
     bootstrap:
-      enabled: true
+      # 默认关闭：需要时显式设置 ADMIN_BOOTSTRAP_PASSWORD 再打开
+      enabled: false
       username: admin
-      password: ${ADMIN_BOOTSTRAP_PASSWORD:change-me}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
       email: admin@example.com
   ai:
     structured-max-attempts: 2
@@ -102,7 +103,7 @@ app:
     limiter:
       provider-max-concurrency: ${AI_PROVIDER_MAX_CONCURRENCY:8}
       user-max-concurrency: ${AI_USER_MAX_CONCURRENCY:4}
-      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:10s}
+      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:60s}
     quota:
       enabled: true
       daily-token-limit: 500000
@@ -117,7 +118,8 @@ app:
         min-score-short: 0.18
         min-score-default: 0.28
   jwt:
-    secret: local-development-jwt-secret-please-change-before-production
+    # 至少 32 字节；未设置时应用启动失败（生成：openssl rand -base64 48）
+    secret: ${APP_JWT_SECRET:}
     access-expiration: 1800
     refresh-expiration: 604800
   interview:

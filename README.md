@@ -265,7 +265,7 @@ cp app/src/main/resources/application.yml.example app/src/main/resources/applica
 - Redis：Redisson 地址  
 - 对象存储：endpoint / access-key / secret-key / bucket（模板里故意留空，必须自行注入）  
 - AI：`spring.ai.openai.*`（DashScope 兼容模式与 API Key）  
-- JWT：`app.jwt.secret`（长度需满足签名要求）  
+- JWT：`app.jwt.secret` 或环境变量 `APP_JWT_SECRET`（至少 32 字节；模板里没有默认值，未设置时应用会拒绝启动）  
 
 可选环境变量可参考仓库根目录 `.env.example`（如 Dify 相关）。
 
@@ -301,8 +301,13 @@ pnpm dev
 ### 6. 全量 Docker 部署
 
 ```bash
+cp .env.example .env
+# 至少填 AI_BAILIAN_API_KEY 与 APP_JWT_SECRET（openssl rand -base64 48）
 docker compose up -d --build
 ```
+
+`APP_JWT_SECRET` 为必填：容器启动时没有它就直接失败，避免用公开默认密钥起服务。
+需要首次启动自动创建管理员时，再设置 `ADMIN_BOOTSTRAP_PASSWORD`（留空则不创建）。
 
 | 服务 | 地址 | 说明 |
 | --- | --- | --- |

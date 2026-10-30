@@ -11,6 +11,7 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
   datasource:
+    # 建议 URL 自带 connectTimeout/socketTimeout/tcpKeepAlive
     url: ${POSTGRES_URL}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
@@ -18,6 +19,8 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    properties:
+      jakarta.persistence.query.timeout: 60000
   redis:
     redisson:
       config: |
@@ -53,7 +56,7 @@ app:
     limiter:
       provider-max-concurrency: ${AI_PROVIDER_MAX_CONCURRENCY:8}
       user-max-concurrency: ${AI_USER_MAX_CONCURRENCY:4}
-      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:10s}
+      acquire-timeout: ${AI_ACQUIRE_TIMEOUT:60s}
   jwt:
     secret: ${APP_JWT_SECRET}
   storage:

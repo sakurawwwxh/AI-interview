@@ -16,7 +16,7 @@ services:
     container_name: interview-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: interview_guide
     volumes:
       # 数据持久化：确保容器重启或删除后，数据库数据不丢失
@@ -24,7 +24,7 @@ services:
       # 初始化脚本：容器首次启动时会自动执行 /docker-entrypoint-initdb.d/ 下的 .sql 文件
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     # 健康检查：
     # 后端服务(app)需要等待数据库完全启动并准备好连接后才能启动。
     # 这里通过 pg_isready 命令检测数据库状态。
@@ -48,7 +48,7 @@ services:
     image: redis:7
     container_name: interview-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -78,8 +78,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -144,7 +144,7 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: interview_guide
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       
       # === Redis 连接 ===
       REDIS_HOST: redis
@@ -158,6 +158,13 @@ services:
       APP_STORAGE_BUCKET: interview-guide
       APP_STORAGE_REGION: us-east-1
       
+      # === 安全（必须配置）===
+      # 至少 32 字节；未设置时容器启动失败（生成：openssl rand -base64 48）
+      # 未设置时后端启动会直接失败（JwtUtil 要求 >=32 字节），不会用默认密钥起服务
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-}
+      # 首次启动创建管理员；留空则不创建
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+
       # === AI 模型配置 (必须配置) ===
       # 这里的变量值来自宿主机的环境变量或 .env 文件
       AI_BAILIAN_API_KEY: ${AI_BAILIAN_API_KEY}

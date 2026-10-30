@@ -27,6 +27,7 @@ public class RagChatDTO {
      */
     public record SendMessageRequest(
         @NotBlank(message = "问题不能为空")
+        @jakarta.validation.constraints.Size(max = 4000, message = "问题过长，请控制在 4000 字以内")
         String question
     ) {}
 
