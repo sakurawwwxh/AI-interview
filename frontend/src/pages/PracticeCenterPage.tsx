@@ -47,7 +47,9 @@ export default function PracticeCenterPage() {
     [tasks],
   );
 
-  const changeFilter = (nextStatus: PracticeTaskStatus, nextCategory = category) => {
+  // 切换状态时清掉分类：分类 chip 来自当前结果集，换状态后可能不存在，
+  // 留着会变成看不见也清不掉的隐形筛选。
+  const changeFilter = (nextStatus: PracticeTaskStatus, nextCategory = '') => {
     const next = new URLSearchParams();
     next.set('status', nextStatus);
     if (nextCategory) next.set('category', nextCategory);

@@ -27,7 +27,13 @@ export default function AdminUsersPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      setPage(await adminApi.getUsers({ keyword: keyword || undefined, page: currentPage, size: 20 }));
+      const result = await adminApi.getUsers({ keyword: keyword || undefined, page: currentPage, size: 20 });
+      // 删掉末页最后一条后当前页会空掉，而分页条只在有数据时渲染，用户会卡在空页
+      if (result.items.length === 0 && currentPage > 0) {
+        setCurrentPage(currentPage - 1);
+        return;
+      }
+      setPage(result);
     } catch (loadError) { setError(getErrorMessage(loadError)); }
     finally { setLoading(false); }
   }, [keyword, currentPage]);
@@ -76,8 +82,10 @@ export default function AdminUsersPage() {
 
   const submitQuota = async () => {
     if (!modal || modal.type !== 'quota') return;
+    // Number('') === 0：清空输入框后直接保存会把用户配额静默归零
+    if (quotaValue.trim() === '') { setActionError('请输入有效的非负数字'); return; }
     const quota = Number(quotaValue);
-    if (isNaN(quota) || quota < 0) { setActionError('请输入有效的非负数字'); return; }
+    if (!Number.isInteger(quota) || quota < 0) { setActionError('请输入有效的非负整数'); return; }
     setSubmitting(true); setActionError(null);
     try {
       await adminApi.updateQuota(modal.user.id, quota);

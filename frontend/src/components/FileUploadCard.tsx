@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useId, useState } from 'react';
+import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useId, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, CheckCircle2, FileText, Loader2, UploadCloud, X } from 'lucide-react';
 
 export interface FileUploadCardProps {
@@ -59,6 +59,7 @@ export default function FileUploadCard({
   const inputId = useId();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
 
   const chooseFile = useCallback((file?: File) => {
@@ -110,7 +111,7 @@ export default function FileUploadCard({
             onClick={openPicker}
             className={`group relative min-h-[300px] cursor-pointer border border-dashed p-6 transition-colors sm:p-10 ${dragOver ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-500/10' : 'border-[var(--shell-border)] bg-[var(--shell-hover)] hover:border-primary-400 hover:bg-primary-50/40 dark:hover:bg-primary-500/5'}`}
           >
-            <input id={inputId} type="file" className="hidden" accept={accept} onChange={handleChange} disabled={uploading} />
+            <input id={inputId} ref={fileInputRef} type="file" className="hidden" accept={accept} onChange={handleChange} disabled={uploading} />
             {selectedFile ? (
               <div className="mx-auto flex max-w-lg flex-col items-center text-center">
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -120,7 +121,7 @@ export default function FileUploadCard({
                 <p className="mt-1 text-sm text-[var(--shell-muted)]">已选择 · {formatFileSize(selectedFile.size)}</p>
                 <div className="mt-6 flex items-center gap-3">
                   <button type="button" onClick={(event) => { event.stopPropagation(); openPicker(); }} className="rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm font-medium text-[var(--shell-text)] hover:bg-[var(--shell-hover)]">更换文件</button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedFile(null); setName(''); }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"><X className="h-4 w-4" />移除</button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedFile(null); setName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"><X className="h-4 w-4" />移除</button>
                 </div>
               </div>
             ) : (

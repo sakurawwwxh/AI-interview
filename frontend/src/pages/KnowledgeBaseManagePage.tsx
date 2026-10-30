@@ -118,7 +118,10 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   const [loading, setLoading] = useState(true);
   // 失败与"真的没有数据"必须分开：原来只有 console.error，用户看到的是"暂无知识库"
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  // 只接受最后一次请求的结果：输入 "ab" 后，"a" 的响应晚到不能覆盖列表
+  const requestSeqRef = useRef(0);
   const [sortBy, setSortBy] = useState<SortOption>('time');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
@@ -134,8 +137,14 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   // 重新向量化状态
   const [revectorizing, setRevectorizing] = useState<number | null>(null);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchKeyword(searchInput.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
   // 加载数据（不显示loading状态，用于轮询）
   const loadDataSilent = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
     try {
       const [statsData, kbList, categoryList] = await Promise.all([
         knowledgeBaseApi.getStatistics(),
@@ -146,11 +155,13 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
           : knowledgeBaseApi.getAllKnowledgeBases(sortBy),
         knowledgeBaseApi.getAllCategories(),
       ]);
+      if (seq !== requestSeqRef.current) return;
       setLoadError(null);
       setStats(statsData);
       setKnowledgeBases(kbList);
       setCategories(categoryList);
     } catch (error) {
+      if (seq !== requestSeqRef.current) return;
       console.error('加载数据失败:', error);
       setLoadError(error instanceof Error ? error.message : '请稍后重试');
     }
@@ -158,6 +169,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
 
   // 加载数据
   const loadData = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
     try {
       setLoading(true);
       const [statsData, kbList, categoryList] = await Promise.all([
@@ -169,14 +181,17 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
           : knowledgeBaseApi.getAllKnowledgeBases(sortBy),
         knowledgeBaseApi.getAllCategories(),
       ]);
+      if (seq !== requestSeqRef.current) return;
+      setLoadError(null);
       setStats(statsData);
       setKnowledgeBases(kbList);
       setCategories(categoryList);
     } catch (error) {
+      if (seq !== requestSeqRef.current) return;
       console.error('加载数据失败:', error);
       setLoadError(error instanceof Error ? error.message : '请稍后重试');
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   }, [searchKeyword, sortBy, selectedCategory]);
 
@@ -288,7 +303,7 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
   // 搜索处理
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadData();
+    setSearchKeyword(searchInput.trim());
   };
 
   return (
@@ -353,8 +368,8 @@ export default function KnowledgeBaseManagePage({ onUpload, onChat }: KnowledgeB
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="搜索知识库名称..."
                 className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
               />

@@ -91,12 +91,13 @@ instance.interceptors.response.use(
       response.data = result.data;
       return response;
     }
-    if (result.code === 9005) return refreshAndRetry(response.config as RetriableConfig);
+    // 9005=过期、9006=签名/格式无效：两者都先尝试刷新一次，刷新失败再登出
+    if (result.code === 9005 || result.code === 9006) return refreshAndRetry(response.config as RetriableConfig);
     return Promise.reject(new Error(result.message || '请求失败'));
   },
   (error) => {
     const result = error.response?.data as Result | undefined;
-    if (error.response?.status === 401 && result?.code === 9005) {
+    if (error.response?.status === 401 && (result?.code === 9005 || result?.code === 9006)) {
       return refreshAndRetry(error.config as RetriableConfig);
     }
     if (result?.message) return Promise.reject(new Error(result.message));

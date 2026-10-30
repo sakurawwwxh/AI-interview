@@ -405,12 +405,12 @@ export default function Interview({
     if (!answer.trim() || !session || !currentQuestion) return;
 
     setIsSubmitting(true);
+    setError("");
 
     const userMessage: Message = {
       type: 'user',
       content: answer
     };
-    setMessages(prev => [...prev, userMessage]);
 
     try {
       // 取消未完成的暂存请求
@@ -427,6 +427,9 @@ export default function Interview({
       });
 
       clearInterviewDraft(session.sessionId, currentQuestion.questionIndex);
+
+      // 提交成功后再把这条回答放进对话记录；失败时 answer 仍在输入框里，重试不会出现两条
+      setMessages(prev => [...prev, userMessage]);
 
       setSession(previous => previous ? {
         ...previous,
@@ -461,6 +464,7 @@ export default function Interview({
     if (!session) return;
 
     setIsSubmitting(true);
+    setError("");
     try {
       // 交卷前尽量把当前输入暂存
       if (answer.trim() && currentQuestion) {
@@ -524,6 +528,11 @@ export default function Interview({
       <>
       {draftSaving && (
         <p className="mb-2 text-center text-xs text-slate-400 dark:text-slate-500">答案已自动暂存…</p>
+      )}
+      {error && (
+        <div role="alert" className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+          {error}
+        </div>
       )}
       <InterviewChatPanel
         session={session}
