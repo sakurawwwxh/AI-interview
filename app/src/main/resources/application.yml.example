@@ -23,7 +23,7 @@ spring:
       enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:true}
 
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}
+    url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:interview_guide}?connectTimeout=10&socketTimeout=60&tcpKeepAlive=true
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
@@ -32,8 +32,15 @@ spring:
       # 生产环境应按数据库实例容量通过环境变量调整，而不是再依赖 Hikari 默认值。
       maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
       minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      # 拿不到连接时快速失败，避免请求全部卡到 30s 后一起超时
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:10000}
+      keepalive-time: 120000
+      max-lifetime: 600000
 
   jpa:
+    properties:
+      # 单条语句最长 60s，兜住锁等待/慢查询
+      jakarta.persistence.query.timeout: 60000
     hibernate:
       ddl-auto: update
     show-sql: false
