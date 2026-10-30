@@ -50,7 +50,10 @@ public class KnowledgeBaseQueryService {
      * 这类短 token 在向量空间中语义信息不足，需要额外做文本包含确认。
      * 更长的短语（如"java的基本特性"）已有足够语义信息，不需要额外确认。
      */
-    private static final Pattern SHORT_TOKEN_PATTERN = Pattern.compile("^[\\p{L}\\p{N}_-]{2,4}$");
+    // 只把 ASCII 标识符（JVM、GC、IO 这类）当作「短 token」做原文包含确认。
+    // \p{L} 会匹配中文，导致「锁机制」「索引优化」这类 2-4 字问题被要求逐字包含，
+    // 文档写法稍有差异就误判成无结果。
+    private static final Pattern SHORT_TOKEN_PATTERN = Pattern.compile("^[A-Za-z0-9_+#.-]{2,4}$");
     private static final int STREAM_PROBE_CHARS = 120;
     /** context 最大字符数，防止 token 溢出 */
     private static final int MAX_CONTEXT_CHARS = 8000;
@@ -162,12 +165,12 @@ public class KnowledgeBaseQueryService {
         usageRecorder.checkQuota();
         try {
             // 5. 调用AI生成回答（注入历史消息）
-            var promptBuilder = chatClient().prompt()
-                    .system(systemPrompt)
-                    .user(userPrompt);
+            // 历史必须排在当前提问之前：messages() 是追加，先塞历史再写 userPrompt。
+            var promptBuilder = chatClient().prompt().system(systemPrompt);
             if (!safeHistory.isEmpty()) {
                 promptBuilder.messages(safeHistory);
             }
+            promptBuilder.user(userPrompt);
             ChatResponse response = promptBuilder.call().chatResponse();
             usageRecorder.recordUsage(response, "rag-chat");
             String answer = extractResponseText(response);
@@ -301,12 +304,12 @@ public class KnowledgeBaseQueryService {
 
             usageRecorder.checkQuota();
             // 5. 流式调用（注入历史消息）+ 探测窗口归一化
-            var promptBuilder = chatClient().prompt()
-                    .system(systemPrompt)
-                    .user(userPrompt);
+            // 历史必须排在当前提问之前：messages() 是追加，先塞历史再写 userPrompt。
+            var promptBuilder = chatClient().prompt().system(systemPrompt);
             if (!safeHistory.isEmpty()) {
                 promptBuilder.messages(safeHistory);
             }
+            promptBuilder.user(userPrompt);
             AtomicReference<ChatResponse> responseWithUsage = new AtomicReference<>();
             Flux<String> responseFlux = promptBuilder.stream()
                 .chatResponse()

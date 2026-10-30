@@ -534,6 +534,10 @@ public class DifyApiClient {
                     }
                     // 其他事件（workflow_started/node_finished 等）忽略
                     return null;
+                } catch (DifyApiException e) {
+                    // 上面 error 事件主动抛出的业务错误不能被解析兜底吞掉，
+                    // 否则上游失败会伪装成「正常结束的空回答」。
+                    throw e;
                 } catch (Exception e) {
                     log.debug("解析 Dify SSE chunk 失败，跳过: {}", chunk.substring(0, Math.min(chunk.length(), 80)));
                     return null;

@@ -53,6 +53,9 @@ public class DifySyncService {
     private final KnowledgeBaseVectorService vectorService;
     private final UserRepository userRepository;
 
+    /** Dify 后台同步没有用户上下文，统一归到系统用户。 */
+    private static final long SYSTEM_USER_ID = 1L;
+
     /**
      * 同步知识库到 Dify（本地 → Dify）
      * 在知识库上传/更新时调用
@@ -272,6 +275,14 @@ public class DifySyncService {
                 DifySyncAction.CREATE, DifySyncStatus.SUCCESS, "Dify docId 重复，跳过创建");
             return;
         }
+        // 同一系统用户名下内容相同也算重复：唯一索引 (user_id, file_hash) 会直接拒绝插入，
+        // 不提前跳过会让每轮同步都在这里失败一次。
+        if (knowledgeBaseRepository.existsByFileHashAndUserId(fileHash, SYSTEM_USER_ID)) {
+            log.info("内容哈希已存在（重复文档），跳过创建: difyDocId={}, hash={}", difyDocId, fileHash);
+            saveSyncLog(null, difyDocId, DifySyncDirection.FROM_DIFY,
+                DifySyncAction.CREATE, DifySyncStatus.SUCCESS, "内容重复，跳过创建");
+            return;
+        }
 
         // 3. 存为 .md 文件到 RustFS
         String filename = remoteDoc.getName();
@@ -304,7 +315,15 @@ public class DifySyncService {
             .map(DifySegment::getContent)
             .filter(c -> c != null && !c.isBlank())
             .toList();
-        vectorService.vectorizeSegmentsAndStore(savedKb.getId(), segmentContents);
+        try {
+            vectorService.vectorizeSegmentsAndStore(savedKb.getId(), segmentContents);
+        } catch (Exception vectorError) {
+            // 向量化失败必须落 FAILED：否则下次同步按 docId 判为已存在、不会重试，
+            // 知识库会永久停在「PENDING 且没有向量」。
+            markVectorFailed(savedKb.getId(), vectorError);
+            log.warn("Dify 回拉向量化失败: kbId={}, error={}", savedKb.getId(), vectorError.getMessage());
+            return;
+        }
 
         // 6. 更新向量化状态为 COMPLETED（vectorizeSegmentsAndStore 本身不更新实体）
         knowledgeBaseRepository.findById(savedKb.getId()).ifPresent(latest -> {
@@ -349,8 +368,9 @@ public class DifySyncService {
         // 2. 先对比哈希，内容没变就跳过，避免重复向量化
         byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
         String newFileHash = fileHashService.calculateHash(contentBytes);
-        if (entity.getFileHash() != null && entity.getFileHash().equals(newFileHash)) {
-            log.info("Dify 文档内容未变化（哈希相同），跳过更新: kbId={}, difyDocId={}", entity.getId(), difyDocId);
+        if (entity.getFileHash() != null && entity.getFileHash().equals(newFileHash)
+            && entity.getVectorStatus() == VectorStatus.COMPLETED) {
+            log.info("Dify 文档内容未变化（哈希相同且向量已完成），跳过更新: kbId={}, difyDocId={}", entity.getId(), difyDocId);
             // 仅更新 difySyncTime 防止重复判定
             knowledgeBaseRepository.findById(entity.getId()).ifPresent(latest -> {
                 latest.setDifySyncTime(LocalDateTime.now());
@@ -393,7 +413,13 @@ public class DifySyncService {
             .map(DifySegment::getContent)
             .filter(c -> c != null && !c.isBlank())
             .toList();
-        vectorService.vectorizeSegmentsAndStore(entity.getId(), segmentContents);
+        try {
+            vectorService.vectorizeSegmentsAndStore(entity.getId(), segmentContents);
+        } catch (Exception vectorError) {
+            markVectorFailed(entity.getId(), vectorError);
+            log.warn("Dify 回拉向量化失败: kbId={}, error={}", entity.getId(), vectorError.getMessage());
+            return;
+        }
 
         // 7. 更新向量化状态为 COMPLETED
         knowledgeBaseRepository.findById(entity.getId()).ifPresent(latest -> {
@@ -531,6 +557,16 @@ public class DifySyncService {
             log.info("清理了 {} 条超过 30 天且已完成的 Dify 删除墓碑", pruned);
         }
         return cleared;
+    }
+
+    /** 向量化失败时落 FAILED + 错误原因，让下一轮同步能重试。 */
+    private void markVectorFailed(Long kbId, Exception error) {
+        knowledgeBaseRepository.findById(kbId).ifPresent(latest -> {
+            latest.setVectorStatus(VectorStatus.FAILED);
+            String message = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+            latest.setVectorError(message.length() > 500 ? message.substring(0, 500) : message);
+            knowledgeBaseRepository.save(latest);
+        });
     }
 
     /** 墓碑存在时更新它，否则退回「插一条日志」的旧行为（例如没有墓碑的历史调用方）。 */

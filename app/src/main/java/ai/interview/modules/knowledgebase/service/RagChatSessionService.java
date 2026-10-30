@@ -286,11 +286,18 @@ public class RagChatSessionService {
             List<RagChatMessageEntity> recent = messageRepository
                 .findBySessionIdOrderByMessageOrderDesc(sessionId, PageRequest.of(0, fetchCount));
 
-            // 过滤掉未完成的 AI 占位消息，反转成正序，最多取 6 条
+            // 当前用户消息和 AI 占位都已被 prepareStreamMessage 写入：
+            // 跳过未完成的 AI 占位，再跳过最近的一条 USER（那就是本次提问，
+            // 已经写在 userPrompt 里，重复注入会让模型收到两遍）。
             List<Message> history = new ArrayList<>();
+            boolean currentUserSkipped = false;
             for (RagChatMessageEntity msg : recent) {
                 if (!msg.getCompleted()) {
                     continue; // 跳过未完成（当前轮次的 AI 占位）
+                }
+                if (msg.getType() == RagChatMessageEntity.MessageType.USER && !currentUserSkipped) {
+                    currentUserSkipped = true;
+                    continue; // 这是当前提问，不算历史
                 }
                 if (msg.getContent() == null || msg.getContent().isBlank()) {
                     continue;
