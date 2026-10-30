@@ -4,6 +4,7 @@ import ai.interview.modules.interview.model.InterviewQuestionDTO;
 import ai.interview.modules.knowledgebase.model.VectorStatus;
 import ai.interview.modules.knowledgebase.repository.KnowledgeBaseRepository;
 import ai.interview.modules.knowledgebase.service.KnowledgeBaseVectorService;
+import ai.interview.modules.user.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -44,13 +45,18 @@ public class InterviewEvaluationEvidenceService {
     private double minScore;
 
     /**
-     * 查询所有向量化完成的知识库 ID（在评估入口调一次，避免每批重复查询）。
+     * 查询当前用户已完成向量化的知识库 ID（在评估入口调一次，避免每批重复查询）。
+     *
+     * <p>必须按用户收口：面试/复练的证据会拼进评分 prompt，跨用户取库会把别人的私有文档
+     * 带进当前用户的报告。异步评估线程由消费者手动写入认证，这里同样能拿到 userId。
      */
     public List<Long> getAvailableKnowledgeBaseIds() {
-        return knowledgeBaseRepository.findAll().stream()
-            .filter(item -> item.getVectorStatus() == VectorStatus.COMPLETED)
-            .map(item -> item.getId())
-            .toList();
+        Long userId = UserContext.getCurrentUserId();
+        if (userId == null) {
+            log.debug("无用户上下文，跳过知识库取证");
+            return List.of();
+        }
+        return knowledgeBaseRepository.findIdsByUserIdAndVectorStatus(userId, VectorStatus.COMPLETED);
     }
 
     /**

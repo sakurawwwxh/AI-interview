@@ -17,9 +17,14 @@ import org.springframework.ai.openai.setup.OpenAiSetup;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -90,15 +95,64 @@ public class UserAiChatClientFactory {
     private ChatClient platformClient(Long userId) {
         return ChatClient.create(new LimitedChatModel(platformChatModel, requestLimiter, "platform", userId));
     }
+    private static final Set<String> LOCAL_HOSTS =
+        Set.of("localhost", "127.0.0.1", "::1", "host.docker.internal");
+
+    /**
+     * 校验用户填写的模型地址。
+     *
+     * <p>只挡协议不够：HTTPS 本身不阻止访问内网或云元数据地址，服务端会带着用户可控的
+     * Authorization 头去请求任意主机（SSRF）。这里解析主机并要求所有解析结果都是公网地址；
+     * HTTP 只放行显式的本机地址，供本地模型使用。解析失败直接拒绝，不把风险留给连接阶段。
+     */
     public void validateBaseUrl(String baseUrl) {
+        final URI uri;
         try {
-            var uri = UriComponentsBuilder.fromUriString(baseUrl).build().toUri();
-            if ("https".equalsIgnoreCase(uri.getScheme())) return;
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(java.util.Locale.ROOT);
-            if ("http".equalsIgnoreCase(uri.getScheme()) && java.util.Set.of("localhost", "127.0.0.1", "::1", "host.docker.internal").contains(host)) return;
+            uri = UriComponentsBuilder.fromUriString(baseUrl).build().toUri();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid AI service address");
+        }
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (host.isBlank()) {
+            throw new IllegalArgumentException("Invalid AI service address");
+        }
+        if ("http".equals(scheme)) {
+            if (!LOCAL_HOSTS.contains(host)) {
+                throw new IllegalArgumentException("Only HTTPS or an explicitly local model endpoint is allowed");
+            }
+            return;
+        }
+        if (!"https".equals(scheme) || isBlockedHost(host)) {
             throw new IllegalArgumentException("Only HTTPS or an explicitly local model endpoint is allowed");
         }
-        catch (Exception e) { throw new IllegalArgumentException("Invalid AI service address"); }
+    }
+
+    private static boolean isBlockedHost(String host) {
+        try {
+            for (InetAddress address : InetAddress.getAllByName(host)) {
+                if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
+                    || address.isSiteLocalAddress() || address.isMulticastAddress()
+                    || isSharedAddressSpace(address) || isUniqueLocalIpv6(address)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (UnknownHostException e) {
+            return true;
+        }
+    }
+
+    /** 100.64.0.0/10：运营商级 NAT，云上常被用作内网段，Java 的 site-local 判定不覆盖。 */
+    private static boolean isSharedAddressSpace(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        return bytes.length == 4 && (bytes[0] & 0xFF) == 100 && (bytes[1] & 0xC0) == 64;
+    }
+
+    /** fc00::/7：IPv6 唯一本地地址。 */
+    private static boolean isUniqueLocalIpv6(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        return bytes.length == 16 && (bytes[0] & 0xFE) == 0xFC;
     }
     private String trimBaseUrl(String url) { return url.trim().replaceAll("/+$", ""); }
 

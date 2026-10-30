@@ -120,6 +120,13 @@ public interface KnowledgeBaseRepository extends JpaRepository<KnowledgeBaseEnti
      */
     List<KnowledgeBaseEntity> findByVectorStatusAndUserIdOrderByUploadedAtDesc(VectorStatus vectorStatus, Long userId);
 
+    /**
+     * 某用户已完成向量化的知识库 ID（评估取证用，只取 id，避免全表加载实体）。
+     */
+    @Query("SELECT k.id FROM KnowledgeBaseEntity k WHERE k.userId = :userId AND k.vectorStatus = :status")
+    List<Long> findIdsByUserIdAndVectorStatus(@Param("userId") Long userId,
+                                              @Param("status") VectorStatus status);
+
     // ==================== Dify 同步相关查询（全局，不按用户） ====================
 
     /**

@@ -5,6 +5,8 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -16,6 +18,10 @@ import java.util.UUID;
 /** JWT generation and parsing with strict access/refresh token separation. */
 @Component
 public class JwtUtil {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtUtil.class);
+    private static final String INSECURE_DEFAULT_SECRET =
+        "local-development-jwt-secret-please-change-before-production";
 
     public static final String TOKEN_TYPE_CLAIM = "typ";
     public static final String ACCESS_TOKEN_TYPE = "access";
@@ -31,7 +37,11 @@ public class JwtUtil {
         @Value("${app.jwt.refresh-expiration:604800}") long refreshExpirationSec
     ) {
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalArgumentException("JWT_SECRET must contain at least 32 bytes");
+            throw new IllegalArgumentException("app.jwt.secret / APP_JWT_SECRET must contain at least 32 bytes");
+        }
+        if (INSECURE_DEFAULT_SECRET.equals(secret)) {
+            log.warn("JWT 使用的是公开默认密钥，任何能读到仓库的人都能伪造 token；"
+                + "对外部署前必须通过 APP_JWT_SECRET 更换（至少 32 字节）");
         }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessExpirationMs = Duration.ofSeconds(accessExpirationSec).toMillis();

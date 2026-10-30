@@ -25,13 +25,13 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${app.admin.bootstrap.enabled:true}")
+    @Value("${app.admin.bootstrap.enabled:false}")
     private boolean enabled;
 
     @Value("${app.admin.bootstrap.username:admin}")
     private String username;
 
-    @Value("${app.admin.bootstrap.password:admin123456}")
+    @Value("${app.admin.bootstrap.password:}")
     private String password;
 
     @Value("${app.admin.bootstrap.email:admin@example.com}")
@@ -42,6 +42,13 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         if (!enabled) {
             log.debug("管理员引导已禁用 (app.admin.bootstrap.enabled=false)");
             return;
+        }
+        if (password == null || password.isBlank()) {
+            log.warn("管理员引导已启用但未配置密码，跳过创建（请设置 ADMIN_BOOTSTRAP_PASSWORD）");
+            return;
+        }
+        if ("admin123456".equals(password)) {
+            log.warn("管理员引导使用的是公开默认口令，请立即通过 ADMIN_BOOTSTRAP_PASSWORD 更换");
         }
 
         // 已创建过管理员时属正常启动路径，勿用 INFO 刷屏
